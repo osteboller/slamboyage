@@ -4,29 +4,65 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Slamberz</title>
-    <link rel="stylesheet" href="styles.css">
+
+    <!-- Fonts (lokalt bundlet) -->
+    <link rel="stylesheet" href="src/styles/fonts.css">
+
+    <!-- Design tokens — ALTID FØRST -->
+    <link rel="stylesheet" href="src/styles/tokens.css">
+
+    <!-- Fundament -->
+    <link rel="stylesheet" href="src/styles/base.css">
+    <link rel="stylesheet" href="src/styles/animations.css">
+
+    <!-- HUD -->
+    <link rel="stylesheet" href="src/styles/hud.css">
+
+    <!-- Komponenter -->
+    <link rel="stylesheet" href="src/styles/components/modals.css">
+    <link rel="stylesheet" href="src/styles/components/cap-overlay.css">
+    <link rel="stylesheet" href="src/styles/components/collection.css">
+
+    <!-- Screens -->
+    <link rel="stylesheet" href="src/styles/screens/loading.css">
+    <link rel="stylesheet" href="src/styles/screens/start.css">
+    <link rel="stylesheet" href="src/styles/screens/map.css">
+    <link rel="stylesheet" href="src/styles/screens/reward.css">
+    <link rel="stylesheet" href="src/styles/screens/run-end.css">
+    <link rel="stylesheet" href="src/styles/screens/shop.css">
 </head>
 <body>
     <div id="canvas-container"></div>
 
-    <div id="ui">
-        <h1>Slamberz</h1>
-        <p>Score: <b id="score">0</b></p>
-        <div id="run-info" style="display:none">
-            <span id="run-node-name"></span> &middot; Goal: <b id="run-goal-score"></b>
-        </div>
-        <div id="throw-pips"></div>
+    <!-- ── Persistent overlay (skjult til run starter) ──────────────────── -->
+    <!-- Top-left: BAG + MAP -->
+    <div id="tl-overlay" style="display:none">
+        <button class="overlay-btn" id="bag-btn" title="Collection">BAG</button>
+        <button class="overlay-btn" id="map-btn" title="Map">MAP</button>
     </div>
 
-    <!-- Top-right: hjælp, reset, slammer, fullscreen -->
+    <!-- Top-right: hjælp, reset, tune, fullscreen -->
     <div id="corner-btns">
         <button id="help-btn" title="How to play">?</button>
         <button id="resetBtn" title="Reset round">↺</button>
-        <button id="slammer-btn" title="Settings">⚙</button>
+        <button id="slammer-btn" title="Tune">⚙</button>
         <button id="fullscreen-btn" title="Fullscreen">⛶</button>
     </div>
 
-    <!-- Help modal -->
+    <!-- Run info (node + goal) — vises kun under battle -->
+    <div id="run-info" style="display:none">
+        <span id="run-node-name"></span><br>GOAL: <b id="run-goal-score"></b>★
+    </div>
+
+    <!-- Score — bottom-right, vises under alle run-screens (skjult til run starter) -->
+    <div id="score-display" style="display:none">
+        <span id="score">0</span><span class="score-star">★</span>
+    </div>
+
+    <!-- Throw pips -->
+    <div id="throw-pips"></div>
+
+    <!-- ── Help modal ────────────────────────────────────────────────────── -->
     <div id="help-modal" role="dialog" aria-modal="true" aria-label="How to play">
         <div id="help-modal-inner">
             <button id="help-close" title="Close">✕</button>
@@ -43,7 +79,7 @@
             <div class="help-section">
                 <div class="help-icon">👆</div>
                 <div>
-                    <strong>Aim & power</strong>
+                    <strong>Aim &amp; power</strong>
                     <p>Tap the field once to throw. <strong>Where you tap</strong> sets the aim. <strong>When you tap</strong> (while the power bar swings) sets the power level. Both are decided by the same tap!</p>
                 </div>
             </div>
@@ -84,13 +120,15 @@
         </div>
     </div>
 
+    <!-- ── Battle HUD ────────────────────────────────────────────────────── -->
+
     <!-- Bottom-left: flipped caps -->
     <button id="pile-won-btn" class="pile-btn" title="Flipped caps">
         <span id="pile-won-count">0/0</span>
         <span class="pile-btn-label">Flipped</span>
     </button>
 
-    <!-- Bottom-right: caps remaining in stack -->
+    <!-- Bottom-left (adjacent): caps remaining in stack -->
     <button id="pile-rem-btn" class="pile-btn" title="Caps in stack">
         <span id="pile-rem-count">0/0</span>
         <span class="pile-btn-label">Stack</span>
@@ -128,8 +166,9 @@
         <div id="power-mask"></div>
     </div>
 
+    <!-- ── Loading screen ───────────────────────────────────────────────── -->
     <div id="loading-screen">
-        <div id="loading-title">Slamberz</div>
+        <div id="loading-title">SLAMBERZ</div>
         <div id="loading-bar-bg"><div id="loading-fill"></div></div>
         <div id="loading-label">Loading caps...</div>
     </div>
