@@ -5,8 +5,9 @@ import { EFFECT_LABELS } from '../game/effects/labels.js';
 const SKIP_BONUS = 5;
 
 export class RewardScreen {
-    constructor({ gameState }) {
+    constructor({ gameState, ui }) {
         this._gs         = gameState;
+        this._ui         = ui;
         this._el         = null;
         this._node       = null;
         this._mode       = 'cap'; // 'cap' | 'relic'
@@ -34,6 +35,14 @@ export class RewardScreen {
         this._render(choices);
 
         this._el.addEventListener('click', e => {
+            // Klik på cap-billede → åbn viewer uden at vælge kortet
+            const capImg = e.target.closest('.reward-cap-img');
+            if (capImg && this._mode === 'cap') {
+                const key = capImg.closest('.reward-card[data-key]')?.dataset.key;
+                const def = choices.find(c => c.name === key);
+                if (def) this._ui.showCapDetail(def, false);
+                return;
+            }
             const card = e.target.closest('.reward-card[data-key]');
             if (card) {
                 const key = card.dataset.key;

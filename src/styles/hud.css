@@ -5,7 +5,7 @@
     left: 16px;
     display: flex;
     gap: 8px;
-    z-index: 210;
+    z-index: 220;
 }
 
 .overlay-btn {
@@ -36,7 +36,7 @@
     right: 16px;
     display: flex;
     gap: 8px;
-    z-index: 210;
+    z-index: 220;
 }
 
 #corner-btns button {
@@ -64,7 +64,7 @@
     #fullscreen-btn { display: flex; }
 }
 
-/* ─── LEGACY #ui — simplified wrapper, ingen visuel stil ────────────────── */
+/* ─── LEGACY #ui ─────────────────────────────────────────────────────────── */
 #ui {
     position: fixed;
     top: 0;
@@ -73,15 +73,89 @@
     z-index: 90;
 }
 
-/* ─── THROW PIPS ─────────────────────────────────────────────────────────── */
-#throw-pips {
+/* ─── BOTTOM BAR — én container til alt i bunden, virker på alle skærme ─── */
+/* Ingen pixel-tweaking: browseren bestemmer layoutet via flexbox             */
+#bottom-bar {
     position: fixed;
-    bottom: 82px;    /* over pile-knapper (top ved 80px), under action-prompt */
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: flex-end;          /* alt rammer bundkanten */
+    padding: 12px 12px;
+    z-index: 90;            /* under shop/map/reward screens (z:200) — pile btns skjules automatisk */
+    pointer-events: none;
+    gap: 8px;
+}
+
+/* Venstre: pile-knapper — starter med padding forbi power bar */
+#bottom-left {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    pointer-events: auto;
+    padding-left: 48px;             /* forbi power bar (left:16 + 32px + borders ≈ 56px) */
+    flex-shrink: 0;
+}
+
+/* Center: action-prompt → pips → status — absolut centreret i viewport */
+#bottom-center {
+    position: absolute;
     left: 50%;
+    bottom: 0;
     transform: translateX(-50%);
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+    padding-bottom: 10px;
+}
+
+/* ─── PILE BUTTONS ───────────────────────────────────────────────────────── */
+.pile-btn {
+    background: var(--clr-bg-panel);
+    color: var(--text-primary);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 78px;
+    height: 64px;
+    font-family: 'JetBrains Mono', monospace;
+    transition: box-shadow 0.08s, transform 0.08s;
+    pointer-events: auto;
+    flex-shrink: 0;
+}
+.pile-btn:active { box-shadow: var(--shadow-pressed); }
+
+#pile-won-btn { transform: rotate(-2deg); }
+#pile-rem-btn { transform: rotate(2deg); }
+
+.pile-btn span:first-child {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-primary);
+}
+.pile-btn-label {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1;
+}
+
+/* ─── THROW PIPS ─────────────────────────────────────────────────────────── */
+#throw-pips {
+    display: flex;
     gap: 6px;
-    z-index: 90;
     pointer-events: none;
 }
 .throw-pip {
@@ -97,29 +171,34 @@
     border-color: #fff;
 }
 
-/* ─── RUN INFO (node name + goal) ────────────────────────────────────────── */
-#run-info {
-    position: fixed;
-    bottom: 80px;
-    right: 16px;
-    background: var(--clr-bg-panel);
-    border: 4px solid var(--border-ink);
-    box-shadow: var(--shadow-sticker);
-    padding: 6px 10px;
+/* ─── ACTION PROMPT ──────────────────────────────────────────────────────── */
+#action-prompt {
+    white-space: nowrap;
+    background: #000;
+    color: #fff;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
+    font-size: 14px;
     font-weight: 700;
-    color: var(--text-primary);
-    text-transform: uppercase;
     letter-spacing: 0.06em;
-    line-height: 1.4;
-    transform: rotate(1deg);
-    z-index: 90;
+    padding: 6px 16px;
     pointer-events: none;
+    display: none;
+    animation: prompt-pulse 1.6s ease-in-out infinite;
+    margin: 0;
 }
-#run-info b { color: #000; }
 
-/* ─── SCORE DISPLAY — bottom-right, sticker stil, altid synlig under run ─── */
+/* ─── STATUS BAR ─────────────────────────────────────────────────────────── */
+#status-bar {
+    white-space: nowrap;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.75);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    font-family: 'Space Grotesk', sans-serif;
+    margin: 0;
+}
+
+/* ─── SCORE DISPLAY — eigen fixed positie, altijd boven alle screens ────── */
 #score-display {
     position: fixed;
     bottom: 16px;
@@ -127,7 +206,7 @@
     display: flex;
     align-items: baseline;
     gap: 4px;
-    z-index: 210;
+    z-index: 220;
     pointer-events: none;
     transform: rotate(2deg);
     background: var(--clr-bg-panel);
@@ -149,89 +228,35 @@
     color: #000;
 }
 
-/* ─── PILE BUTTONS — forskudt til højre for power bar ───────────────────── */
-/* Power bar: left:16px, width:32px + 2*4px kant = 40px → ender ved left:56px  */
-/* Pile-knapper starter ved left:64px = 8px luft til power bar                 */
-.pile-btn {
+/* ─── RUN INFO (node name + goal) ────────────────────────────────────────── */
+#run-info {
     position: fixed;
-    bottom: 16px;
+    bottom: 100px;
+    right: 16px;
     background: var(--clr-bg-panel);
-    color: var(--text-primary);
     border: 4px solid var(--border-ink);
     box-shadow: var(--shadow-sticker);
-    border-radius: 0;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    width: 78px;
-    height: 64px;
+    padding: 6px 10px;
     font-family: 'JetBrains Mono', monospace;
-    transition: box-shadow 0.08s, transform 0.08s;
-    z-index: 90;
-}
-.pile-btn:active { box-shadow: var(--shadow-pressed); }
-
-#pile-won-btn {
-    left: 64px;          /* starter efter power bar (ends at left~56px) */
-    transform: rotate(-2deg);
-}
-#pile-rem-btn {
-    left: 150px;         /* 64 + 78 + 8px gap */
-    transform: rotate(2deg);
-}
-
-.pile-btn span:first-child {
-    font-size: 18px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--text-primary);
-}
-.pile-btn-label {
-    font-size: 9px;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1;
-}
-
-/* ─── ACTION PROMPT — over pipsene, ikke i sigtets vej ──────────────────── */
-/* Rækkefølge fra bunden (op): status-bar → pips → action-prompt            */
-#action-prompt {
-    position: fixed;
-    bottom: 110px;       /* over throw-pips (82px), klart over pile-knapper (80px) */
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    background: #000;
-    color: #fff;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
+    font-size: 11px;
     font-weight: 700;
+    color: var(--text-primary);
+    text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 6px 16px;
-    pointer-events: none;
-    display: none;
+    line-height: 1.4;
+    transform: rotate(1deg);
     z-index: 90;
-    animation: prompt-pulse 1.6s ease-in-out infinite;
-}
-
-#status-bar {
-    position: fixed;
-    bottom: 60px;        /* under pips, tæt på bunden */
-    left: 50%;
-    transform: translateX(-50%);
-    white-space: nowrap;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.75);
-    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
     pointer-events: none;
-    z-index: 90;
-    font-family: 'Space Grotesk', sans-serif;
+    transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
 }
+#run-info b {
+    color: #000;
+    transition: color 0.35s ease;
+}
+#run-info.run-info--won  { background: #c8ecd0; border-color: #4e9e62; color: #1a5228; }
+#run-info.run-info--won  b { color: #1a5228; }
+#run-info.run-info--lost { background: #f2c8c8; border-color: #b05060; color: #7a1f28; }
+#run-info.run-info--lost b { color: #7a1f28; }
 
 /* ─── RESULTS PANEL ──────────────────────────────────────────────────────── */
 #results {
@@ -263,9 +288,8 @@
     display: none;
     position: fixed;
     left: 16px;
-    /* max(60px, ...) sikrer at toppen aldrig dækkes af BAG/MAP-knapperne (bottom ~52px) */
     top: max(60px, calc(50% - 140px));
-    transform: rotate(-2deg);   /* kun rotation — ingen Y-translate (håndteres af max()) */
+    transform: rotate(-2deg);
     width: 32px;
     height: 280px;
     border: 4px solid var(--border-ink);
@@ -281,11 +305,4 @@
     width: 100%;
     height: 100%;
     background: rgba(8, 8, 12, 0.92);
-}
-
-/* ─── MOBIL LANDSCAPE ────────────────────────────────────────────────────── */
-@media (orientation: landscape) and (max-height: 500px) {
-    /* pile-knapper forbliver til højre for power bar */
-    #pile-won-btn  { left: 64px; }
-    #pile-rem-btn  { left: 150px; }
 }

@@ -244,19 +244,25 @@ export class RoundManager {
         // ── Pop animations + per-cap score floats ────────────────────────────
         const popDelay = Math.max(80, 500 / Math.max(actualWon.length, 1));
 
+        const finalScore = this._scoreBase + this._totalScore;
         scoredCaps.forEach(({ cap, capScore, effectMeta }, i) => {
+            const isLast = i === scoredCaps.length - 1;
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
                 if (effectMeta) this._spawnEffectFeedback(cap.body.position, x, y, effectMeta);
                 this._ui.showScoreFloat(x, y, capScore, multChain, () => {
                     this._popCapMesh(cap.mesh);
                     this._ui.popCollectIcon(cap.def);
+                    if (isLast) {
+                        this._ui.setScore(finalScore);
+                        if (scoreGained > 0) this._ui.showScoreGain(scoreGained);
+                    }
                 });
             }, i * popDelay);
         });
+        if (scoredCaps.length === 0) this._ui.setScore(finalScore);
 
         this._ui.updatePileButtons(updatedFaceDown.map(c => c.def), this._wonCapsAll);
-        this._ui.setScore(this._scoreBase + this._totalScore);
         this._ui.updateThrowPips(this._throwsLeft, THROWS_PER_ROUND);
 
         if (this._throwsLeft > 0 && updatedFaceDown.length > 0) {

@@ -3,6 +3,14 @@
     from { opacity: 0; transform: scale(0.98); }
     to   { opacity: 1; transform: scale(1);    }
 }
+@keyframes screen-fade-out {
+    from { opacity: 1; transform: scale(1);    }
+    to   { opacity: 0; transform: scale(0.98); }
+}
+.fading-out {
+    animation: screen-fade-out 0.18s ease-in forwards;
+    pointer-events: none;
+}
 
 /* ─── SCORE FLOAT ────────────────────────────────────────────────────────── */
 @keyframes score-float-anim {
@@ -36,6 +44,10 @@
     user-select: none;
     white-space: nowrap;
     animation: score-float-anim 0.88s ease-out forwards;
+}
+.score-float--deduct {
+    color: #e05050;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.8), 0 0 10px rgba(0,0,0,0.5);
 }
 .score-float.bonus {
     font-size: 26px;
@@ -136,6 +148,17 @@
     45%  { height: 0%;   }
     55%  { height: 0%;   }
     100% { height: 100%; }
+}
+
+/* ─── CAP KØB ───────────────────────────────────────────────────────────── */
+@keyframes cap-buy-out {
+    0%   { opacity: 1; transform: scale(1)    translateY(0);     filter: brightness(1);   }
+    22%  { opacity: 1; transform: scale(1.28) translateY(-4px);  filter: brightness(1.6); }
+    100% { opacity: 0; transform: scale(0.65) translateY(-22px); filter: brightness(1);   }
+}
+.band-item--buying {
+    animation: cap-buy-out 0.38s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+    pointer-events: none;
 }
 
 /* ─── BAND POP-IN ────────────────────────────────────────────────────────── */

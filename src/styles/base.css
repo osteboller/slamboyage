@@ -1,4 +1,4 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
     background: var(--clr-bg);
@@ -11,4 +11,15 @@ body {
     width: 100vw;
     height: 100vh;
     touch-action: none;
+}
+
+/* Transition cover — skjuler canvas/gamle screens under screen-swaps */
+#screen-transition-cover {
+    position: fixed;
+    inset: 0;
+    background: var(--clr-bg);
+    z-index: 299;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease-in-out;
 }

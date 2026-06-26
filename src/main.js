@@ -49,7 +49,9 @@ loadingScreen.style.opacity = '0';
 setTimeout(() => { loadingScreen.style.display = 'none'; }, 400);
 
 // ─── SCREEN ROUTER ───────────────────────────────────────────────────────────
-let currentScreen = null;
+let currentScreen     = null;
+let currentScreenName = 'start';
+let returnToAfterMap  = 'start'; // hvor MAP-back-knappen sender brugeren hen
 const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState };
 
 const startScreen  = new StartScreen(deps);
@@ -61,76 +63,126 @@ const runEndScreen = new RunEndScreen(deps);
 
 const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
 
+// ─── MAP PEEK ────────────────────────────────────────────────────────────────
+function closePeekMap() {
+    const el = document.getElementById('map-screen');
+    if (!el) return;
+    el.style.pointerEvents = 'none';
+    el.style.animation = 'screen-fade-out 0.18s ease-in forwards';
+    setTimeout(() => mapScreen.exit(), 180);
+}
+
+document.getElementById('map-btn')?.addEventListener('click', () => {
+    if (currentScreenName === 'map') return;
+    if (document.getElementById('map-screen')) { closePeekMap(); return; }
+    mapScreen.onBack       = closePeekMap;
+    mapScreen.onNodeSelect = null;
+    mapScreen.enter();
+    if (mapScreen._el) mapScreen._el.style.animation = 'screen-fade-in 0.18s ease-out forwards';
+});
+
+// ─── TRANSITION COVER ────────────────────────────────────────────────────────
+// Styling er i base.css (#screen-transition-cover) — var() virker ikke i inline styles
+const transitionCover = document.createElement('div');
+transitionCover.id = 'screen-transition-cover';
+document.body.appendChild(transitionCover);
+
+// ─── SCREEN ROUTER ───────────────────────────────────────────────────────────
 function showScreen(name, context = null) {
-    currentScreen?.exit();
-    // pointerdown on canvas fires onShot → new screen mounts → pointerup+click
-    // land on the new overlay (common ancestor of down/up targets).
-    // Block all pointer input briefly so the triggering event can't ghost-tap
-    // into the newly mounted screen. One place, covers every transition.
+    const prev = currentScreen;
+
+    // Blokér ghost-taps
     document.body.style.pointerEvents = 'none';
-    setTimeout(() => { document.body.style.pointerEvents = ''; }, 320);
+    setTimeout(() => { document.body.style.pointerEvents = ''; }, 380);
 
-    if (RUN_SCREENS.has(name)) ui.showRunOverlay();
-    else                       ui.hideRunOverlay();
+    function _mount(fadeInNew) {
+        prev?.exit();
+        currentScreenName = name;
 
-    if (name === 'start') {
-        currentScreen = startScreen;
-        startScreen.onNewRun      = () => { gameState.startRun(); showScreen('map'); };
-        startScreen.onContinueRun = () => showScreen('map');
-        startScreen.onFreeMode    = () => showScreen('battle', null);
-        startScreen.enter();
+        if (RUN_SCREENS.has(name)) ui.showRunOverlay();
+        else                       ui.hideRunOverlay();
 
-    } else if (name === 'map') {
-        currentScreen = mapScreen;
-        mapScreen.onBack       = () => showScreen('start');
-        mapScreen.onNodeSelect = (node) => {
-            if (node.type === 'relic') showScreen('relic-choice', node);
-            else                       showScreen('battle', node);
-        };
-        mapScreen.enter();
+        if (name === 'start') {
+            currentScreen = startScreen;
+            startScreen.onNewRun      = () => { returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
+            startScreen.onContinueRun = () => { returnToAfterMap = 'start'; showScreen('map'); };
+            startScreen.onFreeMode    = () => showScreen('battle', null);
+            startScreen.enter();
 
-    } else if (name === 'battle') {
-        currentScreen = battleScreen;
-        battleScreen.onBattleEnd = ({ won, totalScore }) => {
-            const nodePlayed = gameState.currentNode;
-            const loop       = gameState.loop;
-            const ownedCaps  = [...gameState.ownedCaps]; // snapshot before any reset
-            const { won: w } = gameState.completeNode(totalScore);
-            if (w) {
-                showScreen('reward', nodePlayed);
-            } else {
-                showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
+        } else if (name === 'map') {
+            currentScreen = mapScreen;
+            mapScreen.onBack = () => {
+                const dest = returnToAfterMap;
+                returnToAfterMap = 'start';
+                showScreen(dest);
+            };
+            mapScreen.onNodeSelect = (node) => {
+                returnToAfterMap = 'start';
+                if (node.type === 'relic') showScreen('relic-choice', node);
+                else                       showScreen('battle', node);
+            };
+            mapScreen.enter();
+
+        } else if (name === 'battle') {
+            currentScreen = battleScreen;
+            battleScreen.onBattleEnd = ({ won, totalScore }) => {
+                const nodePlayed = gameState.currentNode;
+                const loop       = gameState.loop;
+                const ownedCaps  = [...gameState.ownedCaps];
+                const { won: w } = gameState.completeNode(totalScore);
+                if (w) showScreen('reward', nodePlayed);
+                else   showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
+            };
+            battleScreen.enter(context);
+
+        } else if (name === 'reward') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => showScreen('shop');
+            rewardScreen.enter(context);
+
+        } else if (name === 'relic-choice') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => {
+                gameState.completeNode(0);
+                returnToAfterMap = 'start';
+                showScreen('map');
+            };
+            rewardScreen.enter(context);
+
+        } else if (name === 'run-end') {
+            currentScreen = runEndScreen;
+            runEndScreen.onTryAgain = () => { returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
+            runEndScreen.onMainMenu = () => showScreen('start');
+            runEndScreen.enter(context);
+
+        } else if (name === 'shop') {
+            currentScreen = shopScreen;
+            shopScreen.onContinue = () => {
+                returnToAfterMap = 'start';
+                if (gameState.isRunComplete) gameState.nextLoop();
+                showScreen('map');
+            };
+            shopScreen.enter();
+        }
+
+        if (fadeInNew) {
+            // Ny skærm fader ind direkte — ingen cover
+            if (currentScreen?._el) {
+                currentScreen._el.style.animation = 'screen-fade-in 0.3s ease-out forwards';
             }
-        };
-        battleScreen.enter(context); // context = node or null
+        } else {
+            // Cover fader ud og afslører ny skærm
+            transitionCover.style.opacity = '0';
+        }
+    }
 
-    } else if (name === 'reward') {
-        currentScreen = rewardScreen;
-        rewardScreen.onContinue = () => showScreen('shop');
-        rewardScreen.enter(context); // context = node that was just beaten
-
-    } else if (name === 'relic-choice') {
-        // Standalone relic-event node — no battle, pick relic → back to map
-        currentScreen = rewardScreen;
-        rewardScreen.onContinue = () => {
-            gameState.completeNode(0); // relic nodes always advance
-            showScreen('map');
-        };
-        rewardScreen.enter(context); // context = the relic node (type:'relic')
-
-    } else if (name === 'run-end') {
-        currentScreen = runEndScreen;
-        runEndScreen.onTryAgain = () => { gameState.startRun(); showScreen('map'); };
-        runEndScreen.onMainMenu = () => showScreen('start');
-        runEndScreen.enter(context);
-
-    } else if (name === 'shop') {
-        currentScreen = shopScreen;
-        shopScreen.onContinue = () => {
-            if (gameState.isRunComplete) gameState.nextLoop();
-            showScreen('map');
-        };
-        shopScreen.enter();
+    if (prev === battleScreen) {
+        // Fra battle: ingen cover — reward/run-end fader ind oven på canvas
+        _mount(true);
+    } else {
+        // Alle andre overgange: cover skjuler swappen
+        transitionCover.style.opacity = '1';
+        setTimeout(() => _mount(false), 160);
     }
 }
 

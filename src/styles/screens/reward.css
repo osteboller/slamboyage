@@ -9,7 +9,6 @@
     align-items: center;
     justify-content: center;
     z-index: 200;
-    animation: screen-fade-in 0.25s ease-out;
 }
 
 .reward-inner {

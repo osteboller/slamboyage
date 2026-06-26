@@ -1,6 +1,7 @@
-import { DEFAULT_MASS, STACK_COUNT, SLAMMER_DEFS, CAP_DEFS } from '../config/constants.js';
+import { DEFAULT_MASS, STACK_COUNT, SLAMMER_DEFS, CAP_DEFS, THROWS_PER_ROUND } from '../config/constants.js';
 import { CapViewer }      from './CapViewer.js';
 import { EFFECT_LABELS }  from '../game/effects/labels.js';
+import { RELIC_DEFS }     from '../config/relicDefs.js';
 
 export class UIManager {
     constructor() {
@@ -23,6 +24,7 @@ export class UIManager {
         this._buildTunePanel();
         this._buildPileOverlay();
         this._buildHelp();
+
     }
 
     setGameState(gs) { this._gameState = gs; }
@@ -209,8 +211,72 @@ export class UIManager {
         document.getElementById('results').style.display = 'none';
     }
 
-    setScore(n)  { document.getElementById('score').textContent = n; }
-    resetScore() { document.getElementById('score').textContent = 0; }
+    setScore(n) {
+        const el = document.getElementById('score');
+        const from = parseInt(el.textContent) || 0;
+        if (from === n) return;
+        if (this._scoreTweenRaf) cancelAnimationFrame(this._scoreTweenRaf);
+        const duration = Math.min(450, Math.max(120, Math.abs(n - from) * 6));
+        const start = performance.now();
+        const step = (now) => {
+            const t = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            el.textContent = Math.round(from + (n - from) * eased);
+            if (t < 1) this._scoreTweenRaf = requestAnimationFrame(step);
+            else { el.textContent = n; this._scoreTweenRaf = null; }
+        };
+        this._scoreTweenRaf = requestAnimationFrame(step);
+    }
+    resetScore() {
+        if (this._scoreTweenRaf) { cancelAnimationFrame(this._scoreTweenRaf); this._scoreTweenRaf = null; }
+        document.getElementById('score').textContent = 0;
+        const ri = document.getElementById('run-info');
+        if (ri) ri.classList.remove('run-info--won', 'run-info--lost');
+    }
+
+    showThresholdResult(clearScore, totalScore, won) {
+        setTimeout(() => {
+            const goalEl = document.getElementById('run-goal-score');
+            const runInfo = document.getElementById('run-info');
+            if (!goalEl || !runInfo) return;
+
+            // Tween the goal number from clearScore down toward what's left
+            const target = won ? 0 : clearScore - totalScore;
+            const duration = Math.min(600, Math.max(200, clearScore * 12));
+            const start = performance.now();
+            const step = (now) => {
+                const t = Math.min((now - start) / duration, 1);
+                const eased = 1 - Math.pow(1 - t, 3);
+                goalEl.textContent = Math.round(clearScore + (target - clearScore) * eased);
+                if (t < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    goalEl.textContent = target;
+                    runInfo.classList.add(won ? 'run-info--won' : 'run-info--lost');
+                }
+            };
+            requestAnimationFrame(step);
+        }, 750);
+    }
+
+    _spawnAnchorFloat(text, extraClass) {
+        const anchor = document.getElementById('score-display');
+        if (!anchor) return;
+        const rect = anchor.getBoundingClientRect();
+        const el = document.createElement('div');
+        el.className = `score-float ${extraClass}`;
+        el.style.left = `${rect.left + rect.width * 0.4}px`;
+        el.style.top  = `${rect.top}px`;
+        const val = document.createElement('div');
+        val.className = 'score-float-val';
+        val.textContent = text;
+        el.appendChild(val);
+        document.body.appendChild(el);
+        el.addEventListener('animationend', e => { if (e.target === el) el.remove(); });
+    }
+
+    showScoreDeduct(amount) { this._spawnAnchorFloat(`-${amount}`, 'score-float--deduct'); }
+    showScoreGain(amount)   { this._spawnAnchorFloat(`+${amount}`, 'bonus'); }
 
     showRunOverlay() {
         document.getElementById('tl-overlay').style.display  = '';
@@ -473,10 +539,9 @@ export class UIManager {
 
         const bagBtn = document.getElementById('bag-btn');
         if (bagBtn) {
-            bagBtn.addEventListener('pointerdown', (e) => {
+            bagBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const defs = (this._gameState?.ownedCaps ?? []).map(c => c.def);
-                this._toggleOverlay('My Caps', defs, true, e.currentTarget, overlay);
+                this.openCollection('caps');
             });
         }
 
@@ -543,6 +608,105 @@ export class UIManager {
         overlay.style.display = 'block';
     }
 
+    // ─── COLLECTION OVERLAY ──────────────────────────────────────────────────
+    openCollection(tab = 'caps') {
+        const existing = document.getElementById('map-collection-overlay');
+        if (existing) existing.remove();
+        const gs = this._gameState;
+        if (!gs) return;
+
+        const capsHTML = gs.ownedCaps.map(({ def, enchant }) => {
+            const effectLabel = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : null;
+            const badges = [
+                effectLabel ? `<span class="col-badge effect">${effectLabel}</span>` : '',
+                enchant     ? `<span class="col-badge enchant">${enchant}</span>`    : '',
+            ].join('');
+            return `<div class="col-cap" data-cap-name="${def.name}">
+                <img class="col-cap-img" src="${def.texFront}" alt="${def.name}">
+                <div class="col-cap-name">${def.name}</div>
+                ${badges}
+            </div>`;
+        }).join('') || '<p style="padding:20px;color:#888;font-family:monospace">No caps yet.</p>';
+
+        const slammersHTML = SLAMMER_DEFS.map(s => `
+            <div class="col-cap" data-slammer-name="${s.name}">
+                <img class="col-cap-img" src="${s.texFront}" alt="${s.name}">
+                <div class="col-cap-name">${s.name}</div>
+            </div>`).join('');
+
+        const relicsHTML = gs.ownedRelics?.length > 0
+            ? gs.ownedRelics.map(r => `
+                <div class="col-relic">
+                    <div class="col-relic-icon">${r.icon}</div>
+                    <div class="col-relic-name">${r.name}</div>
+                    <div class="col-relic-desc">${r.description}</div>
+                </div>`).join('')
+            : `<div class="col-relics-empty">
+                <span class="col-relics-icon">⬡</span>
+                <p>No relics yet.</p>
+               </div>`;
+
+        const pips = Array.from({ length: THROWS_PER_ROUND }, () => `<span class="col-pip">●</span>`).join('');
+
+        const overlay = document.createElement('div');
+        overlay.id = 'map-collection-overlay';
+        overlay.innerHTML = `
+            <div class="map-collection-panel" data-tab="${tab}">
+                <div class="col-tabbar">
+                    <button class="col-tab ${tab === 'caps'     ? 'active' : ''}" data-target="caps">
+                        Caps <span class="col-tab-count">${gs.ownedCaps.length}</span>
+                    </button>
+                    <button class="col-tab ${tab === 'slammers' ? 'active' : ''}" data-target="slammers">
+                        Slammers
+                    </button>
+                    <button class="col-tab ${tab === 'relics'   ? 'active' : ''}" data-target="relics">
+                        Relics
+                    </button>
+                    <button id="map-collection-close" class="col-close">✕</button>
+                </div>
+                <div class="col-content" data-content="caps"><div class="col-grid">${capsHTML}</div></div>
+                <div class="col-content" data-content="slammers"><div class="col-grid">${slammersHTML}</div></div>
+                <div class="col-content" data-content="relics"><div class="col-relic-grid">${relicsHTML}</div></div>
+                <div class="col-footer">
+                    <span class="col-footer-stat">Throws: ${pips}</span>
+                    <span class="col-footer-stat">Max stack: <b>${gs.stackSizeLimit}</b></span>
+                </div>
+            </div>`;
+
+        const closeOverlay = () => {
+            overlay.style.animation = 'screen-fade-out 0.18s ease-in forwards';
+            overlay.style.pointerEvents = 'none';
+            setTimeout(() => overlay.remove(), 180);
+        };
+
+        overlay.addEventListener('click', e => {
+            if (e.target.closest('#map-collection-close')) { closeOverlay(); return; }
+            const tabBtn = e.target.closest('.col-tab');
+            if (tabBtn) {
+                const t = tabBtn.dataset.target;
+                overlay.querySelector('.map-collection-panel').dataset.tab = t;
+                overlay.querySelectorAll('.col-tab').forEach(b =>
+                    b.classList.toggle('active', b.dataset.target === t));
+                return;
+            }
+            const capEl = e.target.closest('.col-cap[data-cap-name]');
+            if (capEl) {
+                const def = gs.ownedCaps.find(o => o.def.name === capEl.dataset.capName)?.def;
+                if (def) this._showCapDetail(def, true);
+                return;
+            }
+            const slammerEl = e.target.closest('.col-cap[data-slammer-name]');
+            if (slammerEl) {
+                const def = SLAMMER_DEFS.find(s => s.name === slammerEl.dataset.slammerName);
+                if (def) this._showSlammerDetail(def, true);
+                return;
+            }
+            if (!e.target.closest('.map-collection-panel')) closeOverlay();
+        });
+
+        document.body.appendChild(overlay);
+    }
+
     // ─── HJÆLP-MODAL ─────────────────────────────────────────────────────────
     _buildHelp() {
         const modal  = document.getElementById('help-modal');
@@ -586,7 +750,7 @@ export class UIManager {
     }
 
     // ─── SLAMMER DETAIL POPUP ────────────────────────────────────────────────
-    _showSlammerDetail(def) {
+    _showSlammerDetail(def, showEquip = false) {
         const detail = document.getElementById('slammer-detail');
         const nameEl = document.getElementById('slammer-detail-name');
 
@@ -595,6 +759,25 @@ export class UIManager {
         this._slammerViewer.show(def, 'slammer');
         this._renderSlammerStats(def);
         detail.style.display = 'block';
+
+        const equipBtn = document.getElementById('slammer-equip-btn');
+        if (!equipBtn) return;
+        if (!showEquip) { equipBtn.style.display = 'none'; return; }
+
+        const isEquipped = SLAMMER_DEFS[this._slammerIdx]?.name === def.name;
+        equipBtn.textContent = isEquipped ? 'Equipped ✓' : 'Equip';
+        equipBtn.disabled    = isEquipped;
+        equipBtn.style.display = '';
+        equipBtn.onclick = () => {
+            const idx = SLAMMER_DEFS.findIndex(s => s.name === def.name);
+            if (idx === -1) return;
+            this._slammerIdx = idx;
+            const slamNameEl = document.getElementById('slam-name');
+            if (slamNameEl) slamNameEl.textContent = def.name;
+            if (this.onSlammerChange) this.onSlammerChange(def);
+            equipBtn.textContent = 'Equipped ✓';
+            equipBtn.disabled    = true;
+        };
     }
 
     _renderSlammerStats(def) {

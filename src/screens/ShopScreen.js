@@ -60,11 +60,16 @@ export class ShopScreen {
 
         // Open discard overlay
         if (e.target.closest('#shop-discard-btn')) {
-            this._el.querySelector('#shop-discard-overlay').style.display = '';
+            const ov = this._el.querySelector('#shop-discard-overlay');
+            ov.style.display = '';
+            ov.style.animation = 'screen-fade-in 0.18s ease-out forwards';
             return;
         }
         if (e.target.closest('#shop-discard-close')) {
-            this._el.querySelector('#shop-discard-overlay').style.display = 'none';
+            const ov = this._el.querySelector('#shop-discard-overlay');
+            ov.style.animation = 'screen-fade-out 0.15s ease-in forwards';
+            ov.style.pointerEvents = 'none';
+            setTimeout(() => { ov.style.display = 'none'; ov.style.pointerEvents = ''; }, 150);
             return;
         }
 
@@ -75,15 +80,20 @@ export class ShopScreen {
             const def  = CAP_DEFS.find(c => c.name === name);
             if (def && this._gs.canAfford(this._gs.discardCost)) {
                 this._gs.useDiscard(def);
-                this._render();
-                // Keep overlay open and refreshed
+                // Fade selve overlay'et (det er IKKE inde i .shop-inner)
                 const overlay = this._el.querySelector('#shop-discard-overlay');
                 if (overlay) {
-                    overlay.style.display = '';
-                    overlay.querySelector('.discard-grid').innerHTML = this._buildDiscardGrid();
-                    overlay.querySelector('.discard-cost-label').textContent =
-                        `Costs ${this._gs.discardCost}★ · doubles each use`;
+                    overlay.style.animation = 'screen-fade-out 0.15s ease-in forwards';
+                    overlay.style.pointerEvents = 'none';
                 }
+                setTimeout(() => {
+                    this._render();
+                    const fresh = this._el.querySelector('#shop-discard-overlay');
+                    if (fresh) {
+                        fresh.style.display = '';
+                        fresh.style.animation = 'screen-fade-in 0.15s ease-out forwards';
+                    }
+                }, 150);
             }
             return;
         }
@@ -91,7 +101,7 @@ export class ShopScreen {
         // Close pack popup without choosing
         if (e.target.closest('#pack-popup-close')) {
             this._pendingPack = null;
-            this._render();
+            this._fadePopupOut(() => this._render());
             return;
         }
 
@@ -104,7 +114,7 @@ export class ShopScreen {
                 this._gs.ownedCaps.push({ def, enchant: null });
                 this._packs[this._pendingPack].bought = true;
                 this._pendingPack = null;
-                this._render();
+                this._fadePopupOut(() => this._render());
             }
             return;
         }
@@ -118,12 +128,12 @@ export class ShopScreen {
                 this._gs.addRelic(def);
                 this._packs[this._pendingPack].bought = true;
                 this._pendingPack = null;
-                this._render();
+                this._fadePopupOut(() => this._render());
             }
             return;
         }
 
-        // Open a pack
+        // Open a pack — render popup dan fade het in
         const packEl = e.target.closest('.shop-pack[data-pack-idx]');
         if (packEl) {
             const idx  = parseInt(packEl.dataset.packIdx, 10);
@@ -131,8 +141,11 @@ export class ShopScreen {
             if (pack.bought || pack.choices.length === 0) return;
             if (!this._gs.canAfford(pack.price)) return;
             this._gs.score -= pack.price;
+            this._ui.showScoreDeduct(pack.price);
             this._pendingPack = idx;
             this._render();
+            const popup = this._el.querySelector('#shop-pack-popup');
+            if (popup) popup.style.animation = 'screen-fade-in 0.18s ease-out forwards';
             return;
         }
 
@@ -151,8 +164,17 @@ export class ShopScreen {
             const item = this._band[idx];
             if (!item || item.bought) return;
             if (this._gs.buyCap(item.def, item.price)) {
+                this._ui.showScoreDeduct(item.price);
                 item.bought = true;
-                this._render();
+                const bandItem = bandBuy.closest('.band-item');
+                if (bandItem) {
+                    bandItem.classList.remove('band-item--entering');
+                    bandItem.style.animationDelay = '0ms';
+                    bandItem.classList.add('band-item--buying');
+                    setTimeout(() => this._render(), 380);
+                } else {
+                    this._render();
+                }
             }
             return;
         }
@@ -193,6 +215,17 @@ export class ShopScreen {
     _render() {
         this._el.innerHTML = this._buildHTML();
         this._ui.setScore(this._gs.score);
+    }
+
+    _fadePopupOut(after) {
+        const popup = this._el?.querySelector('#shop-pack-popup');
+        if (popup) {
+            popup.style.animation = 'screen-fade-out 0.15s ease-in forwards';
+            popup.style.pointerEvents = 'none';
+            setTimeout(() => after?.(), 150);
+        } else {
+            after?.();
+        }
     }
 
     _buildHTML() {
@@ -242,6 +275,7 @@ export class ShopScreen {
         <span>${nextLabel}</span>
         <div class="shop-next-price">${nextBadge}</div>
       </button>
+      <div class="shop-score-ghost" aria-hidden="true"></div>
     </div>
 
   </div>

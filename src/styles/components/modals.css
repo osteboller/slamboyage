@@ -193,6 +193,32 @@
     margin: 10px auto 0;
     width: 160px;
 }
+#slammer-equip-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 8px 0;
+    background: #000;
+    color: #fff;
+    border: 3px solid #000;
+    box-shadow: var(--shadow-sticker);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+#slammer-equip-btn:active {
+    box-shadow: var(--shadow-pressed);
+    transform: translate(2px, 2px);
+}
+#slammer-equip-btn:disabled {
+    background: var(--clr-bg-darker);
+    color: var(--text-secondary);
+    border-color: var(--border-subtle);
+    box-shadow: none;
+    cursor: default;
+}
 
 .stat-row {
     display: flex;

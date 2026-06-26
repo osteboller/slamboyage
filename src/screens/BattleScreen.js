@@ -42,6 +42,7 @@ export class BattleScreen {
             if (!this._node) return; // free mode: no transition
             const won = totalScore >= this._node.clearScore;
             this._pendingBattleResult = { won, totalScore, capsFlipped };
+            this._ui.showThresholdResult(this._node.clearScore, totalScore, won);
             this._ui.setActionPrompt(won ? 'Tap to visit the shop' : 'Run over — tap to continue');
         };
 
