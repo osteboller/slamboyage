@@ -16,12 +16,16 @@ export class UIManager {
 
         this.onGravityChange = null;
 
+        this._gameState = null;
+
         this._capViewer = new CapViewer(document.getElementById('cap-viewer-container'));
         this._slammerViewer = new CapViewer(document.getElementById('slammer-viewer-container'));
         this._buildTunePanel();
         this._buildPileOverlay();
         this._buildHelp();
     }
+
+    setGameState(gs) { this._gameState = gs; }
 
     // ─── GETTERS ─────────────────────────────────────────────────────────────
     getMass()        { return this._mass; }
@@ -207,6 +211,15 @@ export class UIManager {
 
     setScore(n)  { document.getElementById('score').textContent = n; }
     resetScore() { document.getElementById('score').textContent = 0; }
+
+    showRunOverlay() {
+        document.getElementById('tl-overlay').style.display  = '';
+        document.getElementById('score-display').style.display = '';
+    }
+    hideRunOverlay() {
+        document.getElementById('tl-overlay').style.display  = 'none';
+        document.getElementById('score-display').style.display = 'none';
+    }
 
     setRunInfo(nodeName, clearScore) {
         document.getElementById('run-node-name').textContent  = nodeName;
@@ -458,6 +471,15 @@ export class UIManager {
             this._toggleOverlay('Caps in stack', this._remainingDefs, false, e.currentTarget, overlay);
         });
 
+        const bagBtn = document.getElementById('bag-btn');
+        if (bagBtn) {
+            bagBtn.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                const defs = (this._gameState?.ownedCaps ?? []).map(c => c.def);
+                this._toggleOverlay('My Caps', defs, true, e.currentTarget, overlay);
+            });
+        }
+
         overlay.addEventListener('pointerdown', e => e.stopPropagation());
         detail.addEventListener('pointerdown',  e => e.stopPropagation());
         slamDetail.addEventListener('pointerdown', e => e.stopPropagation());
@@ -504,8 +526,13 @@ export class UIManager {
         });
 
         const rect = anchorEl.getBoundingClientRect();
-        overlay.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
-        overlay.style.top    = 'auto';
+        if (rect.top < window.innerHeight / 2) {
+            overlay.style.top    = (rect.bottom + 8) + 'px';
+            overlay.style.bottom = 'auto';
+        } else {
+            overlay.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+            overlay.style.top    = 'auto';
+        }
         if (rect.left < window.innerWidth / 2) {
             overlay.style.left  = Math.max(4, rect.left) + 'px';
             overlay.style.right = 'auto';
@@ -552,14 +579,7 @@ export class UIManager {
         const effectLabel  = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : '';
         subEl.textContent  = [seriesLabel, effectLabel].filter(Boolean).join(' · ');
 
-        // Apply visual state based on whether cap is lit (won)
-        if (lit) {
-            detail.style.borderColor = 'rgba(255, 204, 0, 0.4)';
-            detail.style.backgroundColor = 'rgba(0, 0, 0, 0.97)';
-        } else {
-            detail.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-            detail.style.backgroundColor = 'rgba(0, 0, 0, 0.95)';
-        }
+        detail.classList.toggle('cap-detail--lit', lit);
 
         this._capViewer.show(def, 'cap');
         detail.style.display = 'block';

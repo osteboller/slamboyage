@@ -136,7 +136,7 @@ export class ShopScreen {
             return;
         }
 
-        // Open cap detail on image click (uses same CapViewer as battle screen)
+        // Open cap detail on image click
         const capImg = e.target.closest('.band-cap-img[data-cap-name]');
         if (capImg) {
             const def = CAP_DEFS.find(c => c.name === capImg.dataset.capName);
@@ -144,9 +144,9 @@ export class ShopScreen {
             return;
         }
 
-        // Buy a band item
-        const bandBuy = e.target.closest('.band-buy-btn[data-band-idx]:not([disabled])');
-        if (bandBuy) {
+        // Buy a band item (price-tag button is the buy CTA)
+        const bandBuy = e.target.closest('button.band-price-tag[data-band-idx]');
+        if (bandBuy && !bandBuy.disabled && !bandBuy.classList.contains('cant-afford')) {
             const idx  = parseInt(bandBuy.dataset.bandIdx, 10);
             const item = this._band[idx];
             if (!item || item.bought) return;
@@ -190,14 +190,17 @@ export class ShopScreen {
 
     // ─── RENDER ───────────────────────────────────────────────────────────────
 
-    _render() { this._el.innerHTML = this._buildHTML(); }
+    _render() {
+        this._el.innerHTML = this._buildHTML();
+        this._ui.setScore(this._gs.score);
+    }
 
     _buildHTML() {
-        const gs       = this._gs;
-        const nextNode = gs.currentNode;
-        const nextLabel = nextNode
-            ? `Continue  ·  Next: ${nextNode.name} (${nextNode.clearScore}★)`
-            : 'Continue  ·  Loop complete!';
+        const gs        = this._gs;
+        const nextNode  = gs.currentNode;
+        const clearScore = nextNode?.clearScore ?? nextNode?.score;
+        const nextBadge  = clearScore != null ? `${clearScore}★` : '→';
+        const nextLabel  = gs.isRunComplete ? 'NEXT LOOP' : 'NEXT ROUND';
 
         const canReroll  = gs.canAfford(gs.rerollCost);
         const canDiscard = gs.ownedCaps.length > 0;
@@ -205,32 +208,43 @@ export class ShopScreen {
         return `
 <div class="shop-inner">
 
-  <!-- ── Action bar ──────────────────────────────────────────────────── -->
-  <div class="shop-actionbar">
-    <button id="shop-reroll-btn" class="shop-ab-btn reroll ${canReroll ? '' : 'cant-afford'}">
-      ↺&nbsp;${gs.rerollCost}★
-    </button>
-    <div class="shop-titleblock">
-      <span class="shop-title-text">SHOP</span>
-      <span class="shop-wallet">${gs.score}★</span>
+  <!-- ── Title ───────────────────────────────────────────────────────── -->
+  <div class="shop-title-sticker">SHOP</div>
+
+  <!-- ── 2-kolonne: venstre (band+packs) | højre (actions) ───────────── -->
+  <div class="shop-main">
+
+    <!-- Venstre: reroll+band øverst, pack-kort nedenunder -->
+    <div class="shop-left">
+      <div class="shop-band-row">
+        <button id="shop-reroll-btn" class="${canReroll ? '' : 'cant-afford'}" title="Reroll">
+          <span class="reroll-icon">↺</span>
+          <span class="reroll-cost">${gs.rerollCost}★</span>
+        </button>
+        <div class="shop-band">
+          <div class="shop-band-items">
+            ${this._buildBandHTML()}
+          </div>
+        </div>
+      </div>
+      <div class="shop-packs">
+        ${this._packs.map((pack, i) => this._buildPackCardHTML(pack, i)).join('')}
+      </div>
     </div>
-    <button id="shop-discard-btn" class="shop-ab-btn discard ${canDiscard ? '' : 'cant-afford'}">
-      &#x1F480;&nbsp;${gs.discardCost}★
-    </button>
-  </div>
 
-  <!-- ── Band ────────────────────────────────────────────────────────── -->
-  <div class="shop-band">
-    ${this._buildBandHTML()}
-  </div>
+    <!-- Højre: actions -->
+    <div class="shop-actions">
+      <button id="shop-discard-btn" class="shop-remove-btn ${canDiscard ? '' : 'cant-afford'}">
+        <div class="shop-skull-box">💀</div>
+        <span>REMOVE CAPS</span>
+      </button>
+      <button id="shop-continue-btn" class="shop-next-btn">
+        <span>${nextLabel}</span>
+        <div class="shop-next-price">${nextBadge}</div>
+      </button>
+    </div>
 
-  <!-- ── Packs ───────────────────────────────────────────────────────── -->
-  <div class="shop-packs">
-    ${this._packs.map((pack, i) => this._buildPackCardHTML(pack, i)).join('')}
   </div>
-
-  <!-- ── Continue ────────────────────────────────────────────────────── -->
-  <button id="shop-continue-btn" class="shop-continue-btn">${nextLabel}</button>
 
 </div>
 
@@ -255,22 +269,20 @@ ${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendin
         const animate = this._justRerolled;
         return this._band.map((item, i) => {
             if (item.bought) {
-                return `<div class="band-item sold"><span class="band-sold-label">Sold</span></div>`;
+                return `<div class="band-item sold">
+                    <div class="band-slot-box"></div>
+                    <div class="band-price-tag band-sold-label">SOLD</div>
+                </div>`;
             }
-            const canBuy      = gs.canAfford(item.price);
-            const effectLabel = item.def.effect
-                ? (EFFECT_LABELS[item.def.effect] ?? item.def.effect)
-                : null;
-            const animStyle   = animate
-                ? `style="animation-delay:${i * 90}ms"`
-                : '';
-            const animClass   = animate ? 'band-item--entering' : '';
+            const canBuy    = gs.canAfford(item.price);
+            const animStyle = animate ? `style="animation-delay:${i * 90}ms"` : '';
+            const animClass = animate ? 'band-item--entering' : '';
             return `<div class="band-item ${animClass}" ${animStyle}>
-                <img class="band-cap-img" src="${item.def.texFront}" alt="${item.def.name}"
-                     data-cap-name="${item.def.name}">
-                <div class="band-cap-name">${item.def.name}</div>
-                ${effectLabel ? `<div class="band-effect">${effectLabel}</div>` : ''}
-                <button class="band-buy-btn ${canBuy ? '' : 'cant-afford'}"
+                <div class="band-slot-box">
+                    <img class="band-cap-img" src="${item.def.texFront}" alt="${item.def.name}"
+                         data-cap-name="${item.def.name}">
+                </div>
+                <button class="band-price-tag ${canBuy ? '' : 'cant-afford'}"
                         data-band-idx="${i}" ${canBuy ? '' : 'disabled'}>
                     ${item.price}★
                 </button>
@@ -279,13 +291,17 @@ ${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendin
     }
 
     _buildPackCardHTML(pack, i) {
-        const isRelic  = pack.type === 'relic';
-        const typeLabel = isRelic ? 'Relic Pack' : 'Cap Pack';
+        const isRelic   = pack.type === 'relic';
+        const typeLabel = isRelic ? 'Relic Pack' : 'Collector Pack';
+        const icon      = isRelic ? '🔮' : '🛍';
         const relicCls  = isRelic ? ' pack--relic' : '';
         if (pack.bought) {
             return `<div class="shop-pack bought${relicCls}" data-pack-idx="${i}">
-                <div class="pack-type">${typeLabel}</div>
-                <div class="pack-hint">Opened</div>
+                <div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>
+                <div class="pack-info">
+                    <span class="pack-type">${typeLabel}</span>
+                    <span class="pack-hint">Opened</span>
+                </div>
             </div>`;
         }
         const canAfford = this._gs.canAfford(pack.price);
@@ -293,12 +309,15 @@ ${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendin
         const hint      = empty
             ? (isRelic ? 'No relics left' : 'No caps left')
             : (isRelic ? '3 relics · pick 1' : '3 caps · pick 1');
-        return `<div class="shop-pack${relicCls} ${canAfford && !empty ? '' : 'cant-afford'}"
+        return `<button class="shop-pack${relicCls} ${canAfford && !empty ? '' : 'cant-afford'}"
                      data-pack-idx="${i}">
-            <div class="pack-type">${typeLabel}</div>
-            <div class="pack-hint">${hint}</div>
-            <div class="pack-price">${pack.price}★</div>
-        </div>`;
+            <div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>
+            <div class="pack-info">
+                <span class="pack-type">${typeLabel}</span>
+                <span class="pack-hint">${hint}</span>
+                <div class="pack-price">${pack.price}★</div>
+            </div>
+        </button>`;
     }
 
     _buildPackPopupHTML(pack) {

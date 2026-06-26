@@ -1,0 +1,47 @@
+/* ─── LOADING SCREEN ──────────────────────────────────────────────────────── */
+#loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--clr-bg);
+    background-image: var(--bg-dot-grid);
+    background-size: var(--bg-dot-size);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 1000;
+    transition: opacity 0.4s;
+}
+
+#loading-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: 0.05em;
+}
+
+#loading-bar-bg {
+    width: 240px;
+    height: 12px;
+    background: var(--clr-bg-panel);
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    overflow: hidden;
+}
+
+#loading-fill {
+    height: 100%;
+    width: 0%;
+    background: #000;
+    transition: width 0.15s ease-out;
+}
+
+#loading-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}

@@ -17,11 +17,6 @@ export class MapScreen {
         this._render();
 
         this._el.addEventListener('click', (e) => {
-            if (e.target.closest('#map-collection-btn')) {
-                this._toggleCollection();
-                return;
-            }
-            // Close and tab checks before the broad overlay check
             if (e.target.closest('#map-collection-close')) {
                 this._closeCollection();
                 return;
@@ -187,14 +182,10 @@ export class MapScreen {
 
         return `<div class="map-inner">
             <div class="map-topbar">
-                <button id="map-back-btn" class="map-back-btn">← Back</button>
+                <button id="map-back-btn" class="map-back-btn">← Menu</button>
                 <h1 class="map-title">SLAMBERZ</h1>
-                <div class="map-info">
-                    <button id="map-collection-btn" class="map-collection-btn">⬡ ${gs.ownedCaps.length}</button>
-                    <span class="map-currency">${gs.score} ★</span>
-                </div>
             </div>
-            <div class="map-hint">↔ Best played in landscape</div>
+            <div class="map-hint">Tap a node to play</div>
             <div class="map-path">${nodesHTML}</div>
         </div>`;
     }

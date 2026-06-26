@@ -1,0 +1,203 @@
+/* ─── REWARD SCREEN ───────────────────────────────────────────────────────── */
+#reward-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--clr-bg);
+    background-image: var(--bg-dot-grid);
+    background-size: var(--bg-dot-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    animation: screen-fade-in 0.25s ease-out;
+}
+
+.reward-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+    padding: 28px 20px;
+    max-width: 92vw;
+}
+
+.reward-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(18px, 4vw, 26px);
+    font-weight: 800;
+    color: #000;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-align: center;
+    transform: rotate(-1deg);
+}
+
+.reward-sub {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: -10px 0 0;
+    text-align: center;
+}
+
+.reward-cards {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.reward-card {
+    background: var(--clr-bg-panel);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    padding: 16px 14px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.1s;
+    width: clamp(110px, 26vw, 160px);
+}
+.reward-card:hover, .reward-card:focus {
+    box-shadow: var(--shadow-raised);
+    transform: translateY(-3px);
+    outline: none;
+}
+.reward-card:active {
+    box-shadow: var(--shadow-pressed);
+    transform: translate(3px, 3px);
+}
+
+.reward-cap-img {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--border-ink);
+    box-shadow: 3px 3px 0px #000;
+    pointer-events: none;
+}
+
+.reward-cap-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    pointer-events: none;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.reward-cap-series {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+    pointer-events: none;
+}
+
+.reward-effect {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #000;
+    background: #f5c842;
+    border: 2px solid #000;
+    padding: 2px 7px;
+    text-align: center;
+    pointer-events: none;
+    font-weight: 700;
+}
+
+.reward-pick-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+}
+
+.reward-card--relic {
+    justify-content: flex-start;
+    padding: 16px 14px;
+    gap: 6px;
+    text-align: left;
+}
+.reward-relic-icon {
+    font-size: 36px;
+    line-height: 1;
+    margin-bottom: 4px;
+    pointer-events: none;
+}
+.reward-relic-desc {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    color: var(--text-secondary);
+    pointer-events: none;
+    line-height: 1.4;
+}
+
+.reward-card:hover .reward-pick-label,
+.reward-card:focus .reward-pick-label { color: var(--text-primary); }
+
+.reward-card.selected {
+    border-color: #000;
+    background: #f5c842;
+    box-shadow: var(--shadow-raised);
+    transform: translateY(-4px);
+}
+.reward-card.selected .reward-pick-label { color: #000; font-weight: 800; }
+
+.reward-cards:has(.selected) .reward-card:not(.selected) {
+    opacity: 0.4;
+    transform: none;
+    box-shadow: 2px 2px 0px #000;
+}
+
+.reward-confirm-btn {
+    background: #000;
+    color: #fff;
+    border: 4px solid #000;
+    box-shadow: var(--shadow-raised);
+    border-radius: 0;
+    padding: 12px 36px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    animation: screen-fade-in 0.15s ease-out;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.reward-confirm-btn:active {
+    box-shadow: var(--shadow-pressed);
+    transform: translate(3px, 3px);
+}
+
+.reward-skip {
+    background: var(--clr-bg-panel);
+    border: 3px solid var(--border-ink);
+    box-shadow: 3px 3px 0px #000;
+    border-radius: 0;
+    padding: 9px 22px;
+    color: var(--text-secondary);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.reward-skip:active {
+    box-shadow: 1px 1px 0px #000;
+    transform: translate(2px, 2px);
+}
+.reward-skip-bonus { color: #000; font-weight: 800; }

@@ -40,6 +40,7 @@ const texCache = await loadTextures(p => {
 });
 
 const gameState = new GameState();
+ui.setGameState(gameState);
 const factory   = new EntityFactory(physics, render, texCache);
 const throwCtrl = new ThrowController({ physics, render, cam, collisions, factory, ui });
 const roundMgr  = new RoundManager({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState });
@@ -58,6 +59,8 @@ const battleScreen = new BattleScreen(deps);
 const rewardScreen = new RewardScreen(deps);
 const runEndScreen = new RunEndScreen(deps);
 
+const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
+
 function showScreen(name, context = null) {
     currentScreen?.exit();
     // pointerdown on canvas fires onShot → new screen mounts → pointerup+click
@@ -66,6 +69,9 @@ function showScreen(name, context = null) {
     // into the newly mounted screen. One place, covers every transition.
     document.body.style.pointerEvents = 'none';
     setTimeout(() => { document.body.style.pointerEvents = ''; }, 320);
+
+    if (RUN_SCREENS.has(name)) ui.showRunOverlay();
+    else                       ui.hideRunOverlay();
 
     if (name === 'start') {
         currentScreen = startScreen;

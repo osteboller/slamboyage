@@ -1,0 +1,481 @@
+/* ─── SHOP SCREEN ─────────────────────────────────────────────────────────── */
+#shop-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--clr-bg);
+    background-image: var(--bg-dot-grid);
+    background-size: var(--bg-dot-size);
+    z-index: 200;
+    overflow: hidden;
+}
+
+.shop-inner {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 52px 16px 108px;  /* top: tæt under overlay, bund: over score ★ */
+    box-sizing: border-box;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* ── SHOP titel ───────────────────────────────────────────────────────────── */
+.shop-title-sticker {
+    align-self: center;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    padding: 5px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transform: rotate(-2deg);
+    color: #000;
+    white-space: nowrap;
+}
+
+/* ── 2-kolonne grid: venstre (band+packs) og højre (actions) ─────────────── */
+.shop-main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 178px;
+    gap: 12px;
+    align-items: stretch;
+    min-height: 0;
+}
+
+/* ── VENSTRE: band-række + pack-kort under ────────────────────────────────── */
+.shop-left {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* Band-række: reroll-knap overlapper let med bandets venstre kant */
+.shop-band-row {
+    display: flex;
+    align-items: center;
+    gap: 0;   /* ingen gap — reroll "smelter" mod bandet */
+}
+
+#shop-reroll-btn {
+    flex-shrink: 0;
+    width: 54px;
+    height: 64px;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: pointer;
+    transform: rotate(3deg);
+    transition: box-shadow 0.08s, transform 0.1s;
+    padding: 6px;
+    position: relative;
+    z-index: 1;        /* over bandet */
+    margin-right: -12px; /* overlapper let ind over bandets venstre kant */
+}
+#shop-reroll-btn:active {
+    box-shadow: var(--shadow-pressed);
+    transform: rotate(3deg) translate(3px, 3px);
+}
+#shop-reroll-btn.cant-afford { opacity: 0.28; cursor: default; pointer-events: none; }
+.reroll-icon { font-size: 20px; font-weight: 700; color: #000; line-height: 1; }
+.reroll-cost { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #000; }
+
+/* Sort diagonal band */
+.shop-band {
+    flex: 1;
+    min-width: 0;
+    background: #000;
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    padding: 12px 10px 32px;   /* 32px bund til prisbajer under caps */
+    position: relative;
+    overflow: visible;
+    transform: rotate(-2deg);
+}
+.shop-band::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.07) 10px, rgba(255,255,255,0.07) 20px);
+    pointer-events: none;
+}
+
+.shop-band-items {
+    display: flex;
+    flex-wrap: nowrap;             /* aldrig ny række */
+    justify-content: center;       /* cluster midt — ingen kæmpe gaps på store skærme */
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Pack-kort — horisontalt side om side under båndet */
+.shop-packs {
+    display: flex;
+    gap: 10px;
+}
+
+.shop-pack {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: box-shadow 0.08s, transform 0.1s;
+}
+.shop-pack:nth-child(odd)  { transform: rotate(-1deg); }
+.shop-pack:nth-child(even) { transform: rotate(1deg);  }
+.shop-pack:active { box-shadow: var(--shadow-pressed); transform: translate(3px, 3px); }
+.shop-pack.cant-afford { opacity: 0.32; cursor: default; pointer-events: none; }
+.shop-pack.bought      { opacity: 0.20; cursor: default; pointer-events: none; }
+
+.pack-icon-box {
+    width: 40px;
+    height: 46px;
+    background: var(--clr-bg-darker);
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+    transform: rotate(-3deg);
+    position: relative;
+    overflow: hidden;
+}
+.pack-icon-box::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.12;
+    background: repeating-linear-gradient(-45deg, transparent, transparent 5px, #000 5px, #000 10px);
+}
+.pack-icon-box .pack-icon-emoji { position: relative; z-index: 1; }
+.pack--relic .pack-icon-box {
+    background: rgba(185,133,255,0.15);
+    border-color: var(--clr-purple);
+    box-shadow: 3px 3px 0px var(--clr-purple-dark);
+}
+
+.pack-info { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 0; }
+.pack-type {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #000;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+.pack--relic .pack-type { color: var(--clr-purple); }
+.pack-hint {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.pack-price {
+    background: var(--clr-bg-panel);
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px #000;
+    padding: 1px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 800;
+    transform: rotate(2deg);
+    display: inline-block;
+    margin-top: 2px;
+    color: #000;
+}
+.pack--relic .pack-price {
+    border-color: var(--clr-purple);
+    box-shadow: 2px 2px 0px var(--clr-purple-dark);
+    color: var(--clr-purple);
+}
+
+/* ── Band items ── kompakt slots ─────────────────────────────────────────── */
+.band-item {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 16px;
+}
+.band-slot-box {
+    width: 56px;
+    height: 56px;
+    background: var(--clr-bg-panel);
+    border: 3px solid #000;
+    box-shadow: 5px 5px 0px #000;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.1s;
+    position: relative;
+    z-index: 1;
+}
+.band-slot-box:hover  { box-shadow: 2px 2px 0px #000; transform: translateY(3px); }
+.band-slot-box:active { box-shadow: none; transform: translateY(5px); }
+.band-cap-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #000;
+    cursor: pointer;
+    display: block;
+}
+button.band-price-tag {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) rotate(-2deg);
+    background: var(--clr-bg-panel);
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px #000;
+    padding: 1px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+    z-index: 2;
+    color: #000;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+button.band-price-tag:active {
+    box-shadow: 1px 1px 0px #000;
+    transform: translateX(-50%) rotate(-2deg) translate(1px, 1px);
+}
+button.band-price-tag.cant-afford {
+    background: var(--clr-bg-darker);
+    color: var(--text-muted);
+    cursor: default;
+    pointer-events: none;
+}
+.band-price-tag.band-sold-label {
+    background: #444;
+    color: #aaa;
+    border-color: #444;
+    box-shadow: 1px 1px 0px #222;
+    font-size: 9px;
+    cursor: default;
+}
+.band-item.sold .band-slot-box       { opacity: 0.18; box-shadow: 1px 1px 0px #555; cursor: default; }
+.band-item.sold .band-slot-box:hover { box-shadow: 1px 1px 0px #555; transform: none; }
+
+.band-item:nth-child(1) .band-slot-box { transform: rotate(2deg);  }
+.band-item:nth-child(2) .band-slot-box { transform: rotate(-1deg); }
+.band-item:nth-child(3) .band-slot-box { transform: rotate(3deg);  }
+.band-item:nth-child(4) .band-slot-box { transform: rotate(-2deg); }
+.band-item:nth-child(5) .band-slot-box { transform: rotate(1deg);  }
+
+/* ── HØJRE: action column ─────────────────────────────────────────────────── */
+.shop-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: flex-start;  /* knapper øverst, ingen kunstig centring */
+    align-items: stretch;
+}
+
+.shop-remove-btn {
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    padding: 14px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transform: rotate(-2deg);
+    transition: box-shadow 0.08s, transform 0.1s;
+    width: 100%;
+    color: #000;
+}
+.shop-remove-btn:active { box-shadow: var(--shadow-pressed); transform: rotate(-2deg) translate(3px, 3px); }
+.shop-remove-btn.cant-afford { opacity: 0.28; cursor: default; pointer-events: none; }
+.shop-skull-box {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #000;
+    background: rgba(204,34,34,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transform: rotate(3deg);
+    font-size: 15px;
+}
+
+.shop-next-btn {
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-raised);
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transform: rotate(2deg);
+    transition: box-shadow 0.08s, transform 0.1s;
+    width: 100%;
+    color: #000;
+    min-height: 80px;
+    max-height: 160px;
+    flex-grow: 1;              /* vokser men ikke ubegrænset */
+}
+.shop-next-btn:active { box-shadow: var(--shadow-pressed); transform: rotate(2deg) translate(3px, 3px); }
+.shop-next-price {
+    background: var(--clr-bg-panel);
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    padding: 2px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    transform: rotate(-2deg);
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* ── Band pop-in ──────────────────────────────────────────────────────────── */
+.band-item--entering {
+    opacity: 0;
+    animation: band-pop-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── Pack popup ───────────────────────────────────────────────────────────── */
+#shop-pack-popup {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay-modal);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.pack-popup-panel {
+    background: var(--clr-bg-panel);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-raised);
+    border-radius: 0;
+    padding: 20px;
+    width: 100%;
+    max-width: 420px;
+    transform: rotate(-1deg);
+}
+.pack-popup-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-bottom: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.pack-choices-row    { display: flex; gap: 10px; justify-content: center; }
+.pack-choice {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 8px;
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-sticker);
+    background: var(--clr-bg-panel);
+    border-radius: 0;
+    cursor: pointer;
+    text-align: center;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.pack-choice:hover  { box-shadow: var(--shadow-raised); }
+.pack-choice:active { box-shadow: var(--shadow-pressed); transform: translate(2px, 2px); }
+.pack-choice--relic { justify-content: flex-start; text-align: left; gap: 4px; }
+.pack-relic-icon    { font-size: 32px; line-height: 1; margin-bottom: 4px; pointer-events: none; }
+.pack-choice-img    { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 3px solid #000; box-shadow: 3px 3px 0px #000; }
+.pack-choice-name   { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; }
+.pack-choice-effect { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #000; background: #f5c842; padding: 1px 4px; font-weight: 700; line-height: 1.4; }
+.pack-empty         { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px; }
+.pack-skip-btn {
+    display: block; width: 100%; margin-top: 12px; padding: 8px;
+    background: none; border: 3px solid var(--border-ink); border-radius: 0;
+    color: var(--text-secondary); font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.pack-skip-btn:hover { background: var(--surface-dim); }
+
+/* ── Discard overlay ─────────────────────────────────────────────────────── */
+#shop-discard-overlay {
+    position: fixed; inset: 0;
+    background: var(--overlay-heavy);
+    z-index: 300;
+    display: flex; align-items: flex-end; justify-content: center;
+}
+.discard-panel {
+    background: var(--clr-bg-panel);
+    border-top: 4px solid var(--border-ink);
+    border-left: 4px solid var(--border-ink);
+    border-right: 4px solid var(--border-ink);
+    border-radius: 0;
+    padding: 14px; width: 100%; max-height: 70vh;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.discard-header     { display: flex; align-items: center; justify-content: space-between; }
+.discard-title      { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em; }
+.discard-close-btn  { background: var(--clr-bg-darker); border: 3px solid var(--border-ink); color: var(--text-primary); font-size: 14px; cursor: pointer; padding: 2px 8px; }
+.discard-close-btn:hover { box-shadow: 2px 2px 0px #000; }
+.discard-cost-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--clr-red); margin: 0; }
+.discard-grid       { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; overflow-y: auto; }
+.discard-cap {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px 4px; border: 3px solid rgba(204,34,34,0.4);
+    box-shadow: 2px 2px 0px rgba(204,34,34,0.3); background: rgba(255,60,60,0.04);
+    border-radius: 0; cursor: pointer; text-align: center;
+    transition: border-color 0.12s, box-shadow 0.08s, transform 0.08s;
+}
+.discard-cap:hover  { border-color: var(--clr-red); box-shadow: 3px 3px 0px var(--clr-red); transform: translate(-1px,-1px); }
+.discard-cap:active { transform: translate(2px,2px); box-shadow: none; }
+.discard-cap.cant-afford { opacity: 0.3; cursor: default; }
+.discard-cap-img  { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid #000; }
+.discard-cap-name { font-family: 'Space Grotesk', sans-serif; font-size: 9px; color: var(--text-secondary); line-height: 1.2; word-break: break-word; }
+.discard-empty    { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px 0; }

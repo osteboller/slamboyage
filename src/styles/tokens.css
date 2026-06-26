@@ -1,0 +1,68 @@
+:root {
+    /* ── Overflader ──────────────────────────────────────────────────────────── */
+    --clr-bg:           #f9f9f9;
+    --clr-bg-deep:      #f0f0f0;
+    --clr-bg-panel:     #ffffff;
+    --clr-bg-darker:    #e2e2e2;
+    --clr-white:        #ffffff;
+
+    /* ── Tekst ───────────────────────────────────────────────────────────────── */
+    --text-primary:     rgba(0,0,0,0.85);
+    --text-secondary:   rgba(0,0,0,0.55);
+    --text-dim:         rgba(0,0,0,0.40);
+    --text-muted:       rgba(0,0,0,0.28);
+    --text-faint:       rgba(0,0,0,0.15);
+
+    /* ── Borders ─────────────────────────────────────────────────────────────── */
+    --border-hairline:  rgba(0,0,0,0.10);
+    --border-faint:     rgba(0,0,0,0.18);
+    --border-subtle:    rgba(0,0,0,0.28);
+    --border-mid:       rgba(0,0,0,0.50);
+    --border-strong:    rgba(0,0,0,0.85);
+    --border-ink:       #000000;
+
+    /* ── Overflader (lys) ────────────────────────────────────────────────────── */
+    --surface-faint:    rgba(0,0,0,0.03);
+    --surface-dim:      rgba(0,0,0,0.05);
+    --surface-subtle:   rgba(0,0,0,0.08);
+
+    /* ── Overlays ────────────────────────────────────────────────────────────── */
+    --overlay-hud:      rgba(255,255,255,0.92);
+    --overlay-modal:    rgba(0,0,0,0.55);
+    --overlay-heavy:    rgba(0,0,0,0.80);
+    --overlay-light:    rgba(0,0,0,0.15);
+    --overlay-powerbar: rgba(255,255,255,0.95);
+    --surface-modal:    rgba(255,255,255,0.98);
+
+    /* ── Elevation — hard-edge shadows, ingen blur ───────────────────────────── */
+    --shadow-sticker:   4px 4px 0px #000000;
+    --shadow-raised:    6px 6px 0px #000000;
+    --shadow-pressed:   1px 1px 0px #000000;
+
+    /* ── Rotation ────────────────────────────────────────────────────────────── */
+    --rotate-cw:    rotate(2deg);
+    --rotate-ccw:   rotate(-2deg);
+
+    /* ── Brand: guld ─────────────────────────────────────────────────────────── */
+    --clr-gold:         #f5c842;
+    --clr-gold-hover:   #ffd84a;
+    --clr-gold-dark:    #e8b800;
+
+    /* ── Brand: lilla ────────────────────────────────────────────────────────── */
+    --clr-purple:       #b985ff;
+    --clr-purple-light: #c39fff;
+    --clr-purple-dark:  #7a3fcc;
+
+    /* ── Brand: grøn ─────────────────────────────────────────────────────────── */
+    --clr-green:        #22aa44;
+    --clr-green-bright: #4cff88;
+
+    /* ── Brand: rød ──────────────────────────────────────────────────────────── */
+    --clr-red:          #cc2222;
+    --clr-red-bright:   #ff5555;
+    --clr-red-light:    #ff6666;
+
+    /* ── Dot-grid baggrund (bruges på alle light screens) ────────────────────── */
+    --bg-dot-grid: radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px);
+    --bg-dot-size: 22px 22px;
+}
