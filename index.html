@@ -54,13 +54,7 @@
         <span id="run-node-name"></span><br>GOAL: <b id="run-goal-score"></b>★
     </div>
 
-    <!-- Score — bottom-right, vises under alle run-screens (skjult til run starter) -->
-    <div id="score-display" style="display:none">
-        <span id="score">0</span><span class="score-star">★</span>
-    </div>
-
-    <!-- Throw pips -->
-    <div id="throw-pips"></div>
+    <!-- Throw pips (i bottom-bar nedenunder) -->
 
     <!-- ── Help modal ────────────────────────────────────────────────────── -->
     <div id="help-modal" role="dialog" aria-modal="true" aria-label="How to play">
@@ -120,19 +114,35 @@
         </div>
     </div>
 
-    <!-- ── Battle HUD ────────────────────────────────────────────────────── -->
+    <!-- ── Bottom Bar — responsive flex, virker på alle skærmstørrelser ──── -->
+    <div id="bottom-bar">
+        <!-- Venstre: pile-knapper (battle-HUD) -->
+        <div id="bottom-left">
+            <button id="pile-won-btn" class="pile-btn" title="Flipped caps">
+                <span id="pile-won-count">0/0</span>
+                <span class="pile-btn-label">Flipped</span>
+            </button>
+            <button id="pile-rem-btn" class="pile-btn" title="Caps in stack">
+                <span id="pile-rem-count">0/0</span>
+                <span class="pile-btn-label">Stack</span>
+            </button>
+        </div>
 
-    <!-- Bottom-left: flipped caps -->
-    <button id="pile-won-btn" class="pile-btn" title="Flipped caps">
-        <span id="pile-won-count">0/0</span>
-        <span class="pile-btn-label">Flipped</span>
-    </button>
+        <!-- Center: prompt → pips → status stablet fra bund og op -->
+        <div id="bottom-center">
+            <p id="action-prompt"></p>
+            <div id="throw-pips"></div>
+            <p id="status-bar"><span id="status">Loading...</span></p>
+        </div>
 
-    <!-- Bottom-left (adjacent): caps remaining in stack -->
-    <button id="pile-rem-btn" class="pile-btn" title="Caps in stack">
-        <span id="pile-rem-count">0/0</span>
-        <span class="pile-btn-label">Stack</span>
-    </button>
+    </div>
+
+    <!-- Score — eigen fixed positie boven alle screens -->
+    <div id="score-display" style="display:none">
+        <span id="score">0</span><span class="score-star">★</span>
+    </div>
+
+    <!-- ── Battle HUD (overlays, ikke i bottom-bar) ─────────────────────── -->
 
     <!-- Shared overlay for both piles -->
     <div id="cap-overlay">
@@ -152,6 +162,7 @@
         <div id="slammer-detail-name"></div>
         <div id="slammer-viewer-container"></div>
         <div id="slammer-detail-stats"></div>
+        <button id="slammer-equip-btn" style="display:none"></button>
     </div>
 
     <div id="results">
