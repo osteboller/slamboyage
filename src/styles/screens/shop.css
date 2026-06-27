@@ -218,6 +218,22 @@
     box-shadow: 2px 2px 0px var(--clr-purple-dark);
     color: var(--clr-purple);
 }
+.pack--card .pack-icon-box {
+    background: rgba(255, 200, 80, 0.15);
+    border-color: #c87f00;
+    box-shadow: 3px 3px 0px #8b5a00;
+}
+.pack--card .pack-type { color: #c87f00; }
+.pack--card .pack-price {
+    border-color: #c87f00;
+    box-shadow: 2px 2px 0px #8b5a00;
+    color: #c87f00;
+}
+.pack-choice--card .pack-relic-icon {
+    font-size: 32px;
+    text-align: center;
+    margin-bottom: 4px;
+}
 
 /* ── Band items ── kompakt slots ─────────────────────────────────────────── */
 .band-item {
@@ -299,6 +315,65 @@ button.band-price-tag.cant-afford {
 .band-item:nth-child(3) .band-cap-img { transform: rotate(3deg);  }
 .band-item:nth-child(4) .band-cap-img { transform: rotate(-2deg); }
 .band-item:nth-child(5) .band-cap-img { transform: rotate(1deg);  }
+
+/* ── Card slot in band ─────────────────────────────────────────────────────── */
+.band-slot-box--card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: rgba(255, 200, 80, 0.12);
+    border: 2px dashed #c87f00;
+    width: 100%;
+    height: 100%;
+    padding: 4px 2px;
+}
+.band-card-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+.band-card-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 7px;
+    text-transform: uppercase;
+    text-align: center;
+    color: #c87f00;
+    line-height: 1.1;
+}
+
+@keyframes band-no-room-glow {
+    0%   { border-color: #c87f00; box-shadow: none; }
+    25%  { border-color: #cc0000; box-shadow: 0 0 0 5px rgba(200,0,0,0.35); }
+    70%  { border-color: #cc0000; box-shadow: 0 0 0 3px rgba(200,0,0,0.15); }
+    100% { border-color: #c87f00; box-shadow: none; }
+}
+.band-slot-box--no-room {
+    position: relative;
+    animation: band-no-room-glow 0.65s ease-out forwards;
+}
+
+@keyframes no-room-pop {
+    0%   { opacity: 0; transform: translateY(4px) scale(0.85); }
+    20%  { opacity: 1; transform: translateY(0)   scale(1);    }
+    70%  { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-6px); }
+}
+.band-no-room-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 9px;
+    color: #cc0000;
+    background: rgba(255,255,255,0.88);
+    animation: no-room-pop 0.9s ease-out forwards;
+    pointer-events: none;
+}
 
 /* ── HØJRE: action column ─────────────────────────────────────────────────── */
 .shop-actions {

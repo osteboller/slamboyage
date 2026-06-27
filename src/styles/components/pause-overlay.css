@@ -1,0 +1,166 @@
+/* ─── PAUSE OVERLAY ──────────────────────────────────────────────────────── */
+#pause-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 280;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    align-items: center;
+    justify-content: center;
+}
+#pause-overlay.open {
+    display: flex;
+}
+
+/* Score sticker — øverst til venstre, synlig bag panelet */
+#pause-score-sticker {
+    position: fixed;
+    top: 5rem;
+    left: 1.5rem;
+    z-index: 285;
+    background: var(--clr-bg-panel);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-raised);
+    padding: 10px 16px;
+    transform: rotate(-3deg);
+    pointer-events: none;
+}
+.pause-score-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin: 0 0 2px;
+}
+#pause-score-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 36px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--text-primary);
+}
+
+/* Pause panel */
+#pause-panel {
+    position: relative;
+    z-index: 290;
+    background: var(--clr-bg-panel);
+    border: 4px solid var(--border-ink);
+    box-shadow: 8px 8px 0px 0px #000;
+    transform: rotate(2deg);
+    width: clamp(280px, 85%, 400px);
+    padding: 1.5rem;
+    animation: pause-panel-in 0.2s ease-out forwards;
+}
+
+@keyframes pause-panel-in {
+    from { opacity: 0; transform: rotate(2deg) scale(0.96) translateY(6px); }
+    to   { opacity: 1; transform: rotate(2deg) scale(1)    translateY(0);   }
+}
+
+/* Header */
+.pause-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 4px solid var(--border-ink);
+    padding-bottom: 1rem;
+    margin-bottom: 1.25rem;
+}
+.pause-header h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--text-primary);
+}
+#pause-close {
+    width: 36px;
+    height: 36px;
+    background: var(--clr-bg-panel);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-sticker);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.08s, transform 0.08s;
+    flex-shrink: 0;
+}
+#pause-close:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0px #000;
+}
+#pause-close:active {
+    transform: translate(4px, 4px);
+    box-shadow: 0px 0px 0px #000;
+}
+
+/* Action buttons */
+.pause-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.pause-actions button {
+    width: 100%;
+    height: 56px;
+    background: var(--clr-bg-panel);
+    color: var(--text-primary);
+    border: 4px solid var(--border-ink);
+    box-shadow: 6px 6px 0px 0px #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+/* Alternerende rotation for sticker-feel */
+.pause-actions button:nth-child(odd)  { transform: rotate(-1deg); }
+.pause-actions button:nth-child(even) { transform: rotate(1deg);  }
+
+.pause-actions button:hover {
+    transform: translate(2px, 2px) rotate(0deg) !important;
+    box-shadow: 2px 2px 0px 0px #000;
+}
+.pause-actions button:active {
+    transform: translate(4px, 4px) rotate(0deg) !important;
+    box-shadow: 0px 0px 0px 0px #000;
+}
+
+.pause-btn-icon {
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+/* Footer */
+.pause-footer {
+    margin-top: 1.25rem;
+    padding-top: 0.75rem;
+    border-top: 2px dashed var(--border-ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    letter-spacing: 0.12em;
+    opacity: 0.35;
+    color: var(--text-primary);
+}
+
+/* iOS: skjul fullscreen-knap i overlay (sættes via JS som inline display:none) */

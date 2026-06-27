@@ -105,7 +105,9 @@
     30%  { box-shadow: 0 0 0 5px rgba(255,204,0,0.5), var(--shadow-sticker); border-color: #ffcc00; }
     100% { box-shadow: var(--shadow-sticker); border-color: var(--border-ink); }
 }
-#pile-won-btn.collect-flash {
+#pile-won-btn.collect-flash,
+#pile-rem-btn.collect-flash,
+#bag-btn.collect-flash {
     animation: btn-collect-glow 0.55s ease-out forwards;
 }
 
@@ -122,6 +124,7 @@
 .effect-indicator--ok         { color: #4cff88; }
 .effect-indicator--fail       { color: #ff5555; }
 .effect-indicator--neighbours { color: #ffd700; }
+.effect-indicator--magnet     { color: #ffaa00; }
 .effect-indicator.ind-pop { animation: ind-pop-anim 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 @keyframes effect-ind-anim {

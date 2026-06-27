@@ -64,6 +64,31 @@
     #fullscreen-btn { display: flex; }
 }
 
+/* ─── PERSISTENT PAUSE KNAP (run-mode, alle screens) ────────────────────── */
+#pause-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    background: var(--clr-bg-panel);
+    color: var(--text-primary);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: box-shadow 0.08s, transform 0.08s;
+    z-index: 220;
+}
+#pause-btn:active {
+    box-shadow: var(--shadow-pressed);
+    transform: translate(3px, 3px);
+}
+
 /* ─── LEGACY #ui ─────────────────────────────────────────────────────────── */
 #ui {
     position: fixed;
@@ -228,6 +253,63 @@
     color: #000;
 }
 
+@keyframes double-badge-pulse {
+    0%,100% { transform: translateX(-50%) rotate(-3deg) scale(1);    box-shadow: 3px 3px 0 #8b5a00; }
+    50%      { transform: translateX(-50%) rotate(-3deg) scale(1.1);  box-shadow: 4px 4px 0 #8b5a00; }
+}
+#double-badge {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    z-index: 1;
+    transform: translateX(-50%) rotate(-3deg);
+    background: #ffcc00;
+    color: #000;
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0 #8b5a00;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 1px 8px;
+    white-space: nowrap;
+    animation: double-badge-pulse 1s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes first-strike-pulse {
+    0%,100% { transform: rotate(-5deg) scale(1);    box-shadow: 3px 3px 0 #1a5c2a; }
+    50%      { transform: rotate(-5deg) scale(1.08); box-shadow: 4px 4px 0 #1a5c2a; }
+}
+@keyframes last-stand-pulse {
+    0%,100% { transform: rotate(5deg) scale(1);    box-shadow: 3px 3px 0 #8b1a1a; }
+    50%      { transform: rotate(5deg) scale(1.08); box-shadow: 4px 4px 0 #8b1a1a; }
+}
+#first-strike-badge, #last-stand-badge {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 11px;
+    padding: 1px 6px;
+    white-space: nowrap;
+    border: 3px solid #000;
+    pointer-events: none;
+}
+#first-strike-badge {
+    top: -46px;
+    left: -4px;
+    background: #4ecb71;
+    box-shadow: 3px 3px 0 #1a5c2a;
+    animation: first-strike-pulse 1.2s ease-in-out infinite;
+}
+#last-stand-badge {
+    top: -60px;
+    right: -4px;
+    background: #e85555;
+    color: #fff;
+    box-shadow: 3px 3px 0 #8b1a1a;
+    animation: last-stand-pulse 1.2s ease-in-out infinite;
+}
+
 /* ─── RUN INFO (node name + goal) ────────────────────────────────────────── */
 #run-info {
     position: fixed;
@@ -246,6 +328,7 @@
     line-height: 1.4;
     transform: rotate(1deg);
     z-index: 90;
+    overflow: visible;
     pointer-events: none;
     transition: background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
 }

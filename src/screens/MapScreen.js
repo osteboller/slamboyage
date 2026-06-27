@@ -166,15 +166,18 @@ export class MapScreen {
                 ? `<div class="map-line ${i < gs.nodeIndex ? 'done' : ''}"></div>`
                 : '';
 
-            const labelHTML = isRelic
+            const nameHTML = isRelic
                 ? `<div class="map-node-name map-node-relic-label">Relic</div>`
-                : `<div class="map-node-name">${node.name}</div>
-                   <div class="map-node-score">goal: ${node.clearScore}★</div>`;
+                : `<div class="map-node-name">${node.name}</div>`;
+
+            const scoreHTML = isRelic ? '' :
+                `<div class="map-node-score">Goal<span class="map-node-score-val">${node.clearScore}★</span></div>`;
 
             return `<div class="map-node-wrap">
                 <div class="${cls}" data-idx="${i}">
+                    ${nameHTML}
                     <div class="map-node-circle">${icon}</div>
-                    <div class="map-node-label">${labelHTML}</div>
+                    ${scoreHTML}
                 </div>
                 ${line}
             </div>`;
@@ -182,7 +185,6 @@ export class MapScreen {
 
         return `<div class="map-inner">
             <div class="map-topbar">
-                <button id="map-back-btn" class="map-back-btn">← Menu</button>
                 <h1 class="map-title">SLAMBERZ</h1>
             </div>
             <div class="map-hint">Tap a node to play</div>

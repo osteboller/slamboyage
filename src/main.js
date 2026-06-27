@@ -6,6 +6,7 @@ import { loadTextures }     from './render/TextureLoader.js';
 import { InputManager }     from './input/InputManager.js';
 import { UIManager }        from './ui/UIManager.js';
 import { PowerBar }         from './ui/PowerBar.js';
+import { ConsumableSlots }  from './ui/ConsumableSlots.js';
 import { EntityFactory }    from './game/EntityFactory.js';
 import { ThrowController }  from './game/ThrowController.js';
 import { RoundManager }     from './game/RoundManager.js';
@@ -39,9 +40,25 @@ const texCache = await loadTextures(p => {
     if (loadingFill) loadingFill.style.width = (p * 100) + '%';
 });
 
-const gameState = new GameState();
+const gameState    = new GameState();
 ui.setGameState(gameState);
-const factory   = new EntityFactory(physics, render, texCache);
+const consumables  = new ConsumableSlots({ gameState, ui });
+consumables.onUse = (def) => {
+    if (def.id === 'extra_throw') roundMgr.addThrow();
+    if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); }
+    if (def.id === 'refresh') {
+        if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
+        if (currentScreenName === 'reward' || currentScreenName === 'relic-choice') rewardScreen.reroll?.();
+    }
+};
+consumables.onSell = (def) => {
+    if (currentScreenName === 'battle') {
+        roundMgr.addToBase(def.sellPrice); // keeps _scoreBase + _totalScore intact
+    } else {
+        ui.setScore(gameState.score);
+    }
+};
+const factory      = new EntityFactory(physics, render, texCache);
 const throwCtrl = new ThrowController({ physics, render, cam, collisions, factory, ui });
 const roundMgr  = new RoundManager({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState });
 
@@ -62,6 +79,18 @@ const rewardScreen = new RewardScreen(deps);
 const runEndScreen = new RunEndScreen(deps);
 
 const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
+
+// Pause-menu callbacks — globale, virker fra alle run-screens
+let battleSaveState = null;
+let resumeScreen    = null;
+ui.onPauseRetry    = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
+ui.onPauseMainMenu = () => {
+    battleSaveState = null;
+    resumeScreen    = null;
+    if (currentScreenName === 'battle')                          battleSaveState = battleScreen.captureState();
+    else if (['shop', 'map'].includes(currentScreenName))        resumeScreen = currentScreenName;
+    showScreen('start');
+};
 
 // ─── MAP PEEK ────────────────────────────────────────────────────────────────
 function closePeekMap() {
@@ -102,10 +131,29 @@ function showScreen(name, context = null) {
         if (RUN_SCREENS.has(name)) ui.showRunOverlay();
         else                       ui.hideRunOverlay();
 
+        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
+        const contextName = name === 'relic-choice' ? 'reward' : name;
+        if (CONSUMABLE_SCREENS.has(name)) { consumables.setContext(contextName); consumables.show(); }
+        else                              consumables.hide();
+
         if (name === 'start') {
             currentScreen = startScreen;
-            startScreen.onNewRun      = () => { returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
-            startScreen.onContinueRun = () => { returnToAfterMap = 'start'; showScreen('map'); };
+            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
+            startScreen.onContinueRun = () => {
+                if (battleSaveState) {
+                    const saved = battleSaveState;
+                    battleSaveState = null;
+                    showScreen('battle', { __resume: true, node: saved.node, saveState: saved });
+                } else if (resumeScreen) {
+                    const dest = resumeScreen;
+                    resumeScreen = null;
+                    returnToAfterMap = 'start';
+                    showScreen(dest);
+                } else {
+                    returnToAfterMap = 'start';
+                    showScreen('map');
+                }
+            };
             startScreen.onFreeMode    = () => showScreen('battle', null);
             startScreen.enter();
 
@@ -133,6 +181,7 @@ function showScreen(name, context = null) {
                 if (w) showScreen('reward', nodePlayed);
                 else   showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
             };
+            battleScreen.onExitFreeMode = () => showScreen('start');
             battleScreen.enter(context);
 
         } else if (name === 'reward') {
@@ -162,6 +211,7 @@ function showScreen(name, context = null) {
                 if (gameState.isRunComplete) gameState.nextLoop();
                 showScreen('map');
             };
+            shopScreen.onConsumableAdded = (slotIdx) => consumables.flashSlot(slotIdx);
             shopScreen.enter();
         }
 

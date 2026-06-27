@@ -23,11 +23,13 @@ export class RewardScreen {
         this._el.id = 'reward-screen';
         document.body.appendChild(this._el);
 
+        // Sæt score-display til den rigtige carry-forward score (ikke battle-totalen)
+        this._ui.setScore(this._gs.score);
+
         const choices = this._mode === 'relic' ? this._pickRelics() : this._pickCaps();
 
         if (choices.length === 0) {
-            this._gs.score += SKIP_BONUS;
-            if (this.onContinue) this.onContinue();
+            this._doSkip();
             return;
         }
 
@@ -51,8 +53,7 @@ export class RewardScreen {
                 return;
             }
             if (e.target.closest('#reward-skip-btn')) {
-                this._gs.score += SKIP_BONUS;
-                if (this.onContinue) this.onContinue();
+                this._doSkip();
             }
         });
     }
@@ -62,7 +63,22 @@ export class RewardScreen {
         this._el = null;
     }
 
+    reroll() {
+        if (!this._el) return;
+        const choices = this._mode === 'relic' ? this._pickRelics() : this._pickCaps();
+        if (choices.length === 0) return;
+        this._selected = null;
+        this._render(choices);
+    }
+
     // ─── PRIVATE ──────────────────────────────────────────────────────────────
+
+    _doSkip() {
+        this._gs.score += SKIP_BONUS;
+        this._ui.setScore(this._gs.score);
+        this._ui.showScoreGain(SKIP_BONUS);
+        if (this.onContinue) this.onContinue();
+    }
 
     _select(key) {
         this._selected = key;
@@ -118,6 +134,11 @@ export class RewardScreen {
                     Skip &nbsp;<span class="reward-skip-bonus">+${SKIP_BONUS}★</span>
                 </button>
             </div>`;
+
+        this._el.querySelectorAll('.reward-card').forEach((card, i) => {
+            card.classList.add('band-item--entering');
+            card.style.animationDelay = `${i * 80}ms`;
+        });
     }
 
     _capCards(caps) {

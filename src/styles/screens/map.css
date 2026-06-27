@@ -7,8 +7,9 @@
     background-size: var(--bg-dot-size);
     z-index: 215;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    padding-top: 80px;
     overflow: hidden;
 }
 
@@ -23,25 +24,7 @@
 .map-topbar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-}
-
-.map-back-btn {
-    background: var(--clr-bg-panel);
-    border: 4px solid var(--border-ink);
-    box-shadow: var(--shadow-sticker);
-    border-radius: 0;
-    color: var(--text-primary);
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    padding: 6px 14px;
-    transition: box-shadow 0.08s, transform 0.08s;
-}
-.map-back-btn:active {
-    box-shadow: var(--shadow-pressed);
-    transform: translate(2px, 2px);
+    justify-content: flex-end;
 }
 
 .map-title {
@@ -96,7 +79,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     min-width: clamp(48px, 10vw, 80px);
 }
 
@@ -138,7 +121,7 @@
     box-shadow: none;
 }
 
-.map-node-label { text-align: center; }
+.map-node-label { display: none; }
 .map-node-name {
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
@@ -150,8 +133,19 @@
 .map-node-score {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
-    color: var(--text-muted);
-    margin-top: 2px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
+    text-align: center;
+}
+.map-node-score-val {
+    display: block;
+    font-size: 14px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -0.01em;
 }
 .map-node.done .map-node-name    { color: var(--text-secondary); }
 .map-node.locked .map-node-name  { color: var(--text-faint); }
@@ -187,7 +181,6 @@
     width: clamp(12px, 3.5vw, 40px);
     height: 3px;
     background: var(--border-subtle);
-    margin-bottom: clamp(22px, 3vw, 38px);
     flex-shrink: 0;
 }
 .map-line.done { background: #000; }
