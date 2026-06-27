@@ -46,6 +46,14 @@ export async function loadTextures(onProgress) {
 
     await Promise.all(urls.map(url => load(url).then(tex => { cache[url] = tex; })));
 
+    // Warm browser <img> decode cache — ensures shop/reward art shows instantly
+    const imgUrls = urls.filter(u => /\.(png|jpe?g|webp)$/i.test(u));
+    await Promise.all(imgUrls.map(url => new Promise(res => {
+        const img = new Image();
+        img.onload = img.onerror = res;
+        img.src = url;
+    })));
+
     for (const def of SLAMMER_DEFS) {
         def._knurl = createKnurlTexture(def.rimColor);
     }
