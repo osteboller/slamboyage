@@ -7,6 +7,7 @@ export class PowerBar {
     constructor() {
         this._enabled   = false;
         this._frozen    = false;
+        this._running   = false; // startes kun når spilleren holder nede
         this._phase     = 0;
         this._level     = 0; // 0–1
         this._oscSpeed  = BASE_OSC_SPEED;
@@ -40,15 +41,21 @@ export class PowerBar {
 
     freeze() { this._frozen = true; }
 
+    start() {
+        this._frozen  = false;
+        this._running = true;
+    }
+
     reset() {
-        this._phase  = 0;
-        this._level  = 0;
-        this._frozen = false;
+        this._phase   = 0;
+        this._level   = 0;
+        this._frozen  = false;
+        this._running = false;
         this._updateDOM();
     }
 
     update(dt) {
-        if (!this._enabled || this._frozen) return;
+        if (!this._enabled || this._frozen || !this._running) return;
         this._phase = (this._phase + this._oscSpeed * dt) % (Math.PI * 2);
 
         // t: 0→1 position i cyklus

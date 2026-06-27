@@ -14,7 +14,6 @@ export class BattleScreen {
 
         this._animId             = null;
         this._settleMaxR         = 0;
-        this._suppressAim        = false;
         this._last               = 0;
         this._node               = null;   // aktuel run-node (null = fri mode)
         this._pendingBattleResult = null;  // { won, totalScore, capsFlipped }
@@ -81,31 +80,37 @@ export class BattleScreen {
 
         this._input.getHittableObjects = () => this._roundMgr.caps.map(c => c.mesh);
 
-        this._input.onAim = (x, y, z) => {
-            if (this._suppressAim) { this._suppressAim = false; return; }
-            if (this._roundMgr.phase === 'idle') {
-                this._render.setReticlePosition(x, y, z);
-                this._render.setReticleVisible(true);
-            }
+        this._input.onAimStart = (x, y, z) => {
+            if (this._ui.isOverlayOpen()) return;
+            if (this._roundMgr.phase !== 'idle') return;
+            this._powerBar.start();
+            this._render.setReticlePosition(x, y, z);
+            this._render.setReticleVisible(true);
+            this._ui.setActionPrompt('Release to throw!');
         };
 
-        this._input.onShot = (x, y, z) => {
-            if (this._ui.isOverlayOpen())                { this._suppressAim = true; return; }
-            if (this._roundMgr.phase === 'ready')        { this._suppressAim = true; this._roundMgr.applyRestack(); return; }
+        this._input.onAimMove = (x, y, z) => {
+            if (this._roundMgr.phase !== 'idle') return;
+            this._render.setReticlePosition(x, y, z);
+        };
+
+        this._input.onRelease = (x, y, z) => {
+            if (this._ui.isOverlayOpen()) return;
+            if (this._roundMgr.phase !== 'idle') return;
+            this._roundMgr.beginThrow(x, y, z);
+        };
+
+        this._input.onTap = () => {
+            if (this._ui.isOverlayOpen()) return;
+            if (this._roundMgr.phase === 'idle')  { this._powerBar.reset(); this._render.setReticleVisible(false); this._ui.setActionPrompt('Hold to aim'); return; }
+            if (this._roundMgr.phase === 'ready')  { this._roundMgr.applyRestack(); return; }
             if (this._roundMgr.phase === 'done') {
-                this._suppressAim = true;
                 if (this._pendingBattleResult && this.onBattleEnd) {
-                    // Run-mode: gå til shop/map
                     this.onBattleEnd(this._pendingBattleResult);
                 } else {
-                    // Fri mode: start ny runde
                     this._roundMgr.buildStack();
                 }
-                return;
             }
-            if (this._roundMgr.phase !== 'idle') return;
-            this._suppressAim = false;
-            this._roundMgr.beginThrow(x, y, z);
         };
 
         document.getElementById('corner-btns').style.display = '';
@@ -141,8 +146,10 @@ export class BattleScreen {
 
     exit() {
         cancelAnimationFrame(this._animId);
-        this._input.onAim  = null;
-        this._input.onShot = null;
+        this._input.onAimStart = null;
+        this._input.onAimMove  = null;
+        this._input.onRelease  = null;
+        this._input.onTap      = null;
         this._roundMgr.onRoundEnd    = null;
         this._roundMgr.onScoreSettled = null;
         this._ui.clearRunInfo();
