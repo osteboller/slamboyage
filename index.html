@@ -22,6 +22,8 @@
     <link rel="stylesheet" href="src/styles/components/modals.css">
     <link rel="stylesheet" href="src/styles/components/cap-overlay.css">
     <link rel="stylesheet" href="src/styles/components/collection.css">
+    <link rel="stylesheet" href="src/styles/components/pause-overlay.css">
+    <link rel="stylesheet" href="src/styles/components/consumables.css">
 
     <!-- Screens -->
     <link rel="stylesheet" href="src/styles/screens/loading.css">
@@ -41,16 +43,45 @@
         <button class="overlay-btn" id="map-btn" title="Map">MAP</button>
     </div>
 
-    <!-- Top-right: hjælp, reset, tune, fullscreen -->
-    <div id="corner-btns">
+    <!-- Top-right: hjælp, reset, tune, fullscreen (battle only) -->
+    <div id="corner-btns" style="display:none">
+        <button id="home-btn" style="display:none" title="Main menu">⌂</button>
         <button id="help-btn" title="How to play">?</button>
         <button id="resetBtn" title="Reset round">↺</button>
         <button id="slammer-btn" title="Tune">⚙</button>
         <button id="fullscreen-btn" title="Fullscreen">⛶</button>
     </div>
 
+    <!-- Persistent run-mode pause knap (vises på alle run-screens) -->
+    <button id="pause-btn" style="display:none" title="Menu">≡</button>
+
+    <!-- ── Pause overlay (run mode) ──────────────────────────────────────────── -->
+    <div id="pause-overlay">
+        <div id="pause-score-sticker">
+            <p class="pause-score-label">Score</p>
+            <div id="pause-score-val">0</div>
+        </div>
+        <div id="pause-panel">
+            <div class="pause-header">
+                <h2>Paused</h2>
+                <button id="pause-close">✕</button>
+            </div>
+            <div class="pause-actions">
+                <button id="pause-resume"><span class="pause-btn-icon">▶</span>Resume</button>
+                <button id="pause-retry"><span class="pause-btn-icon">↺</span>Retry</button>
+                <button id="pause-tutorial"><span class="pause-btn-icon">?</span>Tutorial</button>
+                <button id="pause-fullscreen"><span class="pause-btn-icon">⛶</span>Fullscreen</button>
+                <button id="pause-mainmenu"><span class="pause-btn-icon">⌂</span>Main Menu</button>
+            </div>
+            <div class="pause-footer">V 0.4 // SLAMBERZ_OS</div>
+        </div>
+    </div>
+
     <!-- Run info (node + goal) — vises kun under battle -->
     <div id="run-info" style="display:none">
+        <div id="double-badge" style="display:none">×2</div>
+        <div id="first-strike-badge" style="display:none">① ×4</div>
+        <div id="last-stand-badge"   style="display:none">⑤ ×4</div>
         <span id="run-node-name"></span><br>GOAL: <b id="run-goal-score"></b>★
     </div>
 
@@ -137,6 +168,27 @@
 
     </div>
 
+    <!-- Consumable slots — permanent, til venstre for score -->
+    <div id="consumable-slots" style="display:none">
+        <div class="consumable-slot" data-slot="0"></div>
+        <div class="consumable-slot" data-slot="1"></div>
+        <div class="consumable-slot" data-slot="2"></div>
+    </div>
+
+    <!-- Consumable popup -->
+    <div id="consumable-popup" style="display:none">
+        <div id="consumable-popup-inner">
+            <div id="consumable-popup-icon"></div>
+            <div id="consumable-popup-name"></div>
+            <div id="consumable-popup-desc"></div>
+            <div id="consumable-popup-btns">
+                <button id="consumable-use-btn">USE</button>
+                <button id="consumable-sell-btn"></button>
+            </div>
+            <button id="consumable-close-btn">✕</button>
+        </div>
+    </div>
+
     <!-- Score — eigen fixed positie boven alle screens -->
     <div id="score-display" style="display:none">
         <span id="score">0</span><span class="score-star">★</span>
@@ -188,17 +240,24 @@
     <script type="module" src="src/main.js"></script>
     <script>
         const btn = document.getElementById('fullscreen-btn');
+        const pauseFullscreenBtn = document.getElementById('pause-fullscreen');
         const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+        async function toggleFullscreen() {
+            try {
+                if (document.fullscreenElement) await document.exitFullscreen();
+                else await document.documentElement.requestFullscreen();
+            } catch (_) {}
+        }
+        window._toggleFullscreen = toggleFullscreen;
+
         if (isIOS) {
             btn.style.display = 'none';
+            pauseFullscreenBtn.style.display = 'none';
         } else {
-            btn.addEventListener('pointerdown', async () => {
-                try {
-                    if (document.fullscreenElement) await document.exitFullscreen();
-                    else await document.documentElement.requestFullscreen();
-                } catch (_) {}
-            });
+            btn.addEventListener('pointerdown', toggleFullscreen);
+            pauseFullscreenBtn.addEventListener('pointerdown', toggleFullscreen);
         }
     </script>
 </body>
