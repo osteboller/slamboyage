@@ -11,6 +11,40 @@ body {
     width: 100vw;
     height: 100vh;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* Rotate overlay — vises i portrait-mode på touch-enheder */
+#rotate-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--clr-bg);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    pointer-events: all;
+}
+#rotate-icon {
+    font-size: 64px;
+    animation: rotate-hint 1.8s ease-in-out infinite;
+}
+#rotate-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+}
+@keyframes rotate-hint {
+    0%,100% { transform: rotate(0deg);   }
+    40%      { transform: rotate(90deg);  }
+    60%      { transform: rotate(90deg);  }
 }
 
 /* Transition cover — skjuler canvas/gamle screens under screen-swaps */

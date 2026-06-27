@@ -12,4 +12,5 @@ export const RELIC_DEFS = [
     { id: 'twin_stack',   name: 'Twin Stack',   icon: '⬡', type: 'stackSize',        value: 5,   description: 'Stack size +5'               },
     { id: 'first_strike', name: 'First Strike', icon: '①', type: 'firstThrow',       value: 4,   description: 'First throw of a round ×4'  },
     { id: 'last_stand',   name: 'Last Stand',   icon: '⑤', type: 'lastThrow',        value: 4,   description: 'Last throw of a round ×4'   },
+    { id: 'extra_arm',    name: 'Extra Arm',    icon: '✋', type: 'extraThrow',       value: 1,   description: '+1 throw every round'        },
 ];

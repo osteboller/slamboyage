@@ -126,7 +126,8 @@ export class RoundManager {
 
         this._phase             = 'idle';
         this._totalScore        = 0; // reset per node/session
-        this._throwsLeft        = THROWS_PER_ROUND;
+        this._throwsTotal       = THROWS_PER_ROUND + (this._gs?.throwBonus ?? 0);
+        this._throwsLeft        = this._throwsTotal;
         this._wonCapsAll        = [];
         this._pendingWon        = [];
         this._pendingFaceDown   = [];
@@ -144,19 +145,19 @@ export class RoundManager {
 
         this._ui.setScore(this._scoreBase);
         this._ui.hideResults();
-        this._ui.updateThrowPips(THROWS_PER_ROUND, THROWS_PER_ROUND);
+        this._ui.updateThrowPips(this._throwsTotal, this._throwsTotal);
 
         const relics = this._gs?.ownedRelics ?? [];
         if (relics.some(r => r.type === 'firstThrow')) this._ui.showFirstStrikeBadge();
         else                                            this._ui.hideFirstStrikeBadge();
         // Last Stand only visible on the last throw — hide at start unless round is 1 throw
-        if (relics.some(r => r.type === 'lastThrow') && THROWS_PER_ROUND === 1) this._ui.showLastStandBadge();
-        else                                                                      this._ui.hideLastStandBadge();
+        if (relics.some(r => r.type === 'lastThrow') && this._throwsTotal === 1) this._ui.showLastStandBadge();
+        else                                                                       this._ui.hideLastStandBadge();
         this._ui.updatePileButtons(this.caps.map(c => c.def), []);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
         this.delay(() => {
-            if (this._phase === 'idle') this._ui.setActionPrompt('Tap the field to throw!');
+            if (this._phase === 'idle') this._ui.setActionPrompt('Hold to aim');
         }, 300);
     }
 
@@ -223,8 +224,8 @@ export class RoundManager {
         this._throwCtrl.reset();
         this._throwCtrl.setCaps(this.caps);
 
-        this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${THROWS_PER_ROUND}`);
-        this._ui.setActionPrompt('Tap to throw!');
+        this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${this._throwsTotal}`);
+        this._ui.setActionPrompt('Hold to aim');
         this._phase = 'idle';
 
         if (this._throwsLeft === 1) {
@@ -258,11 +259,12 @@ export class RoundManager {
         this._scoreBase         = state.scoreBase;
         this._phase             = 'idle';
         this._totalScore        = state.totalScore;
+        this._throwsTotal       = THROWS_PER_ROUND + (this._gs?.throwBonus ?? 0);
         this._throwsLeft        = state.throwsLeft;
         this._wonCapsAll        = [...state.wonCapDefs];
         this._pendingWon        = [];
         this._pendingFaceDown   = [];
-        this._pendingThrowsDone = THROWS_PER_ROUND - state.throwsLeft;
+        this._pendingThrowsDone = this._throwsTotal - state.throwsLeft;
         this._pendingSpawnDefs  = [];
 
         this._throwCtrl.reset();
@@ -276,10 +278,10 @@ export class RoundManager {
 
         this._ui.setScore(state.scoreBase + state.totalScore);
         this._ui.hideResults();
-        this._ui.updateThrowPips(state.throwsLeft, THROWS_PER_ROUND);
+        this._ui.updateThrowPips(state.throwsLeft, this._throwsTotal);
         this._ui.updatePileButtons(this.caps.map(c => c.def), this._wonCapsAll);
-        this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${THROWS_PER_ROUND}`);
-        this._ui.setActionPrompt('Tap the field to throw!');
+        this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${this._throwsTotal}`);
+        this._ui.setActionPrompt('Hold to aim');
     }
 
     // ─── INTERN KAST-AFSLUTNING ────────────────────────────────────────────────
@@ -446,12 +448,12 @@ export class RoundManager {
             ? [...updatedFaceDown.map(c => c.def), ...spawnDefs]
             : updatedFaceDown.map(c => c.def);
         this._ui.updatePileButtons(displayRemaining, this._wonCapsAll);
-        this._ui.updateThrowPips(this._throwsLeft, THROWS_PER_ROUND);
+        this._ui.updateThrowPips(this._throwsLeft, this._throwsTotal);
 
         if (hasNextThrow) {
             this._pendingWon         = actualWon.map(({ cap }) => cap);
             this._pendingFaceDown    = updatedFaceDown;
-            this._pendingThrowsDone  = THROWS_PER_ROUND - this._throwsLeft;
+            this._pendingThrowsDone  = this._throwsTotal - this._throwsLeft;
             this._pendingSpawnDefs   = spawnDefs;
 
             // Animate stack button for each spawn cap, after score floats finish

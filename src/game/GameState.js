@@ -84,6 +84,12 @@ export class GameState {
             .reduce((sum, r) => sum + r.value, 0);
     }
 
+    get throwBonus() {
+        return this.ownedRelics
+            .filter(r => r.type === 'extraThrow')
+            .reduce((sum, r) => sum + r.value, 0);
+    }
+
     hasRelic(relicId)  { return this.ownedRelics.some(r => r.id === relicId); }
 
     addRelic(relicDef) {

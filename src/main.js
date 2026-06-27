@@ -83,8 +83,13 @@ const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice'])
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
 let resumeScreen    = null;
-ui.onPauseRetry    = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
+const closePeekIfOpen = () => {
+    if (currentScreenName !== 'map' && document.getElementById('map-screen')) mapScreen.exit();
+};
+
+ui.onPauseRetry    = () => { closePeekIfOpen(); battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
 ui.onPauseMainMenu = () => {
+    closePeekIfOpen();
     battleSaveState = null;
     resumeScreen    = null;
     if (currentScreenName === 'battle')                          battleSaveState = battleScreen.captureState();
