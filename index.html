@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Slamberz</title>
@@ -106,8 +107,8 @@
             <div class="help-section">
                 <div class="help-icon">👆</div>
                 <div>
-                    <strong>Aim &amp; power</strong>
-                    <p>Tap the field once to throw. <strong>Where you tap</strong> sets the aim. <strong>When you tap</strong> (while the power bar swings) sets the power level. Both are decided by the same tap!</p>
+                    <strong>Aim</strong>
+                    <p><strong>Hold</strong> your finger on the field to aim — a reticle shows where you'll throw. Drag to adjust. The power bar starts swinging the moment you press down.</p>
                 </div>
             </div>
 
@@ -118,14 +119,14 @@
                     </div>
                 </div>
                 <div>
-                    <strong>Power levels</strong>
-                    <p>The power bar swings up and down. Your power level is set by where the bar is when you tap:</p>
+                    <strong>Power</strong>
+                    <p>The power bar swings while you hold. <strong>Release</strong> when the bar is where you want it — that's when the throw fires:</p>
                     <ul>
                         <li><span class="pwr-green">Green</span> = full power — strong blast, hard to control</li>
                         <li><span class="pwr-yellow">Yellow</span> = medium power</li>
                         <li><span class="pwr-red">Red</span> = weak blast — good control</li>
                     </ul>
-                    <p class="help-tip">Tip: Timing is everything! Tap when the bar is where you want the power level.</p>
+                    <p class="help-tip">Tip: Hold to line up your shot, then release at the right moment!</p>
                 </div>
             </div>
 
@@ -133,15 +134,15 @@
                 <div class="help-icon">🔄</div>
                 <div>
                     <strong>Rounds</strong>
-                    <p>You have <strong>3 throws</strong> per round. Between throws, caps are restacked automatically — tap to confirm and continue.</p>
+                    <p>You have <strong>3 throws</strong> per round. Between throws, caps are restacked — tap anywhere to confirm and continue.</p>
                 </div>
             </div>
 
             <div class="help-section">
-                <div class="help-icon">⚙</div>
+                <div class="help-icon">🎒</div>
                 <div>
-                    <strong>Settings</strong>
-                    <p>Use the ⚙ button in the top right to select slammer and adjust physics and cap count.</p>
+                    <strong>Bag</strong>
+                    <p>Open the Bag to see your caps, relics and cards — and to equip a different slammer.</p>
                 </div>
             </div>
         </div>
@@ -231,6 +232,14 @@
         <div id="power-mask"></div>
     </div>
 
+    <!-- ── Rotate overlay ───────────────────────────────────────────────── -->
+    <div id="rotate-overlay">
+        <div id="rotate-inner">
+            <div id="rotate-icon">⟳</div>
+            <div id="rotate-text">Rotate your device</div>
+        </div>
+    </div>
+
     <!-- ── Loading screen ───────────────────────────────────────────────── -->
     <div id="loading-screen">
         <div id="loading-title">SLAMBERZ</div>
@@ -260,6 +269,22 @@
         } else {
             btn.addEventListener('pointerdown', toggleFullscreen);
             pauseFullscreenBtn.addEventListener('pointerdown', toggleFullscreen);
+        }
+
+        // ── Orientation lock ──────────────────────────────────────────────
+        const rotateOverlay = document.getElementById('rotate-overlay');
+
+        function checkOrientation() {
+            const isPortrait = window.innerHeight > window.innerWidth;
+            rotateOverlay.style.display = isPortrait ? 'flex' : 'none';
+        }
+
+        window.addEventListener('resize', checkOrientation);
+        checkOrientation();
+
+        // Forsøg API-lås (virker i fullscreen/PWA på Android, fejler stille på iOS)
+        if (screen.orientation?.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
         }
     </script>
 </body>
