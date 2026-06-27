@@ -15,7 +15,9 @@ export class UIManager {
         this._remainingDefs = [];
         this._wonDefs       = [];
 
-        this.onGravityChange = null;
+        this.onGravityChange  = null;
+        this.onPauseRetry     = null; // sat af BattleScreen i run-mode
+        this.onPauseMainMenu  = null; // sat af main.js
 
         this._gameState = null;
 
@@ -24,6 +26,7 @@ export class UIManager {
         this._buildTunePanel();
         this._buildPileOverlay();
         this._buildHelp();
+        this._buildPauseOverlay();
 
     }
 
@@ -135,6 +138,10 @@ export class UIManager {
                 }, 180 + i * 200);
             }
             setTimeout(() => el.remove(), 180 + meta.count * 200 + 700);
+        } else if (meta.type === 'magnet') {
+            el.classList.add('effect-indicator--magnet');
+            el.textContent = `🧲 ×${meta.count}`;
+            setTimeout(() => el.remove(), 1200);
         }
     }
 
@@ -159,6 +166,35 @@ export class UIManager {
         btn.addEventListener('animationend', () => btn.classList.remove('collect-flash'), { once: true });
 
         return { x: cx, y: cy };
+    }
+
+    popStackIcon(def) {
+        const btn  = document.getElementById('pile-rem-btn');
+        const rect = btn.getBoundingClientRect();
+        const cx   = rect.left + rect.width  / 2;
+        const cy   = rect.top  - 15;
+
+        const img  = document.createElement('img');
+        img.src    = def.texFront ?? '';
+        img.className = 'collect-icon';
+        img.style.left = (cx - 26) + 'px';
+        img.style.top  = cy + 'px';
+        document.body.appendChild(img);
+        img.addEventListener('animationend', () => img.remove());
+
+        btn.classList.remove('collect-flash');
+        void btn.offsetWidth;
+        btn.classList.add('collect-flash');
+        btn.addEventListener('animationend', () => btn.classList.remove('collect-flash'), { once: true });
+    }
+
+    flashBagBtn() {
+        const btn = document.getElementById('bag-btn');
+        if (!btn) return;
+        btn.classList.remove('collect-flash');
+        void btn.offsetWidth;
+        btn.classList.add('collect-flash');
+        btn.addEventListener('animationend', () => btn.classList.remove('collect-flash'), { once: true });
     }
 
     setActionPrompt(text) {
@@ -235,28 +271,25 @@ export class UIManager {
     }
 
     showThresholdResult(clearScore, totalScore, won) {
-        setTimeout(() => {
-            const goalEl = document.getElementById('run-goal-score');
-            const runInfo = document.getElementById('run-info');
-            if (!goalEl || !runInfo) return;
+        const goalEl  = document.getElementById('run-goal-score');
+        const runInfo = document.getElementById('run-info');
+        if (!goalEl || !runInfo) return;
 
-            // Tween the goal number from clearScore down toward what's left
-            const target = won ? 0 : clearScore - totalScore;
-            const duration = Math.min(600, Math.max(200, clearScore * 12));
-            const start = performance.now();
-            const step = (now) => {
-                const t = Math.min((now - start) / duration, 1);
-                const eased = 1 - Math.pow(1 - t, 3);
-                goalEl.textContent = Math.round(clearScore + (target - clearScore) * eased);
-                if (t < 1) {
-                    requestAnimationFrame(step);
-                } else {
-                    goalEl.textContent = target;
-                    runInfo.classList.add(won ? 'run-info--won' : 'run-info--lost');
-                }
-            };
-            requestAnimationFrame(step);
-        }, 750);
+        const target   = won ? 0 : clearScore - totalScore;
+        const duration = Math.min(600, Math.max(200, clearScore * 12));
+        const start    = performance.now();
+        const step = (now) => {
+            const t     = Math.min((now - start) / duration, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            goalEl.textContent = Math.round(clearScore + (target - clearScore) * eased);
+            if (t < 1) {
+                requestAnimationFrame(step);
+            } else {
+                goalEl.textContent = target;
+                runInfo.classList.add(won ? 'run-info--won' : 'run-info--lost');
+            }
+        };
+        requestAnimationFrame(step);
     }
 
     _spawnAnchorFloat(text, extraClass) {
@@ -278,19 +311,34 @@ export class UIManager {
     showScoreDeduct(amount) { this._spawnAnchorFloat(`-${amount}`, 'score-float--deduct'); }
     showScoreGain(amount)   { this._spawnAnchorFloat(`+${amount}`, 'bonus'); }
 
+    showDoubleBadge(mult) {
+        const el = document.getElementById('double-badge');
+        el.textContent = `×${mult}`;
+        el.style.display = '';
+    }
+    hideDoubleBadge()      { document.getElementById('double-badge').style.display = 'none'; }
+    showFirstStrikeBadge() { document.getElementById('first-strike-badge').style.display = ''; }
+    hideFirstStrikeBadge() { document.getElementById('first-strike-badge').style.display = 'none'; }
+    showLastStandBadge()   { document.getElementById('last-stand-badge').style.display = ''; }
+    hideLastStandBadge()   { document.getElementById('last-stand-badge').style.display = 'none'; }
+
     showRunOverlay() {
-        document.getElementById('tl-overlay').style.display  = '';
+        document.getElementById('tl-overlay').style.display    = '';
         document.getElementById('score-display').style.display = '';
+        document.getElementById('pause-btn').style.display     = '';
     }
     hideRunOverlay() {
-        document.getElementById('tl-overlay').style.display  = 'none';
+        document.getElementById('tl-overlay').style.display    = 'none';
         document.getElementById('score-display').style.display = 'none';
+        document.getElementById('pause-btn').style.display     = 'none';
     }
 
     setRunInfo(nodeName, clearScore) {
+        const ri = document.getElementById('run-info');
+        ri.classList.remove('run-info--won', 'run-info--lost');
         document.getElementById('run-node-name').textContent  = nodeName;
         document.getElementById('run-goal-score').textContent = clearScore;
-        document.getElementById('run-info').style.display     = '';
+        ri.style.display = '';
     }
     clearRunInfo() {
         document.getElementById('run-info').style.display = 'none';
@@ -321,7 +369,27 @@ export class UIManager {
     isOverlayOpen() {
         return document.getElementById('cap-overlay')?.style.display === 'block'
             || document.getElementById('cap-detail')?.style.display  === 'block'
-            || document.getElementById('slammer-detail')?.style.display === 'block';
+            || document.getElementById('slammer-detail')?.style.display === 'block'
+            || this.isPauseOpen();
+    }
+
+    // ─── PAUSE OVERLAY ───────────────────────────────────────────────────────
+    showPauseOverlay() {
+        const scoreEl = document.getElementById('score');
+        document.getElementById('pause-score-val').textContent =
+            scoreEl ? scoreEl.textContent : '0';
+        document.getElementById('pause-overlay').classList.add('open');
+    }
+    hidePauseOverlay() {
+        document.getElementById('pause-overlay').classList.remove('open');
+    }
+    isPauseOpen() {
+        return document.getElementById('pause-overlay')?.classList.contains('open') ?? false;
+    }
+
+    // ─── HJÆLP-ÅBNER (bruges fra pause overlay) ──────────────────────────────
+    openHelp() {
+        document.getElementById('help-modal')?.classList.add('open');
     }
 
     // ─── SLAMMER SELECTION ───────────────────────────────────────────────────
@@ -727,6 +795,52 @@ export class UIManager {
         // Escape-tast lukker
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') close();
+        });
+    }
+
+    // ─── PAUSE OVERLAY SETUP (én gang, persistent) ───────────────────────────
+    _buildPauseOverlay() {
+        const overlay = document.getElementById('pause-overlay');
+        const hide    = () => this.hidePauseOverlay();
+
+        document.getElementById('pause-btn')
+            .addEventListener('pointerdown', e => { e.stopPropagation(); this.showPauseOverlay(); });
+
+        document.getElementById('pause-close')
+            .addEventListener('pointerdown',  e => { e.stopPropagation(); hide(); });
+        document.getElementById('pause-resume')
+            .addEventListener('pointerdown',  e => { e.stopPropagation(); hide(); });
+
+        document.getElementById('pause-retry')
+            .addEventListener('pointerdown',  e => {
+                e.stopPropagation();
+                hide();
+                if (this.onPauseRetry) this.onPauseRetry();
+            });
+
+        document.getElementById('pause-tutorial')
+            .addEventListener('pointerdown',  e => {
+                e.stopPropagation();
+                hide();
+                this.openHelp();
+            });
+
+        document.getElementById('pause-fullscreen')
+            .addEventListener('pointerdown',  e => {
+                e.stopPropagation();
+                if (window._toggleFullscreen) window._toggleFullscreen();
+            });
+
+        document.getElementById('pause-mainmenu')
+            .addEventListener('pointerdown',  e => {
+                e.stopPropagation();
+                hide();
+                if (this.onPauseMainMenu) this.onPauseMainMenu();
+            });
+
+        // Klik på backdrop lukker
+        overlay.addEventListener('pointerdown', e => {
+            if (e.target === overlay) hide();
         });
     }
 

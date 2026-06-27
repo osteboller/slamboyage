@@ -5,4 +5,7 @@ export const EFFECT_LABELS = {
     'neighbour':  'Pack: +1★ per close neighbour',
     'solo':       'Lone Wolf: +2★ if isolated',
     'streak':     'Streak: +1★ per flip this throw',
+    'spawn':      'Spawn: adds a copy to the next throw',
+    'magnet':     'Lasso: pulls nearby caps closer',
+    'cue_slam':   'Cue Ball: blasts a random Pewl cap when flipped',
 };

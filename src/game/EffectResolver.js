@@ -13,6 +13,7 @@ const EMPTY_RESULT = Object.freeze({
     triggerCaps:    [],
     fx:             null,
     effectMeta:     null, // { type, ... } — drives visual effect ring in UI
+    spawnCaps:      [],   // cap defs to inject into the next throw's stack
 });
 
 export class EffectResolver {

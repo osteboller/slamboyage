@@ -16,6 +16,9 @@ export class GameState {
         this._loop          = 1;
         this.rerollCost     = 1;
         this.discardCost    = 2;
+        this.shopOffer      = null;
+        this.consumables    = [null, null, null];
+        this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 
     // ─── RUN ──────────────────────────────────────────────────────────────────
@@ -26,13 +29,16 @@ export class GameState {
     startRun() {
         this._loop          = 1;
         this.nodeIndex      = 0;
-        this.score          = 0;
+        this.score          = 100;
         this.stackSizeLimit = 10;
         this.ownedCaps      = [...STARTER_CAPS];
         this.ownedRelics    = [];
         this.runNodes       = this._generateNodes(1);
         this.rerollCost     = 1;
         this.discardCost    = 2;
+        this.shopOffer      = null;
+        this.consumables    = [null, null, null];
+        this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 
     // Call when all nodes cleared — bumps loop, resets progress, scales thresholds
@@ -42,6 +48,7 @@ export class GameState {
         this.runNodes    = this._generateNodes(this._loop);
         this.rerollCost  = 1;
         this.discardCost = 2;
+        this.shopOffer   = null;
     }
 
     // Called after a node battle with the player's full accumulated score.
@@ -82,6 +89,28 @@ export class GameState {
     addRelic(relicDef) {
         this.ownedRelics.push(relicDef);
         if (relicDef.type === 'stackSize') this.stackSizeLimit += relicDef.value;
+    }
+
+    // ─── CONSUMABLES ──────────────────────────────────────────────────────────
+    addConsumable(def) {
+        const slot = this.consumables.findIndex(s => s === null);
+        if (slot === -1) return false;
+        this.consumables[slot] = def;
+        return slot; // return index so callers can animate the correct slot
+    }
+
+    useConsumable(idx) {
+        const def = this.consumables[idx];
+        if (!def) return null;
+        this.consumables[idx] = null;
+        return def;
+    }
+
+    sellConsumable(idx) {
+        const def = this.consumables[idx];
+        if (!def) return;
+        this.score += def.sellPrice;
+        this.consumables[idx] = null;
     }
 
     // ─── SHOP ─────────────────────────────────────────────────────────────────
