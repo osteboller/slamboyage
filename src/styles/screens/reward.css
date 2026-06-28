@@ -6,197 +6,225 @@
     background-image: var(--bg-dot-grid);
     background-size: var(--bg-dot-size);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-}
-
-.reward-inner {
-    display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 18px;
-    padding: 28px 20px;
-    max-width: 92vw;
+    justify-content: center;
+    gap: clamp(12px, 2vh, 20px);
+    z-index: 200;
+    padding: clamp(16px, 3vh, 24px) clamp(12px, 3vw, 24px);
+}
+
+/* Skip — absolute top-right, red sticker */
+#reward-skip-btn {
+    position: absolute;
+    top: 14px;
+    right: 70px;
+    background: var(--clr-red);
+    color: #fff;
+    border: 3px solid #000;
+    box-shadow: 4px 4px 0px #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(9px, 1.8vw, 12px);
+    font-weight: 700;
+    padding: 6px 14px;
+    cursor: pointer;
+    transform: rotate(-2deg);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    transition: box-shadow 0.08s, transform 0.08s;
+    z-index: 1;
+}
+#reward-skip-btn:hover  { box-shadow: 2px 2px 0px #000; transform: rotate(-2deg) translateY(2px); }
+#reward-skip-btn:active { box-shadow: none;              transform: rotate(-2deg) translateY(4px); }
+.reward-skip-bonus { font-weight: 800; }
+
+/* Title sticker box */
+.reward-title-box {
+    display: inline-block;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: 6px 6px 0px #000;
+    padding: clamp(8px, 1.5vh, 14px) clamp(16px, 4vw, 28px);
+    transform: rotate(-1deg) translateX(-24px);
+    text-align: center;
+    flex-shrink: 0;
 }
 
 .reward-title {
     font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(18px, 4vw, 26px);
+    font-size: clamp(13px, 3vw, 22px);
     font-weight: 800;
     color: #000;
     letter-spacing: 0.02em;
     text-transform: uppercase;
-    text-align: center;
-    transform: rotate(-1deg);
+    margin: 0;
 }
 
 .reward-sub {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px;
+    font-size: clamp(10px, 1.8vw, 13px);
     color: var(--text-secondary);
-    margin: -10px 0 0;
-    text-align: center;
+    margin: 4px 0 0;
 }
 
+/* Cards grid */
 .reward-cards {
-    display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: clamp(10px, 2vw, 20px);
+    width: 100%;
+    max-width: min(92vw, 680px);
+    align-items: start;
 }
 
+/* Per-card scattered rotation via CSS custom property */
 .reward-card {
+    --rot: 0deg;
+    position: relative;
     background: var(--clr-bg-panel);
-    border: 4px solid var(--border-ink);
-    box-shadow: var(--shadow-sticker);
-    border-radius: 0;
-    padding: 16px 14px 12px;
+    border: 4px solid #000;
+    box-shadow: 8px 8px 0px #000;
+    padding: clamp(10px, 2vw, 16px) clamp(10px, 2vw, 14px) clamp(8px, 1.5vw, 12px);
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: clamp(5px, 1vh, 8px);
     cursor: pointer;
-    transition: box-shadow 0.08s, transform 0.1s;
-    width: clamp(110px, 26vw, 160px);
+    transform: rotate(var(--rot));
+    transition: box-shadow 0.1s, transform 0.1s;
+    text-align: left;
 }
-.reward-card:hover, .reward-card:focus {
-    box-shadow: var(--shadow-raised);
-    transform: translateY(-3px);
-    outline: none;
-}
-.reward-card:active {
-    box-shadow: var(--shadow-pressed);
-    transform: translate(3px, 3px);
-}
+.reward-card:hover  { box-shadow: 4px 4px 0px #000; transform: rotate(var(--rot)) translateY(-4px); }
+.reward-card:active { box-shadow: none;              transform: rotate(var(--rot)) translateY(4px);  }
 
+.reward-cards .reward-card:nth-child(1) { --rot:  2deg; }
+.reward-cards .reward-card:nth-child(2) { --rot: -1deg; z-index: 1; }
+.reward-cards .reward-card:nth-child(3) { --rot:  3deg; }
+
+/* Rarity badge */
+.reward-rarity {
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(7px, 1.2vw, 9px);
+    font-weight: 700;
+    padding: 3px 8px;
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    pointer-events: none;
+}
+/* COMMON + UNCOMMON → top-left */
+.reward-rarity--common,
+.reward-rarity--uncommon { top: -12px; left: -10px; transform: rotate(-4deg); }
+/* RARE + LEGENDARY → top-right */
+.reward-rarity--rare,
+.reward-rarity--legendary { top: -12px; right: -10px; left: auto; transform: rotate(5deg); }
+
+.reward-rarity--common    { background: #000;            color: #fff; }
+.reward-rarity--uncommon  { background: #5d5f5f;         color: #fff; }
+.reward-rarity--rare      { background: var(--clr-red);  color: #fff; }
+.reward-rarity--legendary { background: #f5c842;          color: #000; }
+
+/* Cap image — larger, spin on card hover */
 .reward-cap-img {
-    width: 72px;
-    height: 72px;
+    width: clamp(64px, 13vw, 100px);
+    height: clamp(64px, 13vw, 100px);
     border-radius: 50%;
     object-fit: cover;
-    border: 4px solid var(--border-ink);
-    box-shadow: 3px 3px 0px #000;
+    border: 4px solid #000;
+    align-self: center;
     pointer-events: none;
+    transition: transform 0.5s;
+    flex-shrink: 0;
 }
+.reward-card:hover .reward-cap-img { transform: rotate(15deg); }
 
+/* Cap name with border-bottom separator */
 .reward-cap-name {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
+    font-size: clamp(9px, 1.8vw, 13px);
     font-weight: 700;
-    color: var(--text-primary);
-    text-align: center;
-    pointer-events: none;
+    color: #000;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+    pointer-events: none;
+    width: 100%;
+    border-bottom: 4px solid #000;
+    padding-bottom: clamp(4px, 0.8vh, 7px);
+    margin-bottom: clamp(2px, 0.4vh, 4px);
 }
 
 .reward-cap-series {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 10px;
+    font-size: clamp(8px, 1.4vw, 11px);
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    text-align: center;
     pointer-events: none;
+    width: 100%;
 }
 
 .reward-effect {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
+    font-size: clamp(8px, 1.4vw, 10px);
     color: #000;
     background: #f5c842;
     border: 2px solid #000;
     padding: 2px 7px;
-    text-align: center;
     pointer-events: none;
     font-weight: 700;
+    align-self: flex-start;
 }
 
-.reward-pick-label {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 11px;
+/* Quick pick sticker */
+.reward-quick-pick {
+    margin-top: auto;
+    align-self: flex-start;
+    background: #000;
+    color: #fff;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.4);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(8px, 1.4vw, 10px);
     font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    pointer-events: none;
+    padding: 4px 10px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transform: rotate(-1deg);
+    transition: box-shadow 0.08s, transform 0.08s;
 }
+.reward-quick-pick:hover  { box-shadow: 3px 3px 0px #000; transform: rotate(-1deg) translate(-1px,-1px); }
+.reward-quick-pick:active { box-shadow: none;              transform: rotate(-1deg) translate(2px,2px);   }
 
-.reward-card--relic {
-    justify-content: flex-start;
-    padding: 16px 14px;
-    gap: 6px;
-    text-align: left;
-}
+/* Relic variant */
+.reward-card--relic { justify-content: flex-start; gap: clamp(4px, 0.8vh, 6px); }
 .reward-relic-icon {
-    font-size: 36px;
+    font-size: clamp(28px, 5vw, 40px);
     line-height: 1;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     pointer-events: none;
+    align-self: center;
 }
 .reward-relic-desc {
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 11px;
+    font-size: clamp(9px, 1.6vw, 11px);
     color: var(--text-secondary);
     pointer-events: none;
     line-height: 1.4;
+    width: 100%;
 }
 
-.reward-card:hover .reward-pick-label,
-.reward-card:focus .reward-pick-label { color: var(--text-primary); }
-
-.reward-card.selected {
-    border-color: #000;
-    background: #f5c842;
-    box-shadow: var(--shadow-raised);
-    transform: translateY(-4px);
+/* Entrance animation — includes --rot so hover still works after animation */
+@keyframes reward-card-in {
+    from { opacity: 0; transform: rotate(var(--rot)) scale(0.5) translateY(12px); }
+    55%  { opacity: 1; transform: rotate(var(--rot)) scale(1.08) translateY(-3px); }
+    75%  { transform: rotate(var(--rot)) scale(0.97) translateY(1px); }
+    100% { opacity: 1; transform: rotate(var(--rot)) scale(1) translateY(0); }
 }
-.reward-card.selected .reward-pick-label { color: #000; font-weight: 800; }
-
-.reward-cards:has(.selected) .reward-card:not(.selected) {
-    opacity: 0.4;
-    transform: none;
-    box-shadow: 2px 2px 0px #000;
+.reward-card--entering {
+    opacity: 0;
+    animation: reward-card-in 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
-
-.reward-confirm-btn {
-    background: #000;
-    color: #fff;
-    border: 4px solid #000;
-    box-shadow: var(--shadow-raised);
-    border-radius: 0;
-    padding: 12px 36px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    animation: screen-fade-in 0.15s ease-out;
-    transition: box-shadow 0.08s, transform 0.08s;
-}
-.reward-confirm-btn:active {
-    box-shadow: var(--shadow-pressed);
-    transform: translate(3px, 3px);
-}
-
-.reward-skip {
-    background: var(--clr-bg-panel);
-    border: 3px solid var(--border-ink);
-    box-shadow: 3px 3px 0px #000;
-    border-radius: 0;
-    padding: 9px 22px;
-    color: var(--text-secondary);
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    margin-top: 6px;
-    transition: box-shadow 0.08s, transform 0.08s;
-}
-.reward-skip:active {
-    box-shadow: 1px 1px 0px #000;
-    transform: translate(2px, 2px);
-}
-.reward-skip-bonus { color: #000; font-weight: 800; }

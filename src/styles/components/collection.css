@@ -119,8 +119,6 @@
     height: 58px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid var(--border-ink);
-    box-shadow: 2px 2px 0px #000;
 }
 
 .col-cap-name {

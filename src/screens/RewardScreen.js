@@ -33,23 +33,36 @@ export class RewardScreen {
             return;
         }
 
+        this._choices  = choices;
         this._selected = null;
         this._render(choices);
 
         this._el.addEventListener('click', e => {
-            // Klik på cap-billede → åbn viewer uden at vælge kortet
-            const capImg = e.target.closest('.reward-cap-img');
-            if (capImg && this._mode === 'cap') {
-                const key = capImg.closest('.reward-card[data-key]')?.dataset.key;
-                const def = choices.find(c => c.name === key);
-                if (def) this._ui.showCapDetail(def, false);
+            // Quick-pick sticker → direkte valg
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) {
+                this._confirm(quickPick.dataset.key);
                 return;
             }
+            // Klik på kort → åbn detail viewer med PICK-sticker
             const card = e.target.closest('.reward-card[data-key]');
             if (card) {
                 const key = card.dataset.key;
-                if (this._selected === key) this._confirm(key, choices);
-                else                        this._select(key);
+                if (this._mode === 'cap') {
+                    const def = this._choices.find(c => c.name === key);
+                    if (def) this._ui.showCapDetail(def, false, {
+                        label:    'PICK',
+                        color:    '#000',
+                        callback: () => this._confirm(key),
+                    });
+                } else {
+                    const def = this._choices.find(r => r.id === key);
+                    if (def) this._ui.showRelicDetail(def, {
+                        label:    'PICK',
+                        color:    '#000',
+                        callback: () => this._confirm(key),
+                    });
+                }
                 return;
             }
             if (e.target.closest('#reward-skip-btn')) {
@@ -67,6 +80,7 @@ export class RewardScreen {
         if (!this._el) return;
         const choices = this._mode === 'relic' ? this._pickRelics() : this._pickCaps();
         if (choices.length === 0) return;
+        this._choices  = choices;
         this._selected = null;
         this._render(choices);
     }
@@ -80,22 +94,12 @@ export class RewardScreen {
         if (this.onContinue) this.onContinue();
     }
 
-    _select(key) {
-        this._selected = key;
-        this._el.querySelectorAll('.reward-card[data-key]').forEach(c => {
-            const sel = c.dataset.key === key;
-            c.classList.toggle('selected', sel);
-            const lbl = c.querySelector('.reward-pick-label');
-            if (lbl) lbl.textContent = sel ? 'Tap again ✓' : 'Pick';
-        });
-    }
-
-    _confirm(key, choices) {
+    _confirm(key) {
         if (this._mode === 'relic') {
-            const def = choices.find(r => r.id === key);
+            const def = this._choices.find(r => r.id === key);
             if (def) this._gs.addRelic(def);
         } else {
-            const def = choices.find(c => c.name === key);
+            const def = this._choices.find(c => c.name === key);
             if (def) this._gs.ownedCaps.push({ def, enchant: null });
         }
         if (this.onContinue) this.onContinue();
@@ -117,7 +121,7 @@ export class RewardScreen {
         const nodeLabel = this._node?.type === 'relic'
             ? 'Relic Event'
             : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!');
-        const sub       = this._mode === 'relic'
+        const sub = this._mode === 'relic'
             ? 'Choose a relic — permanent passive bonus'
             : 'Choose a cap for your collection';
 
@@ -126,45 +130,58 @@ export class RewardScreen {
             : this._capCards(choices);
 
         this._el.innerHTML = `
-            <div class="reward-inner">
+            <button id="reward-skip-btn">
+                SKIP &nbsp;<span class="reward-skip-bonus">+${SKIP_BONUS}★</span>
+            </button>
+            <div class="reward-title-box">
                 <h2 class="reward-title">${nodeLabel}</h2>
                 <p class="reward-sub">${sub}</p>
-                <div class="reward-cards">${cardsHTML}</div>
-                <button id="reward-skip-btn" class="reward-skip">
-                    Skip &nbsp;<span class="reward-skip-bonus">+${SKIP_BONUS}★</span>
-                </button>
-            </div>`;
+            </div>
+            <div class="reward-cards">${cardsHTML}</div>`;
 
         this._el.querySelectorAll('.reward-card').forEach((card, i) => {
-            card.classList.add('band-item--entering');
-            card.style.animationDelay = `${i * 80}ms`;
+            const delay = i * 90;
+            card.classList.add('reward-card--entering');
+            card.style.animationDelay = `${delay}ms`;
+            setTimeout(() => card.classList.remove('reward-card--entering'), delay + 420);
         });
+    }
+
+    _rarityInfo(rarity) {
+        switch (rarity) {
+            case 4:  return { label: 'LEGENDARY', cls: 'legendary' };
+            case 3:  return { label: 'RARE',      cls: 'rare'      };
+            case 2:  return { label: 'UNCOMMON',  cls: 'uncommon'  };
+            default: return { label: 'COMMON',    cls: 'common'    };
+        }
     }
 
     _capCards(caps) {
         const seriesLabel = s => s.replaceAll('_', ' ');
         return caps.map(cap => {
+            const r           = this._rarityInfo(cap.rarity ?? 1);
             const effectLabel = cap.effect ? EFFECT_LABELS[cap.effect] ?? cap.effect : '';
             const effectBadge = effectLabel
                 ? `<div class="reward-effect">${effectLabel}</div>` : '';
-            return `<button class="reward-card" data-key="${cap.name}">
+            return `<div class="reward-card" data-key="${cap.name}">
+                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 <img class="reward-cap-img" src="${cap.texFront}" alt="${cap.name}">
                 <div class="reward-cap-name">${cap.name}</div>
                 <div class="reward-cap-series">${seriesLabel(cap.series)}</div>
                 ${effectBadge}
-                <div class="reward-pick-label">Pick</div>
-            </button>`;
+                <button class="reward-quick-pick" data-key="${cap.name}">▶ PICK</button>
+            </div>`;
         }).join('');
     }
 
     _relicCards(relics) {
         return relics.map(r => `
-            <button class="reward-card reward-card--relic" data-key="${r.id}">
+            <div class="reward-card reward-card--relic" data-key="${r.id}">
                 <div class="reward-relic-icon">${r.icon}</div>
                 <div class="reward-cap-name">${r.name}</div>
                 <div class="reward-relic-desc">${r.description}</div>
-                <div class="reward-pick-label">Pick</div>
-            </button>`
+                <button class="reward-quick-pick" data-key="${r.id}">▶ PICK</button>
+            </div>`
         ).join('');
     }
 }

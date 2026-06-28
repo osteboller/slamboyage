@@ -369,6 +369,7 @@ export class UIManager {
     isOverlayOpen() {
         return document.getElementById('cap-overlay')?.style.display === 'block'
             || document.getElementById('cap-detail')?.style.display  === 'block'
+            || document.getElementById('relic-detail')?.style.display === 'block'
             || document.getElementById('slammer-detail')?.style.display === 'block'
             || this.isPauseOpen();
     }
@@ -592,9 +593,10 @@ export class UIManager {
 
     // ─── PILE OVERLAY ────────────────────────────────────────────────────────
     _buildPileOverlay() {
-        const overlay = document.getElementById('cap-overlay');
-        const detail  = document.getElementById('cap-detail');
+        const overlay    = document.getElementById('cap-overlay');
+        const detail     = document.getElementById('cap-detail');
         const slamDetail = document.getElementById('slammer-detail');
+        const relicDetail = document.getElementById('relic-detail');
 
         document.getElementById('pile-won-btn').addEventListener('pointerdown', (e) => {
             e.stopPropagation();
@@ -613,14 +615,16 @@ export class UIManager {
             });
         }
 
-        overlay.addEventListener('pointerdown', e => e.stopPropagation());
-        detail.addEventListener('pointerdown',  e => e.stopPropagation());
+        overlay.addEventListener('pointerdown',    e => e.stopPropagation());
+        detail.addEventListener('pointerdown',     e => e.stopPropagation());
         slamDetail.addEventListener('pointerdown', e => e.stopPropagation());
+        relicDetail.addEventListener('pointerdown', e => e.stopPropagation());
 
         document.addEventListener('pointerdown', () => {
-            overlay.style.display = 'none';
-            detail.style.display  = 'none';
-            slamDetail.style.display = 'none';
+            overlay.style.display     = 'none';
+            detail.style.display      = 'none';
+            slamDetail.style.display  = 'none';
+            relicDetail.style.display = 'none';
             this._capViewer.hide();
             this._slammerViewer.hide();
         });
@@ -845,12 +849,14 @@ export class UIManager {
     }
 
     // ─── CAP DETAIL POPUP ────────────────────────────────────────────────────
-    showCapDetail(def, lit = false) { this._showCapDetail(def, lit); }
+    // action = { label, price, color, callback } — optional sticker button on viewer
+    showCapDetail(def, lit = false, action = null) { this._showCapDetail(def, lit, action); }
 
-    _showCapDetail(def, lit) {
-        const detail = document.getElementById('cap-detail');
-        const nameEl = document.getElementById('cap-detail-name');
-        const subEl  = document.getElementById('cap-detail-sub');
+    _showCapDetail(def, lit, action = null) {
+        const detail    = document.getElementById('cap-detail');
+        const nameEl    = document.getElementById('cap-detail-name');
+        const subEl     = document.getElementById('cap-detail-sub');
+        const actionEl  = document.getElementById('cap-detail-action');
 
         nameEl.textContent = def.name;
         const seriesLabel  = def.series?.replace(/_/g, ' ') ?? '';
@@ -859,7 +865,57 @@ export class UIManager {
 
         detail.classList.toggle('cap-detail--lit', lit);
 
+        if (action) {
+            actionEl.innerHTML         = `${action.label}${action.price ? `<br>${action.price}` : ''}`;
+            actionEl.style.background  = action.color ?? 'var(--clr-red)';
+            actionEl.style.color       = action.textColor ?? '#fff';
+            actionEl.style.display     = '';
+            // Replace node to drop any previous listener
+            const fresh = actionEl.cloneNode(true);
+            actionEl.parentNode.replaceChild(fresh, actionEl);
+            fresh.addEventListener('click', e => {
+                e.stopPropagation();
+                detail.style.display = 'none';
+                this._capViewer.hide();
+                action.callback();
+            });
+        } else {
+            actionEl.style.display = 'none';
+        }
+
         this._capViewer.show(def, 'cap');
+        detail.style.display = 'block';
+    }
+
+    // ─── RELIC / CARD DETAIL POPUP ───────────────────────────────────────────
+    // item = { icon, name, description }   action = { label, price, color, callback }
+    showRelicDetail(item, action = null) {
+        const detail    = document.getElementById('relic-detail');
+        const iconEl    = document.getElementById('relic-detail-icon');
+        const nameEl    = document.getElementById('relic-detail-name');
+        const descEl    = document.getElementById('relic-detail-desc');
+        const actionEl  = document.getElementById('relic-detail-action');
+
+        iconEl.textContent = item.icon ?? '';
+        nameEl.textContent = item.name ?? '';
+        descEl.textContent = item.description ?? '';
+
+        if (action) {
+            actionEl.innerHTML        = `${action.label}${action.price ? ` · ${action.price}` : ''}`;
+            actionEl.style.background = action.color ?? '#000';
+            actionEl.style.color      = action.textColor ?? '#fff';
+            actionEl.style.display    = '';
+            const fresh = actionEl.cloneNode(true);
+            actionEl.parentNode.replaceChild(fresh, actionEl);
+            fresh.addEventListener('click', e => {
+                e.stopPropagation();
+                detail.style.display = 'none';
+                action.callback();
+            });
+        } else {
+            actionEl.style.display = 'none';
+        }
+
         detail.style.display = 'block';
     }
 

@@ -164,6 +164,18 @@
     pointer-events: none;
 }
 
+/* ─── CAP DISCARD ────────────────────────────────────────────────────────── */
+@keyframes cap-discard-out {
+    0%   { opacity: 1; transform: scale(1)    rotate(0deg);   filter: brightness(1);                      }
+    15%  { opacity: 1; transform: scale(1.05) rotate(-8deg);  filter: brightness(0.9) saturate(2);        }
+    35%  { opacity: 1; transform: scale(0.95) rotate(6deg);   filter: brightness(0.7) saturate(3) sepia(0.4); }
+    100% { opacity: 0; transform: scale(0.35) rotate(20deg) translateY(10px); filter: brightness(0.3) saturate(0); }
+}
+.discard-cap--discarding {
+    animation: cap-discard-out 0.42s cubic-bezier(0.4, 0, 0.8, 1) forwards;
+    pointer-events: none;
+}
+
 /* ─── BAND POP-IN ────────────────────────────────────────────────────────── */
 @keyframes band-pop-in {
     0%   { opacity: 0; transform: scale(0.55) translateY(10px); }

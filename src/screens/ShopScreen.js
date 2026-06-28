@@ -23,6 +23,7 @@ export class ShopScreen {
 
     enter() {
         this._pendingPack = null;
+        this._packEl      = null;
 
         if (this._gs.shopOffer) {
             this._band  = this._gs.shopOffer.band;
@@ -43,6 +44,8 @@ export class ShopScreen {
     }
 
     exit() {
+        this._packEl?.remove();
+        this._packEl = null;
         this._el?.remove();
         this._el = null;
     }
@@ -77,96 +80,47 @@ export class ShopScreen {
             ov.style.animation = 'screen-fade-in 0.18s ease-out forwards';
             return;
         }
-        if (e.target.closest('#shop-discard-close')) {
+        if (e.target.closest('#shop-discard-close') || e.target.id === 'shop-discard-overlay') {
             const ov = this._el.querySelector('#shop-discard-overlay');
             ov.style.animation = 'screen-fade-out 0.15s ease-in forwards';
             ov.style.pointerEvents = 'none';
-            setTimeout(() => { ov.style.display = 'none'; ov.style.pointerEvents = ''; }, 150);
+            setTimeout(() => {
+                ov.style.display = 'none';
+                ov.style.pointerEvents = '';
+                this._render();
+            }, 150);
             return;
         }
 
-        // Discard a cap
-        const discardCap = e.target.closest('.discard-cap[data-cap-name]');
-        if (discardCap) {
-            const name = discardCap.dataset.capName;
-            const def  = CAP_DEFS.find(c => c.name === name);
-            if (def && this._gs.canAfford(this._gs.discardCost)) {
-                this._gs.useDiscard(def);
-                // Fade selve overlay'et (det er IKKE inde i .shop-inner)
-                const overlay = this._el.querySelector('#shop-discard-overlay');
-                if (overlay) {
-                    overlay.style.animation = 'screen-fade-out 0.15s ease-in forwards';
-                    overlay.style.pointerEvents = 'none';
-                }
-                setTimeout(() => {
-                    this._render();
-                    const fresh = this._el.querySelector('#shop-discard-overlay');
-                    if (fresh) {
-                        fresh.style.display = '';
-                        fresh.style.animation = 'screen-fade-in 0.15s ease-out forwards';
-                    }
-                }, 150);
-            }
+        // Quick discard via price tag — no viewer
+        const quickDiscard = e.target.closest('.discard-price-tag[data-cap-name]');
+        if (quickDiscard) {
+            const def = CAP_DEFS.find(c => c.name === quickDiscard.dataset.capName);
+            if (def) this._doDiscard(def);
             return;
         }
 
-        // Close pack popup without choosing
-        if (e.target.closest('#pack-popup-close')) {
-            this._pendingPack = null;
-            this._fadePopupOut(() => this._render());
-            return;
-        }
-
-        // Pick a cap from pack popup
-        const packChoice = e.target.closest('.pack-choice[data-cap-name]');
-        if (packChoice && this._pendingPack !== null) {
-            const name = packChoice.dataset.capName;
-            const def  = CAP_DEFS.find(c => c.name === name);
+        // Cap image clicked → show 3D cap viewer with DISCARD action sticker
+        const discardImg = e.target.closest('.discard-cap-img[data-cap-name]');
+        if (discardImg) {
+            const def = CAP_DEFS.find(c => c.name === discardImg.dataset.capName);
             if (def) {
-                this._gs.ownedCaps.push({ def, enchant: null });
-                this._packs[this._pendingPack].bought = true;
-                this._pendingPack = null;
-                this._ui.flashBagBtn();
-                this._fadePopupOut(() => this._render());
+                const canAfford = this._gs.canAfford(this._gs.discardCost);
+                this._ui.showCapDetail(def, true, canAfford ? {
+                    label:    'DISCARD',
+                    price:    `${this._gs.discardCost}★`,
+                    color:    'var(--clr-red)',
+                    callback: () => this._doDiscard(def),
+                } : {
+                    label:    "CAN'T AFFORD",
+                    color:    '#888',
+                    callback: () => {},
+                });
             }
             return;
         }
 
-        // Pick a relic from relic pack popup
-        const relicChoice = e.target.closest('.pack-choice[data-relic-id]');
-        if (relicChoice && this._pendingPack !== null) {
-            const id  = relicChoice.dataset.relicId;
-            const def = RELIC_DEFS.find(r => r.id === id);
-            if (def) {
-                this._gs.addRelic(def);
-                this._packs[this._pendingPack].bought = true;
-                this._pendingPack = null;
-                this._ui.flashBagBtn();
-                this._fadePopupOut(() => this._render());
-            }
-            return;
-        }
-
-        // Pick a consumable from card pack popup
-        const cardChoice = e.target.closest('.pack-choice[data-card-id]');
-        if (cardChoice && this._pendingPack !== null) {
-            const id  = cardChoice.dataset.cardId;
-            const def = CONSUMABLE_DEFS.find(c => c.id === id);
-            if (def) {
-                const slotIdx = this._gs.addConsumable(def);
-                if (slotIdx === false) {
-                    this._flashNoRoom(cardChoice);
-                    return;
-                }
-                this._packs[this._pendingPack].bought = true;
-                this._pendingPack = null;
-                if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
-                this._fadePopupOut(() => this._render());
-            }
-            return;
-        }
-
-        // Open a pack — render popup dan fade het in
+        // Open a pack — fullscreen picker
         const packEl = e.target.closest('.shop-pack[data-pack-idx]');
         if (packEl) {
             const idx  = parseInt(packEl.dataset.packIdx, 10);
@@ -176,17 +130,35 @@ export class ShopScreen {
             this._gs.score -= pack.price;
             this._ui.showScoreDeduct(pack.price);
             this._pendingPack = idx;
-            this._render();
-            const popup = this._el.querySelector('#shop-pack-popup');
-            if (popup) popup.style.animation = 'screen-fade-in 0.18s ease-out forwards';
+            this._showPackScreen(pack, idx);
             return;
         }
 
-        // Open cap detail on image click
+        // Open cap detail on image click — with BUY sticker if purchasable
         const capImg = e.target.closest('.band-cap-img[data-cap-name]');
         if (capImg) {
             const def = CAP_DEFS.find(c => c.name === capImg.dataset.capName);
-            if (def) this._ui.showCapDetail(def);
+            if (def) {
+                const priceTag = capImg.closest('.band-item')?.querySelector('[data-band-idx]');
+                const bandIdx  = priceTag ? parseInt(priceTag.dataset.bandIdx, 10) : NaN;
+                const item     = !isNaN(bandIdx) ? this._band[bandIdx] : null;
+
+                let action = null;
+                if (item && !item.bought) {
+                    const canBuy = this._gs.canAfford(item.price);
+                    action = canBuy ? {
+                        label:    'BUY',
+                        price:    `${item.price}★`,
+                        color:    '#2a9d5c',
+                        callback: () => this._doBuy(bandIdx),
+                    } : {
+                        label:    "CAN'T AFFORD",
+                        color:    '#888',
+                        callback: () => {},
+                    };
+                }
+                this._ui.showCapDetail(def, false, action);
+            }
             return;
         }
 
@@ -304,8 +276,8 @@ export class ShopScreen {
 
     // Called by consumable 'refresh' card — free reroll with no cost/price increase
     refreshCurrentView() {
-        if (this._pendingPack !== null) {
-            // Pack popup is open — re-roll that pack's choices
+        if (this._pendingPack !== null && this._packEl) {
+            // Pack screen is open — re-roll its choices
             const pack = this._packs[this._pendingPack];
             if (pack.type === 'relic') {
                 const pool = RELIC_DEFS.filter(r => !this._gs.hasRelic(r.id)).sort(() => Math.random() - 0.5);
@@ -318,11 +290,9 @@ export class ShopScreen {
                     .filter(c => !this._gs.hasCapDef(c) && !bandNames.has(c.name))
                     .sort(() => Math.random() - 0.5).slice(0, 3);
             }
-            this._render();
-            const popup = this._el?.querySelector('#shop-pack-popup');
-            if (popup) popup.style.animation = 'screen-fade-in 0.18s ease-out forwards';
+            this._renderPackScreen(pack, this._pendingPack);
         } else {
-            // No popup — free band reroll (no cost, no rerollCost increase)
+            // No pack screen — free band reroll
             this._band = this._genBand();
             this._gs.shopOffer.band = this._band;
             this._justRerolled = true;
@@ -338,15 +308,132 @@ export class ShopScreen {
         this._ui.setScore(this._gs.score);
     }
 
-    _fadePopupOut(after) {
-        const popup = this._el?.querySelector('#shop-pack-popup');
-        if (popup) {
-            popup.style.animation = 'screen-fade-out 0.15s ease-in forwards';
-            popup.style.pointerEvents = 'none';
-            setTimeout(() => after?.(), 150);
+    // ─── PACK SCREEN ──────────────────────────────────────────────────────────
+
+    _showPackScreen(pack, idx) {
+        this._packEl = document.createElement('div');
+        this._packEl.id = 'reward-screen';
+        document.body.appendChild(this._packEl);
+        this._renderPackScreen(pack, idx);
+
+        this._packEl.addEventListener('click', e => {
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) { this._pickFromPack(quickPick.dataset.key, pack, idx); return; }
+
+            const card = e.target.closest('.reward-card[data-key]');
+            if (card) {
+                const key = card.dataset.key;
+                if (pack.type === 'cap') {
+                    const def = pack.choices.find(c => c.name === key);
+                    if (def) this._ui.showCapDetail(def, false, {
+                        label: 'PICK', color: '#000',
+                        callback: () => this._pickFromPack(key, pack, idx),
+                    });
+                } else if (pack.type === 'relic') {
+                    const def = pack.choices.find(r => r.id === key);
+                    if (def) this._ui.showRelicDetail(def, {
+                        label: 'PICK', color: '#000',
+                        callback: () => this._pickFromPack(key, pack, idx),
+                    });
+                } else {
+                    this._pickFromPack(key, pack, idx);
+                }
+            }
+        });
+    }
+
+    _renderPackScreen(pack, idx) {
+        const titleMap = { cap: 'CAP PACK', relic: 'RELIC PACK', card: 'CARD PACK' };
+        let cardsHTML;
+        if (pack.type === 'relic')     cardsHTML = this._packRelicCards(pack.choices);
+        else if (pack.type === 'card') cardsHTML = this._packCardCards(pack.choices);
+        else                           cardsHTML = this._packCapCards(pack.choices);
+
+        this._packEl.innerHTML = `
+            <div class="reward-title-box">
+                <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'} — PICK 1</h2>
+                <p class="reward-sub">You paid ${pack.price}★ · choose one to keep</p>
+            </div>
+            <div class="reward-cards">${cardsHTML}</div>`;
+
+        this._packEl.querySelectorAll('.reward-card').forEach((card, i) => {
+            const delay = i * 90;
+            card.classList.add('reward-card--entering');
+            card.style.animationDelay = `${delay}ms`;
+            setTimeout(() => card.classList.remove('reward-card--entering'), delay + 420);
+        });
+        this._packEl.style.animation = 'screen-fade-in 0.2s ease-out forwards';
+    }
+
+    _pickFromPack(key, pack, idx) {
+        if (pack.type === 'relic') {
+            const def = pack.choices.find(r => r.id === key);
+            if (def) this._gs.addRelic(def);
+        } else if (pack.type === 'card') {
+            const def = pack.choices.find(c => c.id === key);
+            if (def) {
+                const slotIdx = this._gs.addConsumable(def);
+                if (slotIdx === false) {
+                    this._flashNoRoom(this._packEl?.querySelector(`[data-key="${key}"]`));
+                    return;
+                }
+                if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
+            }
         } else {
-            after?.();
+            const def = pack.choices.find(c => c.name === key);
+            if (def) this._gs.ownedCaps.push({ def, enchant: null });
         }
+        this._packs[idx].bought = true;
+        this._pendingPack = null;
+        this._ui.flashBagBtn();
+        this._packEl?.remove();
+        this._packEl = null;
+        this._render();
+    }
+
+    _rarityInfo(rarity) {
+        switch (rarity) {
+            case 4:  return { label: 'LEGENDARY', cls: 'legendary' };
+            case 3:  return { label: 'RARE',      cls: 'rare'      };
+            case 2:  return { label: 'UNCOMMON',  cls: 'uncommon'  };
+            default: return { label: 'COMMON',    cls: 'common'    };
+        }
+    }
+
+    _packCapCards(caps) {
+        return caps.map(cap => {
+            const r     = this._rarityInfo(cap.rarity ?? 1);
+            const effL  = cap.effect ? (EFFECT_LABELS[cap.effect] ?? cap.effect) : '';
+            const badge = effL ? `<div class="reward-effect">${effL}</div>` : '';
+            return `<div class="reward-card" data-key="${cap.name}">
+                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
+                <img class="reward-cap-img" src="${cap.texFront}" alt="${cap.name}">
+                <div class="reward-cap-name">${cap.name}</div>
+                <div class="reward-cap-series">${cap.series.replaceAll('_', ' ')}</div>
+                ${badge}
+                <button class="reward-quick-pick" data-key="${cap.name}">▶ PICK</button>
+            </div>`;
+        }).join('');
+    }
+
+    _packRelicCards(relics) {
+        return relics.map(r => `
+            <div class="reward-card reward-card--relic" data-key="${r.id}">
+                <div class="reward-relic-icon">${r.icon}</div>
+                <div class="reward-cap-name">${r.name}</div>
+                <div class="reward-relic-desc">${r.description}</div>
+                <button class="reward-quick-pick" data-key="${r.id}">▶ PICK</button>
+            </div>`).join('');
+    }
+
+    _packCardCards(cards) {
+        return cards.map(c => `
+            <div class="reward-card reward-card--relic" data-key="${c.id}">
+                <div class="reward-relic-icon">${c.icon}</div>
+                <div class="reward-cap-name">${c.name}</div>
+                <div class="reward-relic-desc">${c.description}</div>
+                <button class="reward-quick-pick" data-key="${c.id}">▶ PICK</button>
+            </div>`).join('');
     }
 
     _buildHTML() {
@@ -389,8 +476,11 @@ export class ShopScreen {
     <!-- Højre: actions -->
     <div class="shop-actions">
       <button id="shop-discard-btn" class="shop-remove-btn ${canDiscard ? '' : 'cant-afford'}">
-        <div class="shop-skull-box">💀</div>
-        <span>REMOVE CAPS</span>
+        <div class="shop-remove-top">
+          <div class="shop-skull-box">💀</div>
+          <span>REMOVE CAPS</span>
+        </div>
+        <div class="shop-discard-price">${gs.discardCost}★</div>
       </button>
       <button id="shop-continue-btn" class="shop-next-btn">
         <span>${nextLabel}</span>
@@ -403,14 +493,11 @@ export class ShopScreen {
 
 </div>
 
-<!-- ── Pack popup ──────────────────────────────────────────────────── -->
-${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendingPack]) : ''}
-
 <!-- ── Discard overlay ─────────────────────────────────────────────── -->
 <div id="shop-discard-overlay" style="display:none">
   <div class="discard-panel">
     <div class="discard-header">
-      <span class="discard-title">Discard a cap</span>
+      <span class="discard-title">Remove a cap</span>
       <button id="shop-discard-close" class="discard-close-btn">✕</button>
     </div>
     <p class="discard-cost-label">Costs ${gs.discardCost}★ · doubles each use</p>
@@ -490,48 +577,61 @@ ${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendin
         </button>`;
     }
 
-    _buildPackPopupHTML(pack) {
-        const isRelic = pack.type === 'relic';
-        const isCard  = pack.type === 'card';
-        const title   = isRelic ? 'Relic Pack — Pick 1' : isCard ? 'Card Pack — Pick 1' : 'Cap Pack — Pick 1';
-
-        let choicesHTML;
-        if (pack.choices.length === 0) {
-            choicesHTML = `<p class="pack-empty">Nothing available.</p>`;
-        } else if (isRelic) {
-            choicesHTML = pack.choices.map(r => `
-                <button class="pack-choice pack-choice--relic" data-relic-id="${r.id}">
-                    <div class="pack-relic-icon">${r.icon}</div>
-                    <div class="pack-choice-name">${r.name}</div>
-                    <div class="pack-choice-effect">${r.description}</div>
-                </button>`).join('');
-        } else if (isCard) {
-            choicesHTML = pack.choices.map(c => `
-                <button class="pack-choice pack-choice--card" data-card-id="${c.id}">
-                    <div class="pack-relic-icon">${c.icon}</div>
-                    <div class="pack-choice-name">${c.name}</div>
-                    <div class="pack-choice-effect">${c.description}</div>
-                </button>`).join('');
-        } else {
-            choicesHTML = pack.choices.map(def => {
-                const effectLabel = def.effect
-                    ? (EFFECT_LABELS[def.effect] ?? def.effect)
-                    : 'No effect';
-                return `<button class="pack-choice" data-cap-name="${def.name}">
-                    <img class="pack-choice-img" src="${def.texFront}" alt="${def.name}">
-                    <div class="pack-choice-name">${def.name}</div>
-                    <div class="pack-choice-effect">${effectLabel}</div>
-                </button>`;
-            }).join('');
+    _doBuy(bandIdx) {
+        const item = this._band[bandIdx];
+        if (!item || item.bought) return;
+        if (this._gs.buyCap(item.def, item.price)) {
+            this._ui.showScoreDeduct(item.price);
+            this._ui.flashBagBtn();
+            item.bought = true;
+            const bandItem = this._el
+                ?.querySelector(`[data-band-idx="${bandIdx}"]`)
+                ?.closest('.band-item');
+            if (bandItem) {
+                bandItem.classList.remove('band-item--entering');
+                bandItem.style.animationDelay = '0ms';
+                bandItem.classList.add('band-item--buying');
+                setTimeout(() => this._render(), 380);
+            } else {
+                this._render();
+            }
         }
+    }
 
-        return `<div id="shop-pack-popup">
-            <div class="pack-popup-panel">
-                <div class="pack-popup-title">${title}</div>
-                <div class="pack-choices-row">${choicesHTML}</div>
-                <button id="pack-popup-close" class="pack-skip-btn">Skip</button>
-            </div>
-        </div>`;
+    _doDiscard(def) {
+        if (!this._gs.canAfford(this._gs.discardCost)) return;
+
+        const overlay = this._el?.querySelector('#shop-discard-overlay');
+        const capEl   = overlay?.querySelector(`.discard-cap-img[data-cap-name="${def.name}"]`)
+                                ?.closest('.discard-cap');
+
+        const apply = () => {
+            this._gs.useDiscard(def);
+            this._ui.setScore(this._gs.score);
+
+            if (!overlay) return;
+            const grid = overlay.querySelector('.discard-grid');
+            if (grid) grid.innerHTML = this._buildDiscardGrid();
+            const label = overlay.querySelector('.discard-cost-label');
+            if (label) label.textContent = `Costs ${this._gs.discardCost}★ · doubles each use`;
+
+            if (this._gs.ownedCaps.length === 0) {
+                overlay.style.animation = 'screen-fade-out 0.15s ease-in forwards';
+                overlay.style.pointerEvents = 'none';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    overlay.style.pointerEvents = '';
+                    this._render();
+                }, 150);
+            }
+        };
+
+        if (capEl) {
+            capEl.classList.add('discard-cap--discarding');
+            setTimeout(apply, 400);
+        } else {
+            apply();
+        }
     }
 
     _buildDiscardGrid() {
@@ -541,11 +641,15 @@ ${this._pendingPack !== null ? this._buildPackPopupHTML(this._packs[this._pendin
         }
         const canAfford = gs.canAfford(gs.discardCost);
         return gs.ownedCaps.map(({ def }) =>
-            `<button class="discard-cap ${canAfford ? '' : 'cant-afford'}"
-                     data-cap-name="${def.name}" ${canAfford ? '' : 'disabled'}>
-                <img class="discard-cap-img" src="${def.texFront}" alt="${def.name}">
+            `<div class="discard-cap ${canAfford ? '' : 'cant-afford'}">
+                <img class="discard-cap-img" src="${def.texFront}" alt="${def.name}"
+                     data-cap-name="${def.name}">
                 <div class="discard-cap-name">${def.name}</div>
-            </button>`
+                <button class="discard-price-tag ${canAfford ? '' : 'cant-afford'}"
+                        data-cap-name="${def.name}" ${canAfford ? '' : 'disabled'}>
+                    💀 ${gs.discardCost}★
+                </button>
+            </div>`
         ).join('');
     }
 }

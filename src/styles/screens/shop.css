@@ -13,8 +13,8 @@
     height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    padding: 46px 16px 16px;
+    gap: clamp(8px, 2vh, 20px);
+    padding: clamp(24px, 6vh, 46px) 16px clamp(8px, 2vh, 16px);
     box-sizing: border-box;
     max-width: 900px;
     margin: 0 auto;
@@ -392,9 +392,10 @@ button.band-price-tag.cant-afford {
     border-radius: 0;
     padding: 14px 10px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 6px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 11px;
     font-weight: 800;
@@ -405,6 +406,22 @@ button.band-price-tag.cant-afford {
     transition: box-shadow 0.08s, transform 0.1s;
     width: 100%;
     color: #000;
+}
+.shop-remove-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.shop-discard-price {
+    background: var(--clr-red);
+    color: #fff;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    padding: 2px 6px;
+    transform: rotate(-1deg);
+    pointer-events: none;
 }
 .shop-remove-btn:active { box-shadow: var(--shadow-pressed); transform: rotate(-2deg) translate(3px, 3px); }
 .shop-remove-btn.cant-afford { opacity: 0.28; cursor: default; pointer-events: none; }
@@ -536,35 +553,78 @@ button.band-price-tag.cant-afford {
 /* ── Discard overlay ─────────────────────────────────────────────────────── */
 #shop-discard-overlay {
     position: fixed; inset: 0;
-    background: var(--overlay-heavy);
+    background: var(--overlay-modal);
     z-index: 300;
-    display: flex; align-items: flex-end; justify-content: center;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 60px;
 }
 .discard-panel {
     background: var(--clr-bg-panel);
-    border-top: 4px solid var(--border-ink);
-    border-left: 4px solid var(--border-ink);
-    border-right: 4px solid var(--border-ink);
+    border: 4px solid var(--border-ink);
+    box-shadow: var(--shadow-raised);
     border-radius: 0;
-    padding: 14px; width: 100%; max-height: 70vh;
-    display: flex; flex-direction: column; gap: 10px;
+    width: min(92vw, 520px);
+    max-height: 70vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transform: rotate(1deg);
 }
-.discard-header     { display: flex; align-items: center; justify-content: space-between; }
-.discard-title      { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em; }
-.discard-close-btn  { background: var(--clr-bg-darker); border: 3px solid var(--border-ink); color: var(--text-primary); font-size: 14px; cursor: pointer; padding: 2px 8px; }
-.discard-close-btn:hover { box-shadow: 2px 2px 0px #000; }
-.discard-cost-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: var(--clr-red); margin: 0; }
-.discard-grid       { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); gap: 8px; overflow-y: auto; }
+.discard-header {
+    display: flex; align-items: stretch;
+    border-bottom: 4px solid var(--border-ink);
+    flex-shrink: 0;
+}
+.discard-title {
+    flex: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    color: #000; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 10px 14px 6px;
+}
+.discard-close-btn {
+    background: none; border: none;
+    border-left: 3px solid var(--border-ink);
+    color: var(--text-secondary); font-size: 15px;
+    cursor: pointer; padding: 0 14px; flex-shrink: 0;
+    transition: background 0.12s;
+}
+.discard-close-btn:hover { background: var(--surface-dim); }
+.discard-cost-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; font-weight: 700; color: var(--clr-red);
+    margin: 0; padding: 5px 14px;
+    border-bottom: 3px solid var(--border-ink);
+    background: rgba(204,34,34,0.05);
+    flex-shrink: 0;
+}
+.discard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px; padding: 14px 16px;
+    overflow-y: auto; flex: 1;
+}
 .discard-cap {
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-    padding: 8px 4px; border: 3px solid rgba(204,34,34,0.4);
-    box-shadow: 2px 2px 0px rgba(204,34,34,0.3); background: rgba(255,60,60,0.04);
-    border-radius: 0; cursor: pointer; text-align: center;
-    transition: border-color 0.12s, box-shadow 0.08s, transform 0.08s;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    background: none; border: none;
+    text-align: center; padding: 6px 4px;
 }
-.discard-cap:hover  { border-color: var(--clr-red); box-shadow: 3px 3px 0px var(--clr-red); transform: translate(-1px,-1px); }
-.discard-cap:active { transform: translate(2px,2px); box-shadow: none; }
-.discard-cap.cant-afford { opacity: 0.3; cursor: default; }
-.discard-cap-img  { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; border: 2px solid #000; }
-.discard-cap-name { font-family: 'Space Grotesk', sans-serif; font-size: 9px; color: var(--text-secondary); line-height: 1.2; word-break: break-word; }
-.discard-empty    { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px 0; }
+.discard-cap-img {
+    width: 58px; height: 58px; border-radius: 50%; object-fit: cover;
+    cursor: pointer; transition: box-shadow 0.12s;
+}
+.discard-cap-img:hover { box-shadow: 0 0 0 3px var(--clr-red); }
+.discard-cap-name { font-family: 'Space Grotesk', sans-serif; font-size: 10px; color: var(--text-primary); line-height: 1.2; word-break: break-word; }
+.discard-price-tag {
+    background: var(--clr-red); color: #fff;
+    border: 2px solid #000; box-shadow: 2px 2px 0px #000;
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700;
+    padding: 2px 6px; cursor: pointer;
+    transform: rotate(-1deg);
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.discard-price-tag:hover  { box-shadow: 3px 3px 0px #000; transform: rotate(-1deg) translate(-1px,-1px); }
+.discard-price-tag:active { box-shadow: none; transform: rotate(-1deg) translate(2px,2px); }
+.discard-price-tag.cant-afford { opacity: 0.35; cursor: default; }
+.discard-cap.cant-afford { opacity: 0.35; pointer-events: none; }
+.discard-empty    { font-family: 'Space Grotesk', sans-serif; font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px; }
+
