@@ -15,7 +15,8 @@
 }
 
 /* Skip — absolute top-right, red sticker */
-#reward-skip-btn {
+#reward-skip-btn,
+#pack-skip-btn {
     position: absolute;
     top: 14px;
     right: 70px;
@@ -35,8 +36,8 @@
     transition: box-shadow 0.08s, transform 0.08s;
     z-index: 1;
 }
-#reward-skip-btn:hover  { box-shadow: 2px 2px 0px #000; transform: rotate(-2deg) translateY(2px); }
-#reward-skip-btn:active { box-shadow: none;              transform: rotate(-2deg) translateY(4px); }
+#reward-skip-btn:hover, #pack-skip-btn:hover  { box-shadow: 2px 2px 0px #000; transform: rotate(-2deg) translateY(2px); }
+#reward-skip-btn:active, #pack-skip-btn:active { box-shadow: none;              transform: rotate(-2deg) translateY(4px); }
 .reward-skip-bonus { font-weight: 800; }
 
 /* Title sticker box */

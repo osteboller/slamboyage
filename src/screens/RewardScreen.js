@@ -56,12 +56,7 @@ export class RewardScreen {
                         callback: () => this._confirm(key),
                     });
                 } else {
-                    const def = this._choices.find(r => r.id === key);
-                    if (def) this._ui.showRelicDetail(def, {
-                        label:    'PICK',
-                        color:    '#000',
-                        callback: () => this._confirm(key),
-                    });
+                    this._confirm(key);
                 }
                 return;
             }

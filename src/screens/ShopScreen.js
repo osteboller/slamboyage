@@ -50,6 +50,10 @@ export class ShopScreen {
         this._el = null;
     }
 
+    refresh() {
+        if (this._el && !this._packEl) this._render();
+    }
+
     // ─── CLICK HANDLER ────────────────────────────────────────────────────────
 
     _onClick(e) {
@@ -129,6 +133,7 @@ export class ShopScreen {
             if (!this._gs.canAfford(pack.price)) return;
             this._gs.score -= pack.price;
             this._ui.showScoreDeduct(pack.price);
+            this._ui.setScore(this._gs.score);
             this._pendingPack = idx;
             this._showPackScreen(pack, idx);
             return;
@@ -317,6 +322,14 @@ export class ShopScreen {
         this._renderPackScreen(pack, idx);
 
         this._packEl.addEventListener('click', e => {
+            if (e.target.closest('#pack-skip-btn')) {
+                this._packs[idx].bought = true;
+                this._pendingPack = null;
+                this._packEl?.remove();
+                this._packEl = null;
+                this._render();
+                return;
+            }
             const quickPick = e.target.closest('.reward-quick-pick[data-key]');
             if (quickPick) { this._pickFromPack(quickPick.dataset.key, pack, idx); return; }
 
@@ -326,12 +339,6 @@ export class ShopScreen {
                 if (pack.type === 'cap') {
                     const def = pack.choices.find(c => c.name === key);
                     if (def) this._ui.showCapDetail(def, false, {
-                        label: 'PICK', color: '#000',
-                        callback: () => this._pickFromPack(key, pack, idx),
-                    });
-                } else if (pack.type === 'relic') {
-                    const def = pack.choices.find(r => r.id === key);
-                    if (def) this._ui.showRelicDetail(def, {
                         label: 'PICK', color: '#000',
                         callback: () => this._pickFromPack(key, pack, idx),
                     });
@@ -350,6 +357,7 @@ export class ShopScreen {
         else                           cardsHTML = this._packCapCards(pack.choices);
 
         this._packEl.innerHTML = `
+            <button id="pack-skip-btn">SKIP</button>
             <div class="reward-title-box">
                 <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'} — PICK 1</h2>
                 <p class="reward-sub">You paid ${pack.price}★ · choose one to keep</p>
@@ -440,7 +448,7 @@ export class ShopScreen {
         const gs        = this._gs;
         const nextNode  = gs.currentNode;
         const clearScore = nextNode?.clearScore ?? nextNode?.score;
-        const nextBadge  = clearScore != null ? `${clearScore}★` : '→';
+        const nextBadge  = clearScore != null ? `GOAL: ${clearScore}★` : '→';
         const nextLabel  = gs.isRunComplete ? 'NEXT LOOP' : 'NEXT ROUND';
 
         const canReroll  = gs.canAfford(gs.rerollCost);

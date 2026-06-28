@@ -56,6 +56,7 @@ consumables.onSell = (def) => {
         roundMgr.addToBase(def.sellPrice); // keeps _scoreBase + _totalScore intact
     } else {
         ui.setScore(gameState.score);
+        if (currentScreenName === 'shop') shopScreen.refresh();
     }
 };
 const factory      = new EntityFactory(physics, render, texCache);

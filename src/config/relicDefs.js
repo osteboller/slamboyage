@@ -3,6 +3,7 @@
 //       'stackSize'        → increases GameState.stackSizeLimit immediately on pickup
 //       'firstThrow'       → ×value multiplier on the first throw of a round
 //       'lastThrow'        → ×value multiplier on the last throw of a round
+//       'throwSaver'       → each unused throw at end of battle adds +value to a persistent multiplier
 export const RELIC_DEFS = [
     { id: 'golden_eye',   name: 'Golden Eye',   icon: '◎', type: 'globalMultiplier', value: 1.5, description: 'All throw scores ×1.5'       },
     { id: 'lucky_flip',   name: 'Lucky Flip',   icon: '◈', type: 'globalMultiplier', value: 2.0, description: 'All throw scores ×2'         },
@@ -13,4 +14,5 @@ export const RELIC_DEFS = [
     { id: 'first_strike', name: 'First Strike', icon: '①', type: 'firstThrow',       value: 4,   description: 'First throw of a round ×4'  },
     { id: 'last_stand',   name: 'Last Stand',   icon: '⑤', type: 'lastThrow',        value: 4,   description: 'Last throw of a round ×4'   },
     { id: 'extra_arm',    name: 'Extra Arm',    icon: '✋', type: 'extraThrow',       value: 1,   description: '+1 throw every round'        },
+    { id: 'iron_discipline', name: 'Iron Discipline', icon: '⊛', type: 'throwSaver', value: 0.1, description: 'Each unused throw adds ×0.1 · Current: ×1.0' },
 ];

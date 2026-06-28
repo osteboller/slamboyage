@@ -55,6 +55,7 @@ export class RoundManager {
         if (this._phase === 'idle' || this._phase === 'ready') {
             this._throwsLeft++;
             this._ui.updateThrowPips(this._throwsLeft, this._throwsLeft + this._throwIndex);
+            if (this._throwsLeft > 1) this._ui.hideLastStandBadge();
         }
     }
 
@@ -475,6 +476,17 @@ export class RoundManager {
             this._ui.setActionPrompt('Tap to continue');
             this._phase = 'ready';
         } else {
+            // Unused throws → grow throwSaver multiplier
+            if (this._throwsLeft > 0 && this._gs) {
+                this._gs.ownedRelics
+                    .filter(r => r.type === 'throwSaver')
+                    .forEach(r => {
+                        const oldValue = r.currentValue ?? 1.0;
+                        r.currentValue = oldValue + this._throwsLeft * r.value;
+                        r.description  = `Each unused throw adds ×${r.value} · Current: ×${r.currentValue.toFixed(1)}`;
+                        this._ui.showRelicGain(r.icon, oldValue, r.currentValue, this._throwsLeft);
+                    });
+            }
             this._phase = 'done';
             this._ui.showResults(
                 this._wonCapsAll.length, this._totalScore,

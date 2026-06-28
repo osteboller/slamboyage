@@ -311,6 +311,24 @@ export class UIManager {
     showScoreDeduct(amount) { this._spawnAnchorFloat(`-${amount}`, 'score-float--deduct'); }
     showScoreGain(amount)   { this._spawnAnchorFloat(`+${amount}`, 'bonus'); }
 
+    showRelicGain(icon, oldValue, newValue, unusedThrows) {
+        const el = document.createElement('div');
+        el.className = 'relic-gain-sticker';
+        el.innerHTML = `
+            <div class="relic-gain-top">
+                <span class="relic-gain-icon">${icon}</span>
+                <span class="relic-gain-throws">+${unusedThrows} unused</span>
+            </div>
+            <div class="relic-gain-row">
+                <span class="relic-gain-old">×${oldValue.toFixed(1)}</span>
+                <span class="relic-gain-arrow">→</span>
+                <span class="relic-gain-new">×${newValue.toFixed(1)}</span>
+            </div>`;
+        document.body.appendChild(el);
+        setTimeout(() => el.classList.add('relic-gain-sticker--reveal'), 400);
+        el.addEventListener('animationend', e => { if (e.target === el) el.remove(); });
+    }
+
     showDoubleBadge(mult) {
         const el = document.getElementById('double-badge');
         el.textContent = `×${mult}`;

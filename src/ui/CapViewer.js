@@ -67,6 +67,16 @@ export class CapViewer {
         const id = ++this._loadId;
         this._visible = true;
 
+        // Stop old loop and clear canvas immediately — prevents old cap flashing
+        if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
+        if (this._mesh) {
+            this._scene.remove(this._mesh);
+            this._mesh.geometry.dispose();
+            this._mesh.material.forEach(m => m.dispose());
+            this._mesh = null;
+        }
+        this._renderer.render(this._scene, this._camera);
+
         if (type === 'slammer') {
             await this._showSlammer(def, id);
         } else {

@@ -1,6 +1,7 @@
 export class StartScreen {
-    constructor({ gameState }) {
+    constructor({ gameState, ui }) {
         this._gameState    = gameState;
+        this._ui           = ui;
         this._el           = null;
         this.onNewRun      = null; // () => {}
         this.onContinueRun = null; // () => {}
@@ -17,6 +18,10 @@ export class StartScreen {
             if (e.target.closest('#start-new-btn')      && this.onNewRun)      this.onNewRun();
             if (e.target.closest('#start-continue-btn') && this.onContinueRun) this.onContinueRun();
             if (e.target.closest('#start-free-btn')     && this.onFreeMode)    this.onFreeMode();
+            if (e.target.closest('#dev-add-score-btn')) {
+                this._gameState.score += 100;
+                this._ui.setScore(this._gameState.score);
+            }
         });
     }
 
@@ -46,6 +51,7 @@ export class StartScreen {
                     ${continueBtn}
                     <button id="start-free-btn" class="start-btn secondary">Free Play</button>
                 </div>
-            </div>`;
+            </div>
+            <button id="dev-add-score-btn">DEV +100★</button>`;
     }
 }

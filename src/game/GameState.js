@@ -1,9 +1,7 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
 
-const _raptors = CAP_DEFS.filter(c => c.series === 'raptor_strike').slice(0, 4);
-const _alien   = CAP_DEFS.find(c => c.name === 'Alien');
-const STARTER_CAPS = [..._raptors, _alien].filter(Boolean).map(def => ({ def, enchant: null }));
+const _commonCaps = CAP_DEFS.filter(c => c.rarity === 1);
 
 export class GameState {
     constructor() {
@@ -29,9 +27,9 @@ export class GameState {
     startRun() {
         this._loop          = 1;
         this.nodeIndex      = 0;
-        this.score          = 100;
+        this.score          = 0;
         this.stackSizeLimit = 10;
-        this.ownedCaps      = [...STARTER_CAPS];
+        this.ownedCaps      = [..._commonCaps].sort(() => Math.random() - 0.5).slice(0, 5).map(def => ({ def, enchant: null }));
         this.ownedRelics    = [];
         this.runNodes       = this._generateNodes(1);
         this.rerollCost     = 1;
@@ -69,9 +67,13 @@ export class GameState {
     // ─── RELICS ───────────────────────────────────────────────────────────────
     // Individual multipliers in application order — lets the UI reveal them one by one
     get multiplierChain() {
-        return this.ownedRelics
+        const global = this.ownedRelics
             .filter(r => r.type === 'globalMultiplier')
             .map(r => r.value);
+        const saver = this.ownedRelics
+            .filter(r => r.type === 'throwSaver' && (r.currentValue ?? 1.0) > 1.0)
+            .map(r => r.currentValue);
+        return [...global, ...saver];
     }
 
     get globalMultiplier() {
@@ -93,8 +95,10 @@ export class GameState {
     hasRelic(relicId)  { return this.ownedRelics.some(r => r.id === relicId); }
 
     addRelic(relicDef) {
-        this.ownedRelics.push(relicDef);
-        if (relicDef.type === 'stackSize') this.stackSizeLimit += relicDef.value;
+        const entry = { ...relicDef };
+        if (entry.type === 'throwSaver') entry.currentValue = 1.0;
+        this.ownedRelics.push(entry);
+        if (entry.type === 'stackSize') this.stackSizeLimit += entry.value;
     }
 
     // ─── CONSUMABLES ──────────────────────────────────────────────────────────
