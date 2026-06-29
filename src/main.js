@@ -17,6 +17,7 @@ import { ShopScreen }       from './screens/ShopScreen.js';
 import { BattleScreen }     from './screens/BattleScreen.js';
 import { RewardScreen }     from './screens/RewardScreen.js';
 import { RunEndScreen }    from './screens/RunEndScreen.js';
+import { ENCHANT_DEFS }   from './config/enchantDefs.js';
 
 // ─── ENGINES ─────────────────────────────────────────────────────────────────
 const physics    = new PhysicsEngine();
@@ -49,6 +50,17 @@ consumables.onUse = (def) => {
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
         if (currentScreenName === 'reward' || currentScreenName === 'relic-choice') rewardScreen.reroll?.();
+    }
+    if (def.id === 'enchant') {
+        const caps = gameState.ownedCaps;
+        if (caps.length > 0) {
+            ui.showCapPicker('Pick a cap to enchant', caps, entry => {
+                const enchantDef = ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)];
+                gameState.applyEnchant(entry.id, enchantDef.id);
+                roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
+                ui.showEnchantResult(enchantDef);
+            });
+        }
     }
 };
 consumables.onSell = (def) => {

@@ -1,4 +1,6 @@
 export const VERSION = '0.4.1';
+
+export const ENCHANT_OVERLAY_OPACITY = 0.65;
 export const POG_R       = 1.2;
 export const POG_H       = 0.13;
 export const SLAM_H      = 0.28;
@@ -77,6 +79,16 @@ export const CAP_DEFS = [
     { rarity: 2, series: 'scary_skullz',  color: 0xcc7700, name: 'Chief Skull',     mass: 1.0, bounce: 0.3,                   texFront: 'assets/caps/scary_skullz/07_chief_skull.png',      texBack: 'assets/caps/scary_skullz/07_chief_skull_b.png'    },
     { rarity: 3, series: 'scary_skullz',  color: 0xb08840, name: 'Prairie Skull',   mass: 1.0, bounce: 0.3, effect: 'magnet', texFront: 'assets/caps/scary_skullz/08_prarie_skull.png',     texBack: 'assets/caps/scary_skullz/08_prarie_skull_b.png'   },
     { rarity: 3, series: 'scary_skullz',  color: 0x1122aa, name: 'Dual Snake Skull',mass: 1.0, bounce: 0.3, effect: 'streak', texFront: 'assets/caps/scary_skullz/09_dual_snake_skull.png', texBack: 'assets/caps/scary_skullz/09_dual_snake_skull_b.png' },
+    // Cosmic Caps
+    { rarity: 2, series: 'cosmic_caps', color: 0x8833ff, name: 'Genesis',      mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/cosmic_caps/01_genesis.png',      texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 2, series: 'cosmic_caps', color: 0x2255cc, name: 'Galaxy',       mass: 1.0, bounce: 0.3, effect: 'neighbour',  texFront: 'assets/caps/cosmic_caps/02_galaxy.png',       texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 3, series: 'cosmic_caps', color: 0xcc5500, name: 'Met Shower',   mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/cosmic_caps/03_met_shower.png',   texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 2, series: 'cosmic_caps', color: 0x00cccc, name: 'Warp Tunnel',  mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/cosmic_caps/04_warp_tunnel.png',  texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 2, series: 'cosmic_caps', color: 0xaabbcc, name: 'Satelite',     mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/cosmic_caps/05_satelite.png',     texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 3, series: 'cosmic_caps', color: 0xff44aa, name: 'Pulsar Prime', mass: 1.0, bounce: 0.3, effect: 'streak',     texFront: 'assets/caps/cosmic_caps/06_pulsar_prime.png', texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 1, series: 'cosmic_caps', color: 0x9944cc, name: 'Nebulli',      mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/cosmic_caps/07_nebulli.png',      texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 3, series: 'cosmic_caps', color: 0x220033, name: 'Void Eater',   mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/cosmic_caps/08_void_eater.png',   texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 4, series: 'cosmic_caps', color: 0xffaa00, name: 'Ssupernova',   mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/cosmic_caps/09_ssupernova.png',   texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
     // Pewl Ballz
     { rarity: 1, series: 'pewl_ballz', color: 0xddcc00, name: 'Yellow Pewl',   mass: 1.0, bounce: 0.35, texFront: 'assets/caps/pewl_ballz/01_pewls.png', texBack: 'assets/caps/pewl_ballz/01_pewls_b.png' },
     { rarity: 1, series: 'pewl_ballz', color: 0x2266cc, name: 'Blue Pewl',     mass: 1.0, bounce: 0.35, texFront: 'assets/caps/pewl_ballz/02_pewls.png', texBack: 'assets/caps/pewl_ballz/02_pewls_b.png' },

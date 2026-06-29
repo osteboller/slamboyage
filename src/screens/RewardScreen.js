@@ -95,7 +95,7 @@ export class RewardScreen {
             if (def) this._gs.addRelic(def);
         } else {
             const def = this._choices.find(c => c.name === key);
-            if (def) this._gs.ownedCaps.push({ def, enchant: null });
+            if (def) this._gs.gainCap(def);
         }
         if (this.onContinue) this.onContinue();
     }

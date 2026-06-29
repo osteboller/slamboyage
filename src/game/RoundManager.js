@@ -79,6 +79,14 @@ export class RoundManager {
         this._magnetCancels = [];
     }
 
+    // Updates enchant on a live cap in the current stack — no-op if cap not in play
+    updateLiveCapEnchant(entryId, enchantId) {
+        const cap = this.caps.find(c => c.entryId === entryId);
+        if (!cap) return;
+        cap.enchant = enchantId;
+        this._factory.updateCapEnchant(cap.mesh, enchantId);
+    }
+
     // ─── SESSION ───────────────────────────────────────────────────────────────
 
     newSession() {
@@ -114,11 +122,12 @@ export class RoundManager {
         const shuffled = [...source].sort(() => Math.random() - 0.5);
 
         for (let i = 0; i < count; i++) {
-            const { def, enchant } = shuffled[i % shuffled.length];
+            const entry = shuffled[i % shuffled.length];
             this.caps.push(this._factory.spawnCap(
-                def,
+                entry.def,
                 POG_H * 0.5 + i * (POG_H + 0.01),
-                enchant
+                entry.enchant,
+                entry.id ?? null
             ));
         }
 
@@ -154,7 +163,7 @@ export class RoundManager {
         // Last Stand only visible on the last throw — hide at start unless round is 1 throw
         if (relics.some(r => r.type === 'lastThrow') && this._throwsTotal === 1) this._ui.showLastStandBadge();
         else                                                                       this._ui.hideLastStandBadge();
-        this._ui.updatePileButtons(this.caps.map(c => c.def), []);
+        this._ui.updatePileButtons(this.caps, []);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
         this.delay(() => {
@@ -192,8 +201,10 @@ export class RoundManager {
 
         // Inject spawned caps before reshuffling
         if (this._pendingSpawnDefs.length > 0) {
-            this._pendingSpawnDefs.forEach(def => {
-                this._pendingFaceDown.push(this._factory.spawnCap(def, 100, null));
+            this._pendingSpawnDefs.forEach(entry => {
+                const def     = entry.def ?? entry;
+                const enchant = entry.enchant ?? null;
+                this._pendingFaceDown.push(this._factory.spawnCap(def, 100, enchant));
             });
             this._pendingSpawnDefs = [];
         }
@@ -215,7 +226,7 @@ export class RoundManager {
         });
 
         this.caps = this._pendingFaceDown;
-        this._ui.updatePileButtons(this.caps.map(c => c.def), this._wonCapsAll);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll);
         this._collisions.reset();
         this._powerBar.reset();
         this._cam.zoomIn();
@@ -280,7 +291,7 @@ export class RoundManager {
         this._ui.setScore(state.scoreBase + state.totalScore);
         this._ui.hideResults();
         this._ui.updateThrowPips(state.throwsLeft, this._throwsTotal);
-        this._ui.updatePileButtons(this.caps.map(c => c.def), this._wonCapsAll);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll);
         this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${this._throwsTotal}`);
         this._ui.setActionPrompt('Hold to aim');
     }
@@ -407,14 +418,14 @@ export class RoundManager {
         const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
 
-        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, effectMeta }) => {
-            const capScore   = Math.floor((1 + (bonus ?? 0) + flatRelicBonus) * (localMultiplier ?? 1));
+        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
+            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + flatRelicBonus) * (localMultiplier ?? 1));
             const finalScore = Math.floor(capScore * globalMult);
             return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain };
         });
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
 
-        this._wonCapsAll.push(...actualWon.map(({ cap }) => cap.def));
+        this._wonCapsAll.push(...actualWon.map(({ cap }) => cap));
         this._totalScore += scoreGained;
         this._throwsLeft--;
 
@@ -446,8 +457,8 @@ export class RoundManager {
         const hasNextThrow = this._throwsLeft > 0 && updatedFaceDown.length > 0;
 
         const displayRemaining = hasNextThrow
-            ? [...updatedFaceDown.map(c => c.def), ...spawnDefs]
-            : updatedFaceDown.map(c => c.def);
+            ? [...updatedFaceDown, ...spawnDefs]
+            : updatedFaceDown;
         this._ui.updatePileButtons(displayRemaining, this._wonCapsAll);
         this._ui.updateThrowPips(this._throwsLeft, this._throwsTotal);
 
@@ -462,8 +473,8 @@ export class RoundManager {
                 const spawnAnimDelay = scoredCaps.length > 0
                     ? scoredCaps.length * popDelay + 350
                     : 350;
-                spawnDefs.forEach((def, i) => {
-                    this.delay(() => this._ui.popStackIcon(def), spawnAnimDelay + i * 200);
+                spawnDefs.forEach((entry, i) => {
+                    this.delay(() => this._ui.popStackIcon(entry.def ?? entry), spawnAnimDelay + i * 200);
                 });
             }
 

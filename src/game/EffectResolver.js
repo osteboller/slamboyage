@@ -7,9 +7,10 @@ export const VERY_NEARBY_RADIUS  = 3; // world units
 
 // EffectResult shape — all fields optional from effect functions; defaults applied here
 const EMPTY_RESULT = Object.freeze({
-    bonus:          0,
+    baseValue:       1,
+    bonus:           0,
     localMultiplier: 1,
-    returnToStack:  false,
+    returnToStack:   false,
     triggerCaps:    [],
     fx:             null,
     effectMeta:     null, // { type, ... } — drives visual effect ring in UI

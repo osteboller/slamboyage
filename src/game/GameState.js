@@ -1,5 +1,6 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
+import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 
 const _commonCaps = CAP_DEFS.filter(c => c.rarity === 1);
 
@@ -12,11 +13,16 @@ export class GameState {
         this.ownedCaps      = [];
         this.ownedRelics    = [];
         this._loop          = 1;
+        this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
         this.rerollCost     = 1;
         this.discardCost    = 2;
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
+    }
+
+    _mkCapEntry(def, enchant = null) {
+        return { id: this._nextCapId++, def, enchant };
     }
 
     // ─── RUN ──────────────────────────────────────────────────────────────────
@@ -29,13 +35,15 @@ export class GameState {
         this.nodeIndex      = 0;
         this.score          = 0;
         this.stackSizeLimit = 10;
-        this.ownedCaps      = [..._commonCaps].sort(() => Math.random() - 0.5).slice(0, 5).map(def => ({ def, enchant: null }));
+        const enchantIds = ['gilded','reverb','boomerang','ironclad','feather','halflife'];
+        this.ownedCaps      = [..._commonCaps].sort(() => Math.random() - 0.5).slice(0, 6).map((def, i) => this._mkCapEntry(def, enchantIds[i] ?? null));
         this.ownedRelics    = [];
         this.runNodes       = this._generateNodes(1);
         this.rerollCost     = 1;
         this.discardCost    = 2;
         this.shopOffer      = null;
-        this.consumables    = [null, null, null];
+        const mystixx = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
+        this.consumables    = [mystixx ?? null, mystixx ?? null, mystixx ?? null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 
@@ -127,10 +135,14 @@ export class GameState {
     canAfford(price)      { return this.score >= price; }
     hasCapDef(capDef)     { return this.ownedCaps.some(c => c.def.name === capDef.name); }
 
+    gainCap(capDef) {
+        this.ownedCaps.push(this._mkCapEntry(capDef));
+    }
+
     buyCap(capDef, price) {
         if (!this.canAfford(price)) return false;
         this.score -= price;
-        this.ownedCaps.push({ def: capDef, enchant: null });
+        this.gainCap(capDef);
         return true;
     }
 
@@ -141,14 +153,14 @@ export class GameState {
     }
 
     // Discard a cap — costs the player ★, doubles each use per loop
-    useDiscard(capDef) {
+    useDiscard(capId) {
         this.score       -= this.discardCost;
         this.discardCost *= 2;
-        this.ownedCaps    = this.ownedCaps.filter(c => c.def.name !== capDef.name);
+        this.ownedCaps    = this.ownedCaps.filter(c => c.id !== capId);
     }
 
-    applyEnchant(capDef, enchantId) {
-        const entry = this.ownedCaps.find(c => c.def.name === capDef.name);
+    applyEnchant(capId, enchantId) {
+        const entry = this.ownedCaps.find(c => c.id === capId);
         if (entry) entry.enchant = enchantId;
     }
 

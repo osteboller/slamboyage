@@ -1,4 +1,5 @@
-import { POG_R, POG_H, SLAM_H } from '../config/constants.js';
+import { POG_R, POG_H, SLAM_H, ENCHANT_OVERLAY_OPACITY } from '../config/constants.js';
+import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 
 export class CapViewer {
     constructor(container) {
@@ -63,39 +64,26 @@ export class CapViewer {
         el.addEventListener('pointercancel', () => { this._dragging = false; });
     }
 
-    async show(def, type = 'cap') {
+    async show(def, type = 'cap', enchant = null) {
         const id = ++this._loadId;
         this._visible = true;
 
         // Stop old loop and clear canvas immediately — prevents old cap flashing
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
-        if (this._mesh) {
-            this._scene.remove(this._mesh);
-            this._mesh.geometry.dispose();
-            this._mesh.material.forEach(m => m.dispose());
-            this._mesh = null;
-        }
+        this._clearMesh();
         this._renderer.render(this._scene, this._camera);
 
-        if (type === 'slammer') {
-            await this._showSlammer(def, id);
-        } else {
-            await this._showCap(def, id);
-        }
+        if (type === 'slammer') await this._showSlammer(def, id);
+        else await this._showCap(def, id, enchant);
     }
 
-    async _showCap(def, id) {
+    async _showCap(def, id, enchant = null) {
         const [frontTex, backTex] = await Promise.all([
             this._loadTex(def.texFront),
             this._loadTexBack(def.texBack),
         ]);
         if (id !== this._loadId) return;
-
-        if (this._mesh) {
-            this._scene.remove(this._mesh);
-            this._mesh.geometry.dispose();
-            this._mesh.material.forEach(m => m.dispose());
-        }
+        this._clearMesh();
 
         const geo = new THREE.CylinderGeometry(POG_R, POG_R, POG_H * 0.35, 64, 1, false);
         const mat = [
@@ -112,6 +100,17 @@ export class CapViewer {
         this._mesh.rotation.x = Math.PI / 2 - 0.25;
         this._mesh.rotation.y = 0.3 + Math.PI / 4 + Math.PI / 6;
         this._scene.add(this._mesh);
+
+        if (enchant) {
+            const enchantDef = ENCHANT_DEFS.find(e => e.id === enchant);
+            if (enchantDef) {
+                const overlayTex = await this._loadTex(`assets/enchants/${enchantDef.overlayAsset}`);
+                if (overlayTex && id === this._loadId && this._mesh) {
+                    this._addEnchantOverlay(overlayTex);
+                }
+            }
+        }
+
         this._startLoop();
     }
 
@@ -122,11 +121,7 @@ export class CapViewer {
         ]);
         if (id !== this._loadId) return;
 
-        if (this._mesh) {
-            this._scene.remove(this._mesh);
-            this._mesh.geometry.dispose();
-            this._mesh.material.forEach(m => m.dispose());
-        }
+        this._clearMesh();
 
         // Slammer bruger samme radius som caps men større højde
         const geo = new THREE.CylinderGeometry(POG_R, POG_R, SLAM_H * 0.8, 36, 1, false);
@@ -152,6 +147,38 @@ export class CapViewer {
     hide() {
         this._visible = false;
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
+    }
+
+    _clearMesh() {
+        if (!this._mesh) return;
+        this._mesh.children.forEach(child => {
+            child.geometry?.dispose();
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => m?.dispose());
+        });
+        this._scene.remove(this._mesh);
+        this._mesh.geometry.dispose();
+        this._mesh.material.forEach(m => m.dispose());
+        this._mesh = null;
+    }
+
+    _addEnchantOverlay(overlayTex) {
+        const capHeight = POG_H * 0.35;
+        const overlayGeo = new THREE.CylinderGeometry(POG_R * 0.97, POG_R * 0.97, 0.001, 64, 1, false);
+        const overlayMat = [
+            new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+            new THREE.MeshBasicMaterial({
+                map: overlayTex,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                opacity: ENCHANT_OVERLAY_OPACITY,
+                depthWrite: false,
+            }),
+            new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+        ];
+        const overlayMesh = new THREE.Mesh(overlayGeo, overlayMat);
+        overlayMesh.position.y = capHeight / 2 + 0.002;
+        this._mesh.add(overlayMesh);
     }
 
     _startLoop() {

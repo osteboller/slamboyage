@@ -218,6 +218,83 @@
     width: 100%;
 }
 
+/* ── Gum card variant in pack-open ──────────────────────────────────────── */
+.reward-card--gumcard {
+    padding: 0;
+    overflow: hidden;
+    align-items: stretch;
+    gap: 0;
+}
+
+.gum-pack-top {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.gum-pack-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    flex: 1;
+    padding: 0 clamp(10px, 2vw, 16px) clamp(8px, 1.5vh, 14px);
+}
+
+.gum-pack-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: clamp(11px, 2.2vw, 15px);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: clamp(8px, 1.5vw, 12px) 12px;
+    flex-shrink: 0;
+}
+
+.gum-pack-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: clamp(28px, 5vw, 42px);
+    line-height: 1;
+    text-align: center;
+    padding: clamp(12px, 2vh, 20px) 0 clamp(6px, 1vh, 10px);
+    align-self: center;
+}
+
+.gum-pack-flavor {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(8px, 1.2vw, 10px);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    text-align: center;
+    color: #000;
+    opacity: 0.45;
+    padding: clamp(6px, 1vh, 10px) 0 clamp(4px, 0.6vh, 6px);
+    width: 100%;
+}
+
+.gum-pack-desc {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(9px, 1.6vw, 11px);
+    color: var(--text-secondary);
+    line-height: 1.4;
+    text-align: center;
+    padding: clamp(6px, 1vh, 10px) clamp(10px, 2vw, 16px);
+    flex: 1;
+}
+
+.gum-pack-footer {
+    display: flex;
+    justify-content: center;
+    padding: clamp(8px, 1.5vh, 12px);
+}
+
+.gum-pack-footer .reward-quick-pick {
+    margin: 0;
+}
+
 /* Entrance animation — includes --rot so hover still works after animation */
 @keyframes reward-card-in {
     from { opacity: 0; transform: rotate(var(--rot)) scale(0.5) translateY(12px); }

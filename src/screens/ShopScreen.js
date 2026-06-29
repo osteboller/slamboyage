@@ -97,24 +97,24 @@ export class ShopScreen {
         }
 
         // Quick discard via price tag — no viewer
-        const quickDiscard = e.target.closest('.discard-price-tag[data-cap-name]');
+        const quickDiscard = e.target.closest('.discard-price-tag[data-cap-id]');
         if (quickDiscard) {
-            const def = CAP_DEFS.find(c => c.name === quickDiscard.dataset.capName);
-            if (def) this._doDiscard(def);
+            const entry = this._gs.ownedCaps.find(c => c.id === +quickDiscard.dataset.capId);
+            if (entry) this._doDiscard(entry);
             return;
         }
 
         // Cap image clicked → show 3D cap viewer with DISCARD action sticker
-        const discardImg = e.target.closest('.discard-cap-img[data-cap-name]');
+        const discardImg = e.target.closest('.discard-cap-img[data-cap-id]');
         if (discardImg) {
-            const def = CAP_DEFS.find(c => c.name === discardImg.dataset.capName);
-            if (def) {
+            const entry = this._gs.ownedCaps.find(c => c.id === +discardImg.dataset.capId);
+            if (entry) {
                 const canAfford = this._gs.canAfford(this._gs.discardCost);
-                this._ui.showCapDetail(def, true, canAfford ? {
+                this._ui.showCapDetail(entry, true, canAfford ? {
                     label:    'DISCARD',
                     price:    `${this._gs.discardCost}★`,
                     color:    'var(--clr-red)',
-                    callback: () => this._doDiscard(def),
+                    callback: () => this._doDiscard(entry),
                 } : {
                     label:    "CAN'T AFFORD",
                     color:    '#888',
@@ -435,13 +435,32 @@ export class ShopScreen {
     }
 
     _packCardCards(cards) {
-        return cards.map(c => `
-            <div class="reward-card reward-card--relic" data-key="${c.id}">
-                <div class="reward-relic-icon">${c.icon}</div>
-                <div class="reward-cap-name">${c.name}</div>
-                <div class="reward-relic-desc">${c.description}</div>
-                <button class="reward-quick-pick" data-key="${c.id}">▶ PICK</button>
-            </div>`).join('');
+        return cards.map(c => {
+            const stripe  = `repeating-linear-gradient(-45deg, ${c.bg} 0px, ${c.bg} 2px, #fff 2px, #fff 4px)`;
+            const textCol = this._headerTextColor(c.color);
+            return `
+                <div class="reward-card reward-card--gumcard" data-key="${c.id}">
+                    <div class="gum-pack-top" style="background:${stripe};">
+                        <div class="gum-pack-header" style="background:${c.color}; color:${textCol};">${c.name}</div>
+                        <div class="gum-pack-icon">${c.icon}</div>
+                    </div>
+                    <div class="gum-pack-bottom">
+                        <div class="gum-pack-flavor">${c.flavor}</div>
+                        <div class="gum-pack-desc">${c.description}</div>
+                    </div>
+                    <div class="gum-pack-footer" style="background:${stripe};">
+                        <button class="reward-quick-pick" data-key="${c.id}">▶ PICK</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    _headerTextColor(hex) {
+        if (!hex) return '#fff';
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#000' : '#fff';
     }
 
     _buildHTML() {
@@ -529,10 +548,18 @@ export class ShopScreen {
             const animClass = animate ? 'band-item--entering' : '';
 
             if (item.type === 'card') {
+                const d = item.def;
+                const stripe = `repeating-linear-gradient(-45deg, ${d.bg} 0px, ${d.bg} 2px, #fff 2px, #fff 4px)`;
                 return `<div class="band-item band-item--card ${animClass}" ${animStyle}>
-                    <div class="band-slot-box band-slot-box--card">
-                        <span class="band-card-icon">${item.def.icon}</span>
-                        <span class="band-card-name">${item.def.name}</span>
+                    <div class="band-slot-box band-slot-box--card" style="background:${stripe}; border:3px solid #000; box-shadow:3px 3px 0 #000; padding:0;">
+                        <div class="gum-slot-inner">
+                            <div class="gum-slot-header" style="background:${d.color};">
+                                <span class="gum-slot-name">${d.name}</span>
+                            </div>
+                            <div class="gum-slot-body">
+                                <span class="gum-slot-icon">${d.icon}</span>
+                            </div>
+                        </div>
                     </div>
                     <button class="band-price-tag ${canBuy ? '' : 'cant-afford'}"
                             data-band-idx="${i}" ${canBuy ? '' : 'disabled'}>
@@ -555,14 +582,14 @@ export class ShopScreen {
     }
 
     _buildPackCardHTML(pack, i) {
-        const isRelic = pack.type === 'relic';
-        const isCard  = pack.type === 'card';
+        const isRelic   = pack.type === 'relic';
+        const isCard    = pack.type === 'card';
         const typeLabel = isRelic ? 'Relic Pack' : isCard ? 'Card Pack' : 'Collector Pack';
-        const icon      = isRelic ? '🔮' : isCard ? '🃏' : '🛍';
         const extraCls  = isRelic ? ' pack--relic' : isCard ? ' pack--card' : '';
+        const iconHTML  = this._packIconHTML(pack);
         if (pack.bought) {
             return `<div class="shop-pack bought${extraCls}" data-pack-idx="${i}">
-                <div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>
+                ${iconHTML}
                 <div class="pack-info">
                     <span class="pack-type">${typeLabel}</span>
                     <span class="pack-hint">Opened</span>
@@ -576,13 +603,37 @@ export class ShopScreen {
             : (isRelic ? '3 relics · pick 1' : isCard ? '3 cards · pick 1' : '3 caps · pick 1');
         return `<button class="shop-pack${extraCls} ${canAfford && !empty ? '' : 'cant-afford'}"
                      data-pack-idx="${i}">
-            <div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>
+            ${iconHTML}
             <div class="pack-info">
                 <span class="pack-type">${typeLabel}</span>
                 <span class="pack-hint">${hint}</span>
                 <div class="pack-price">${pack.price}★</div>
             </div>
         </button>`;
+    }
+
+    _packIconHTML(pack) {
+        if (pack.type === 'card') {
+            const cards = [
+                { bg: '#ffe0e0', color: '#cc2200' },
+                { bg: '#ede0ff', color: '#7722cc' },
+                { bg: '#d6f5f5', color: '#00a0a0' },
+            ];
+            const miniCards = cards.map(({ bg, color }, idx) => {
+                const stripe = `repeating-linear-gradient(-45deg, ${bg} 0px, ${bg} 2px, #fff 2px, #fff 4px)`;
+                const offsets = [
+                    'translate(calc(-50% - 5px), calc(-50% + 2px)) rotate(-9deg)',
+                    'translate(calc(-50% + 4px), calc(-50% + 1px)) rotate(6deg)',
+                    'translate(-50%, -50%) rotate(-1deg)',
+                ];
+                return `<div class="mini-gum-card" style="background:${stripe}; transform:${offsets[idx]}; z-index:${idx + 1};">
+                    <div style="background:${color}; height:9px; flex-shrink:0;"></div>
+                </div>`;
+            }).join('');
+            return `<div class="pack-icon-box pack-icon-box--gumstack">${miniCards}</div>`;
+        }
+        const icon = pack.type === 'relic' ? '🔮' : '🛍';
+        return `<div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>`;
     }
 
     _doBuy(bandIdx) {
@@ -606,15 +657,15 @@ export class ShopScreen {
         }
     }
 
-    _doDiscard(def) {
+    _doDiscard(entry) {
         if (!this._gs.canAfford(this._gs.discardCost)) return;
 
         const overlay = this._el?.querySelector('#shop-discard-overlay');
-        const capEl   = overlay?.querySelector(`.discard-cap-img[data-cap-name="${def.name}"]`)
+        const capEl   = overlay?.querySelector(`.discard-cap-img[data-cap-id="${entry.id}"]`)
                                 ?.closest('.discard-cap');
 
         const apply = () => {
-            this._gs.useDiscard(def);
+            this._gs.useDiscard(entry.id);
             this._ui.setScore(this._gs.score);
 
             if (!overlay) return;
@@ -648,13 +699,13 @@ export class ShopScreen {
             return `<p class="discard-empty">No caps to discard.</p>`;
         }
         const canAfford = gs.canAfford(gs.discardCost);
-        return gs.ownedCaps.map(({ def }) =>
+        return gs.ownedCaps.map(({ id, def }) =>
             `<div class="discard-cap ${canAfford ? '' : 'cant-afford'}">
                 <img class="discard-cap-img" src="${def.texFront}" alt="${def.name}"
-                     data-cap-name="${def.name}">
+                     data-cap-id="${id}">
                 <div class="discard-cap-name">${def.name}</div>
                 <button class="discard-price-tag ${canAfford ? '' : 'cant-afford'}"
-                        data-cap-name="${def.name}" ${canAfford ? '' : 'disabled'}>
+                        data-cap-id="${id}" ${canAfford ? '' : 'disabled'}>
                     💀 ${gs.discardCost}★
                 </button>
             </div>`
