@@ -15,6 +15,8 @@ const EMPTY_RESULT = Object.freeze({
     fx:             null,
     effectMeta:     null, // { type, ... } — drives visual effect ring in UI
     spawnCaps:      [],   // cap defs to inject into the next throw's stack
+    auraBonus:      0,    // bonus to grant to other matching caps this throw
+    auraFilter:     null, // 'nearby' | 'series' | 'series_or_nearby'
 });
 
 export class EffectResolver {

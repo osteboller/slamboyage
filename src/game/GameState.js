@@ -35,8 +35,16 @@ export class GameState {
         this.nodeIndex      = 0;
         this.score          = 0;
         this.stackSizeLimit = 10;
-        const enchantIds = ['gilded','reverb','boomerang','ironclad','feather','halflife'];
-        this.ownedCaps      = [..._commonCaps].sort(() => Math.random() - 0.5).slice(0, 6).map((def, i) => this._mkCapEntry(def, enchantIds[i] ?? null));
+        // Test-hånd: demonstrerer crew, rally, halflife og gilded+streak
+        const byName = name => CAP_DEFS.find(d => d.name === name);
+        this.ownedCaps = [
+            this._mkCapEntry(byName('Martian Graffiti'), null),      // crew — giver +1 til alle cosmic_caps
+            this._mkCapEntry(byName('Ollien'),           null),      // rally — giver +1 til alle i nærheden
+            this._mkCapEntry(byName('Phone Homie'),      null),      // modtager fra begge
+            this._mkCapEntry(byName("Surfin' Alien"),    null),      // modtager fra begge
+            this._mkCapEntry(byName('Hang Light'),       'halflife'),// scorer 1★ selvom den ikke flippes
+            this._mkCapEntry(byName('Space Rockera'),    'gilded'),  // streak + gilded
+        ].filter(e => e.def);
         this.ownedRelics    = [];
         this.runNodes       = this._generateNodes(1);
         this.rerollCost     = 1;
@@ -137,6 +145,10 @@ export class GameState {
 
     gainCap(capDef) {
         this.ownedCaps.push(this._mkCapEntry(capDef));
+    }
+
+    gainEnchantedCap(capDef, enchant = null) {
+        this.ownedCaps.push(this._mkCapEntry(capDef, enchant));
     }
 
     buyCap(capDef, price) {

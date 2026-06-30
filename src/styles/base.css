@@ -1,10 +1,12 @@
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 html, body {
-    /* Forhindrer pull-to-refresh / rubber-band scroll på iOS Safari, som er det
-       der typisk trigger URL-baren til at poppe ned og forskyde viewporten. */
     overscroll-behavior: none;
     height: 100%;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
 }
 
 body {
@@ -17,9 +19,6 @@ body {
 #canvas-container {
     position: fixed;
     inset: 0;
-    /* 100vh er fallback for browsere uden dvh-support. 100dvh følger det faktisk
-       synlige viewport løbende på iOS Safari, så canvas/kamera/aim ikke forskydes
-       når URL-baren vises/skjules under et touch-træk. */
     width: 100vw;
     height: 100vh;
     width: 100dvw;

@@ -1,3 +1,5 @@
+import { capThumbnailHTML } from '../ui/capThumbnail.js';
+
 export class RunEndScreen {
     constructor({ gameState }) {
         this._gs  = gameState;
@@ -37,8 +39,8 @@ export class RunEndScreen {
         const loopLabel  = loop > 1 ? `Loop ${loop}` : null;
         const capCount   = ownedCaps.length;
 
-        const capPreviews = ownedCaps.slice(0, 12).map(({ def }) =>
-            `<img class="run-end-cap-img" src="${def.texFront}" alt="${def.name}" title="${def.name}">`
+        const capPreviews = ownedCaps.slice(0, 12).map(entry =>
+            capThumbnailHTML(entry, { imgClass: 'run-end-cap-img' })
         ).join('');
 
         return `

@@ -3,9 +3,12 @@ import { CAP_PRICE } from '../config/mapData.js';
 import { EFFECT_LABELS } from '../game/effects/labels.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
+import { capThumbnailHTML } from '../ui/capThumbnail.js';
+import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 
 const BAND_SIZE       = 5;
-const PACK_PRICES     = { cap: 8, relic: 10, card: 6 };
+const PACK_PRICES     = { cap: 8, relic: 10, card: 6, rare_cap: 12, legendary_cap: 18, mystery: 10 };
+const ENCHANT_IDS     = ['gilded', 'reverb', 'boomerang', 'halflife'];
 const CARD_IN_BAND_CHANCE = 0.3; // 30% chance one band slot is a card instead of a cap
 
 export class ShopScreen {
@@ -105,7 +108,7 @@ export class ShopScreen {
         }
 
         // Cap image clicked → show 3D cap viewer with DISCARD action sticker
-        const discardImg = e.target.closest('.discard-cap-img[data-cap-id]');
+        const discardImg = e.target.closest('.cap-enchant-wrap[data-cap-id]');
         if (discardImg) {
             const entry = this._gs.ownedCaps.find(c => c.id === +discardImg.dataset.capId);
             if (entry) {
@@ -140,7 +143,7 @@ export class ShopScreen {
         }
 
         // Open cap detail on image click — with BUY sticker if purchasable
-        const capImg = e.target.closest('.band-cap-img[data-cap-name]');
+        const capImg = e.target.closest('.cap-enchant-wrap[data-cap-name]');
         if (capImg) {
             const def = CAP_DEFS.find(c => c.name === capImg.dataset.capName);
             if (def) {
@@ -235,31 +238,41 @@ export class ShopScreen {
     _genPacks() {
         const bandNames = new Set(this._band.map(b => b.def.name));
 
-        // Helpers
         const relicChoices = () => {
             const pool = RELIC_DEFS.filter(r => !this._gs.hasRelic(r.id)).sort(() => Math.random() - 0.5);
             return (pool.length > 0 ? pool : [...RELIC_DEFS].sort(() => Math.random() - 0.5)).slice(0, 3);
         };
-
         const cardChoices = () => [...CONSUMABLE_DEFS].sort(() => Math.random() - 0.5).slice(0, 3);
 
-        // TEST: slot 1 = card, slot 2 = relic
-        return [
-            { type: 'card',  price: PACK_PRICES.card,  choices: cardChoices(),  bought: false },
-            { type: 'relic', price: PACK_PRICES.relic, choices: relicChoices(), bought: false },
-        ];
+        const capChoicesRare = () => CAP_DEFS
+            .filter(c => c.rarity >= 2 && c.rarity < 4 && !this._gs.hasCapDef(c) && !bandNames.has(c.name))
+            .sort(() => Math.random() - 0.5).slice(0, 3);
 
-        // PRODUCTION (swap in when ready):
-        // const types = ['cap', 'relic', 'card'];
-        // return [0, 1].map(() => {
-        //     const type = types[Math.floor(Math.random() * types.length)];
-        //     return {
-        //         type,
-        //         price: PACK_PRICES[type],
-        //         choices: type === 'cap' ? capChoices() : type === 'relic' ? relicChoices() : cardChoices(),
-        //         bought: false,
-        //     };
-        // });
+        const capChoicesLegendary = () => CAP_DEFS
+            .filter(c => c.rarity >= 3 && !this._gs.hasCapDef(c) && !bandNames.has(c.name))
+            .sort(() => Math.random() - 0.5).slice(0, 3);
+
+        const randomEnchant = () => ENCHANT_IDS[Math.floor(Math.random() * ENCHANT_IDS.length)];
+
+        const mysteryChoices = () => {
+            // Always one of each type — shuffled so order is random
+            const relic   = relicChoices()[0];
+            const cap     = (CAP_DEFS.filter(c => c.rarity >= 2 && !this._gs.hasCapDef(c))
+                .sort(() => Math.random() - 0.5)[0]) ?? CAP_DEFS[Math.floor(Math.random() * CAP_DEFS.length)];
+            const card    = cardChoices()[0];
+            return [
+                { itemType: 'relic', def: relic },
+                { itemType: 'cap',   def: cap, enchant: randomEnchant() },
+                { itemType: 'card',  def: card },
+            ].sort(() => Math.random() - 0.5);
+        };
+
+        const all = [
+            { type: 'rare_cap',      price: PACK_PRICES.rare_cap,      choices: capChoicesRare()      },
+            { type: 'legendary_cap', price: PACK_PRICES.legendary_cap, choices: capChoicesLegendary() },
+            { type: 'mystery',       price: PACK_PRICES.mystery,       choices: mysteryChoices()      },
+        ];
+        return all.sort(() => Math.random() - 0.5).slice(0, 2).map(p => ({ ...p, bought: false }));
     }
 
     _flashNoRoom(el) {
@@ -336,7 +349,7 @@ export class ShopScreen {
             const card = e.target.closest('.reward-card[data-key]');
             if (card) {
                 const key = card.dataset.key;
-                if (pack.type === 'cap') {
+                if (pack.type === 'cap' || pack.type === 'rare_cap' || pack.type === 'legendary_cap') {
                     const def = pack.choices.find(c => c.name === key);
                     if (def) this._ui.showCapDetail(def, false, {
                         label: 'PICK', color: '#000',
@@ -350,11 +363,12 @@ export class ShopScreen {
     }
 
     _renderPackScreen(pack, idx) {
-        const titleMap = { cap: 'CAP PACK', relic: 'RELIC PACK', card: 'CARD PACK' };
+        const titleMap = { cap: 'CAP PACK', relic: 'RELIC PACK', card: 'CARD PACK', rare_cap: 'RARE PACK', legendary_cap: 'LEGENDARY PACK', mystery: 'MYSTERY PACK' };
         let cardsHTML;
-        if (pack.type === 'relic')     cardsHTML = this._packRelicCards(pack.choices);
-        else if (pack.type === 'card') cardsHTML = this._packCardCards(pack.choices);
-        else                           cardsHTML = this._packCapCards(pack.choices);
+        if (pack.type === 'relic')          cardsHTML = this._packRelicCards(pack.choices);
+        else if (pack.type === 'card')      cardsHTML = this._packCardCards(pack.choices);
+        else if (pack.type === 'mystery')   cardsHTML = this._packMysteryCards(pack.choices);
+        else                                cardsHTML = this._packCapCards(pack.choices);
 
         this._packEl.innerHTML = `
             <button id="pack-skip-btn">SKIP</button>
@@ -387,9 +401,25 @@ export class ShopScreen {
                 }
                 if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
             }
+        } else if (pack.type === 'mystery') {
+            const item = pack.choices[parseInt(key, 10)];
+            if (!item) return;
+            if (item.itemType === 'relic') {
+                this._gs.addRelic(item.def);
+            } else if (item.itemType === 'card') {
+                const slotIdx = this._gs.addConsumable(item.def);
+                if (slotIdx === false) {
+                    this._flashNoRoom(this._packEl?.querySelector(`[data-key="${key}"]`));
+                    return;
+                }
+                if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
+            } else {
+                this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
+                this._ui.flashBagBtn();
+            }
         } else {
             const def = pack.choices.find(c => c.name === key);
-            if (def) this._gs.ownedCaps.push({ def, enchant: null });
+            if (def) this._gs.gainCap(def);
         }
         this._packs[idx].bought = true;
         this._pendingPack = null;
@@ -415,11 +445,56 @@ export class ShopScreen {
             const badge = effL ? `<div class="reward-effect">${effL}</div>` : '';
             return `<div class="reward-card" data-key="${cap.name}">
                 <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
-                <img class="reward-cap-img" src="${cap.texFront}" alt="${cap.name}">
+                ${capThumbnailHTML(cap, { imgClass: 'reward-cap-img' })}
                 <div class="reward-cap-name">${cap.name}</div>
                 <div class="reward-cap-series">${cap.series.replaceAll('_', ' ')}</div>
                 ${badge}
                 <button class="reward-quick-pick" data-key="${cap.name}">▶ PICK</button>
+            </div>`;
+        }).join('');
+    }
+
+    _packMysteryCards(items) {
+        return items.map((item, i) => {
+            if (item.itemType === 'relic') {
+                return `<div class="reward-card reward-card--relic" data-key="${i}">
+                    <div class="reward-rarity reward-rarity--rare">RELIC</div>
+                    <div class="reward-relic-icon">${item.def.icon}</div>
+                    <div class="reward-cap-name">${item.def.name}</div>
+                    <div class="reward-relic-desc">${item.def.description}</div>
+                    <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
+                </div>`;
+            }
+            if (item.itemType === 'card') {
+                const c      = item.def;
+                const stripe = `repeating-linear-gradient(-45deg, ${c.bg} 0px, ${c.bg} 2px, #fff 2px, #fff 4px)`;
+                const tCol   = this._headerTextColor(c.color);
+                return `<div class="reward-card reward-card--gumcard" data-key="${i}">
+                    <div class="gum-pack-top" style="background:${stripe};">
+                        <div class="gum-pack-header" style="background:${c.color}; color:${tCol};">${c.name}</div>
+                        <div class="gum-pack-icon">${c.icon}</div>
+                    </div>
+                    <div class="gum-pack-bottom">
+                        <div class="gum-pack-flavor">${c.flavor}</div>
+                        <div class="gum-pack-desc">${c.description}</div>
+                    </div>
+                    <div class="gum-pack-footer" style="background:${stripe};">
+                        <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
+                    </div>
+                </div>`;
+            }
+            const entry  = { def: item.def, enchant: item.enchant ?? null };
+            const r      = this._rarityInfo(item.def.rarity ?? 1);
+            const effL   = item.def.effect ? (EFFECT_LABELS[item.def.effect] ?? item.def.effect) : '';
+            const eDef   = item.enchant ? ENCHANT_DEFS.find(e => e.id === item.enchant) : null;
+            return `<div class="reward-card" data-key="${i}">
+                <div class="reward-rarity reward-rarity--${r.cls}">CAP · ${r.label}</div>
+                ${capThumbnailHTML(entry, { imgClass: 'reward-cap-img' })}
+                <div class="reward-cap-name">${item.def.name}</div>
+                <div class="reward-cap-series">${item.def.series.replaceAll('_', ' ')}</div>
+                ${effL  ? `<div class="reward-effect">${effL}</div>` : ''}
+                ${eDef  ? `<div class="reward-effect" style="color:${eDef.color}">${eDef.icon} ${eDef.name}</div>` : ''}
+                <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
             </div>`;
         }).join('');
     }
@@ -570,8 +645,7 @@ export class ShopScreen {
 
             return `<div class="band-item ${animClass}" ${animStyle}>
                 <div class="band-slot-box">
-                    <img class="band-cap-img" src="${item.def.texFront}" alt="${item.def.name}"
-                         data-cap-name="${item.def.name}">
+                    ${capThumbnailHTML({ def: item.def, enchant: item.enchant, id: item.def.name }, { imgClass: 'band-cap-img', idAttr: 'data-cap-name' })}
                 </div>
                 <button class="band-price-tag ${canBuy ? '' : 'cant-afford'}"
                         data-band-idx="${i}" ${canBuy ? '' : 'disabled'}>
@@ -582,31 +656,33 @@ export class ShopScreen {
     }
 
     _buildPackCardHTML(pack, i) {
-        const isRelic   = pack.type === 'relic';
-        const isCard    = pack.type === 'card';
-        const typeLabel = isRelic ? 'Relic Pack' : isCard ? 'Card Pack' : 'Collector Pack';
-        const extraCls  = isRelic ? ' pack--relic' : isCard ? ' pack--card' : '';
+        const META = {
+            relic:         { label: 'Relic Pack',     cls: ' pack--relic',     hint: '3 relics · pick 1',   emptyHint: 'No relics left'  },
+            card:          { label: 'Card Pack',       cls: ' pack--card',      hint: '3 cards · pick 1',    emptyHint: 'No cards left'   },
+            cap:           { label: 'Collector Pack',  cls: '',                 hint: '3 caps · pick 1',     emptyHint: 'No caps left'    },
+            rare_cap:      { label: 'Rare Pack',       cls: ' pack--rare',      hint: '3 rare caps · pick 1',      emptyHint: 'No rare caps left'      },
+            legendary_cap: { label: 'Legendary Pack',  cls: ' pack--legendary', hint: '3 legendary caps · pick 1', emptyHint: 'No legendary caps left' },
+            mystery:       { label: 'Mystery Pack',    cls: ' pack--mystery',   hint: 'mixed rewards · pick 1',    emptyHint: '—'                      },
+        };
+        const m         = META[pack.type] ?? META.cap;
         const iconHTML  = this._packIconHTML(pack);
         if (pack.bought) {
-            return `<div class="shop-pack bought${extraCls}" data-pack-idx="${i}">
+            return `<div class="shop-pack bought${m.cls}" data-pack-idx="${i}">
                 ${iconHTML}
                 <div class="pack-info">
-                    <span class="pack-type">${typeLabel}</span>
+                    <span class="pack-type">${m.label}</span>
                     <span class="pack-hint">Opened</span>
                 </div>
             </div>`;
         }
         const canAfford = this._gs.canAfford(pack.price);
         const empty     = pack.choices.length === 0;
-        const hint      = empty
-            ? (isRelic ? 'No relics left' : isCard ? 'No cards left' : 'No caps left')
-            : (isRelic ? '3 relics · pick 1' : isCard ? '3 cards · pick 1' : '3 caps · pick 1');
-        return `<button class="shop-pack${extraCls} ${canAfford && !empty ? '' : 'cant-afford'}"
+        return `<button class="shop-pack${m.cls} ${canAfford && !empty ? '' : 'cant-afford'}"
                      data-pack-idx="${i}">
             ${iconHTML}
             <div class="pack-info">
-                <span class="pack-type">${typeLabel}</span>
-                <span class="pack-hint">${hint}</span>
+                <span class="pack-type">${m.label}</span>
+                <span class="pack-hint">${empty ? m.emptyHint : m.hint}</span>
                 <div class="pack-price">${pack.price}★</div>
             </div>
         </button>`;
@@ -632,7 +708,8 @@ export class ShopScreen {
             }).join('');
             return `<div class="pack-icon-box pack-icon-box--gumstack">${miniCards}</div>`;
         }
-        const icon = pack.type === 'relic' ? '🔮' : '🛍';
+        const icons = { relic: '🔮', cap: '🛍', rare_cap: '⭐', legendary_cap: '👑', mystery: '🎲' };
+        const icon  = icons[pack.type] ?? '🛍';
         return `<div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>`;
     }
 
@@ -661,7 +738,7 @@ export class ShopScreen {
         if (!this._gs.canAfford(this._gs.discardCost)) return;
 
         const overlay = this._el?.querySelector('#shop-discard-overlay');
-        const capEl   = overlay?.querySelector(`.discard-cap-img[data-cap-id="${entry.id}"]`)
+        const capEl   = overlay?.querySelector(`[data-cap-id="${entry.id}"]`)
                                 ?.closest('.discard-cap');
 
         const apply = () => {
@@ -699,10 +776,9 @@ export class ShopScreen {
             return `<p class="discard-empty">No caps to discard.</p>`;
         }
         const canAfford = gs.canAfford(gs.discardCost);
-        return gs.ownedCaps.map(({ id, def }) =>
+        return gs.ownedCaps.map(({ id, def, enchant }) =>
             `<div class="discard-cap ${canAfford ? '' : 'cant-afford'}">
-                <img class="discard-cap-img" src="${def.texFront}" alt="${def.name}"
-                     data-cap-id="${id}">
+                ${capThumbnailHTML({ id, def, enchant }, { imgClass: 'discard-cap-img' })}
                 <div class="discard-cap-name">${def.name}</div>
                 <button class="discard-price-tag ${canAfford ? '' : 'cant-afford'}"
                         data-cap-id="${id}" ${canAfford ? '' : 'disabled'}>

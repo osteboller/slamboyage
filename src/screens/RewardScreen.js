@@ -1,6 +1,7 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
 import { EFFECT_LABELS } from '../game/effects/labels.js';
+import { capThumbnailHTML } from '../ui/capThumbnail.js';
 
 const SKIP_BONUS = 5;
 
@@ -160,7 +161,7 @@ export class RewardScreen {
                 ? `<div class="reward-effect">${effectLabel}</div>` : '';
             return `<div class="reward-card" data-key="${cap.name}">
                 <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
-                <img class="reward-cap-img" src="${cap.texFront}" alt="${cap.name}">
+                ${capThumbnailHTML(cap, { imgClass: 'reward-cap-img' })}
                 <div class="reward-cap-name">${cap.name}</div>
                 <div class="reward-cap-series">${seriesLabel(cap.series)}</div>
                 ${effectBadge}

@@ -20,11 +20,24 @@ export class RenderEngine {
         this._setupGround();
         this._setupReticle(); // <--- NY: Byg sigtekornet med det samme
 
-        window.addEventListener('resize', () => {
-            this.camera.aspect = innerWidth / innerHeight;
+        const syncViewportSize = () => {
+            const vv = window.visualViewport;
+            const w  = vv ? vv.width  : innerWidth;
+            const h  = vv ? vv.height : innerHeight;
+            this.camera.aspect = w / h;
             this.camera.updateProjectionMatrix();
-            this.renderer.setSize(innerWidth, innerHeight);
+            this.renderer.setSize(w, h);
+        };
+
+        window.addEventListener('resize', syncViewportSize);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(syncViewportSize, 100);
         });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', syncViewportSize);
+        }
+
+        this.syncViewportSize = syncViewportSize;
     }
 
     _setupLights() {
@@ -127,6 +140,27 @@ export class RenderEngine {
         requestAnimationFrame(tick);
     }
 
+    // Smoothly rotates capMesh from its current quaternion to the target euler over durationMs.
+    // Bypasses sync() during animation via skipSync flag; calls onDone(finalQuat) when complete.
+    animateCapFlip(capMesh, targetEulerXYZ, durationMs, onDone) {
+        const fromQuat = capMesh.quaternion.clone();
+        const toQuat   = new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(targetEulerXYZ[0], targetEulerXYZ[1], targetEulerXYZ[2])
+        );
+        capMesh.userData.skipSync = true;
+        const start = performance.now();
+        const tick = () => {
+            const t    = Math.min((performance.now() - start) / durationMs, 1);
+            const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+            capMesh.quaternion.slerpQuaternions(fromQuat, toQuat, ease);
+            if (t < 1) { requestAnimationFrame(tick); return; }
+            capMesh.userData.skipSync = false;
+            capMesh.quaternion.copy(toQuat);
+            onDone?.(toQuat);
+        };
+        requestAnimationFrame(tick);
+    }
+
     _createCorkTexture() {
     const S   = 512;
     const cvs = document.createElement('canvas');
@@ -208,6 +242,7 @@ export class RenderEngine {
 
     sync(caps, slammer) {
         caps.forEach(({ mesh, body }) => {
+            if (mesh.userData.skipSync) return; // flip animation in progress
             mesh.position.copy(body.position);
             mesh.quaternion.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
         });

@@ -2,7 +2,8 @@ import { DEFAULT_MASS, STACK_COUNT, SLAMMER_DEFS, CAP_DEFS, THROWS_PER_ROUND } f
 import { CapViewer }      from './CapViewer.js';
 import { EFFECT_LABELS }  from '../game/effects/labels.js';
 import { RELIC_DEFS }     from '../config/relicDefs.js';
-import { ENCHANT_DEFS }   from '../config/enchantDefs.js';
+import { ENCHANT_DEFS }      from '../config/enchantDefs.js';
+import { capThumbnailHTML }  from './capThumbnail.js';
 
 export class UIManager {
     constructor() {
@@ -143,6 +144,18 @@ export class UIManager {
             el.classList.add('effect-indicator--magnet');
             el.textContent = `🧲 ×${meta.count}`;
             setTimeout(() => el.remove(), 1200);
+        } else if (meta.type === 'boomerang') {
+            el.classList.add('effect-indicator--boomerang');
+            el.textContent = '🪃';
+            setTimeout(() => el.remove(), 900);
+        } else if (meta.type === 'rally') {
+            el.classList.add('effect-indicator--rally');
+            el.textContent = meta.count > 0 ? `⚡+${meta.count}` : '⚡';
+            setTimeout(() => el.remove(), 1100);
+        } else if (meta.type === 'crew') {
+            el.classList.add('effect-indicator--crew');
+            el.textContent = meta.count > 0 ? `👾+${meta.count}` : '👾';
+            setTimeout(() => el.remove(), 1100);
         }
     }
 
@@ -220,21 +233,17 @@ export class UIManager {
         }
 
         const wonList = document.getElementById('wonList');
+        const wonStyle = 'width:40px;height:40px;margin:3px;border-radius:50%;border:2px solid rgba(255,255,255,0.25);cursor:pointer;display:inline-block;vertical-align:middle;overflow:hidden;';
         wonList.innerHTML = wonCaps.map((entry, i) => {
-            const def     = entry.def ?? entry;
-            const enchant = this._liveEnchant(entry);
+            const def = entry.def ?? entry;
             if (def.texFront) {
-                return `<div class="cap-enchant-wrap" data-idx="${i}"
-                    style="width:40px;height:40px;margin:3px;border-radius:50%;
-                    border:2px solid rgba(255,255,255,0.25);cursor:pointer;
-                    display:inline-block;vertical-align:middle;overflow:hidden;">
-                    <img src="${def.texFront}" alt="${def.name}" title="${def.name}"
-                        style="width:100%;height:100%;object-fit:cover;display:block;">
-                    ${this._enchantHTML(enchant)}
-                </div>`;
+                return capThumbnailHTML(
+                    { ...entry, enchant: this._liveEnchant(entry) },
+                    { imgClass: 'cap-thumb-img', extraAttrs: `data-idx="${i}" style="${wonStyle}"` }
+                );
             }
             const hex = '#' + (def.color ?? 0xaaaaaa).toString(16).padStart(6, '0');
-            return `<span title="${def.name}" style="display:inline-block;width:40px;height:40px;
+            return `<span title="${def.name}" data-idx="${i}" style="display:inline-block;width:40px;height:40px;
                     border-radius:50%;background:${hex};margin:3px;
                     border:2px solid rgba(255,255,255,0.2)"></span>`;
         }).join('');
@@ -667,14 +676,13 @@ export class UIManager {
 
         const dotsEl = document.getElementById('cap-overlay-dots');
         dotsEl.innerHTML = defs.map((entry, i) => {
-            const def     = entry.def ?? entry;
-            const enchant = this._liveEnchant(entry);
+            const def = entry.def ?? entry;
             if (def.texFront) {
-                return `<div class="cap-enchant-wrap cap-thumb${lit ? '' : ' dimmed'}"
-                    title="${def.name}" data-idx="${i}" data-lit="${lit}">
-                    <img class="cap-thumb-img" src="${def.texFront}" alt="${def.name}">
-                    ${this._enchantHTML(enchant)}
-                </div>`;
+                return capThumbnailHTML(
+                    { ...entry, enchant: this._liveEnchant(entry) },
+                    { wrapClass: `cap-thumb${lit ? '' : ' dimmed'}`, imgClass: 'cap-thumb-img',
+                      dimmed: !lit, extraAttrs: `data-idx="${i}" data-lit="${lit}"` }
+                );
             }
             const hex = '#' + (def.color ?? 0xaaaaaa).toString(16).padStart(6, '0');
             return `<span style="display:inline-block;width:40px;height:40px;border-radius:50%;
@@ -721,10 +729,7 @@ export class UIManager {
                 enchant     ? `<span class="col-badge enchant">${enchant}</span>`    : '',
             ].join('');
             return `<div class="col-cap" data-cap-id="${id}">
-                <div class="cap-enchant-wrap">
-                    <img class="col-cap-img" src="${def.texFront}" alt="${def.name}">
-                    ${this._enchantHTML(enchant)}
-                </div>
+                ${capThumbnailHTML({ id, def, enchant }, { imgClass: 'col-cap-img' })}
                 <div class="col-cap-name">${def.name}</div>
                 ${badges}
             </div>`;
@@ -896,6 +901,14 @@ export class UIManager {
         const effectLabel  = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : '';
         subEl.textContent  = [seriesLabel, effectLabel].filter(Boolean).join(' · ');
 
+        const rarityEl = document.getElementById('cap-detail-rarity');
+        if (rarityEl) {
+            const RARITY_MAP = { 1: ['common', 'Common'], 2: ['uncommon', 'Uncommon'], 3: ['rare', 'Rare'], 4: ['legendary', 'Legendary'] };
+            const [cls, label] = RARITY_MAP[def.rarity ?? 1] ?? ['common', 'Common'];
+            rarityEl.className   = `rarity--${cls}`;
+            rarityEl.textContent = label;
+        }
+
         detail.classList.toggle('cap-detail--lit', lit);
 
         if (action) {
@@ -1024,7 +1037,9 @@ export class UIManager {
             <div class="enchant-result-name">${enchantDef.name}</div>
             <div class="enchant-result-desc">${enchantDef.description}</div>`;
         document.body.appendChild(el);
-        setTimeout(() => el.classList.add('enchant-result-sticker--out'), 2200);
+        const dismiss = () => el.classList.add('enchant-result-sticker--out');
+        const timer = setTimeout(dismiss, 2200);
+        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
         el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
     }
 
@@ -1032,14 +1047,13 @@ export class UIManager {
     showCapPicker(title, entries, onPick) {
         document.getElementById('cap-picker-overlay')?.remove();
 
-        const grid = entries.map(entry => {
-            const { id, def, enchant } = entry;
-            return `<div class="cap-picker-thumb cap-enchant-wrap" data-cap-id="${id}" title="${def.name}">
-                <img class="cap-thumb-img" src="${def.texFront}" alt="${def.name}">
-                ${this._enchantHTML(enchant)}
-                <div class="cap-picker-name">${def.name}</div>
-            </div>`;
-        }).join('');
+        const grid = entries.map(entry =>
+            capThumbnailHTML(entry, {
+                wrapClass: 'cap-picker-thumb',
+                imgClass:  'cap-thumb-img',
+                innerHTML: `<div class="cap-picker-name">${(entry.def ?? entry).name}</div>`,
+            })
+        ).join('');
 
         const el = document.createElement('div');
         el.id = 'cap-picker-overlay';
@@ -1072,12 +1086,4 @@ export class UIManager {
         return entry.enchant ?? null;
     }
 
-    // Returns overlay img + badge HTML for a cap thumbnail — empty string if no enchant
-    _enchantHTML(enchant) {
-        if (!enchant) return '';
-        const def = ENCHANT_DEFS.find(e => e.id === enchant);
-        if (!def) return '';
-        return `<img class="enchant-thumb-overlay" src="assets/enchants/${def.overlayAsset}" alt="">` +
-               `<div class="enchant-thumb-badge" style="background:${def.color}">${def.icon}</div>`;
-    }
 }

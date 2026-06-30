@@ -401,6 +401,33 @@ export class RoundManager {
 
         const updatedFaceDown = [...stillDown, ...returnCaps];
 
+        // ── Phase 2b: aura pre-pass — caps med rally/crew giver bonus + samler feedback ──
+        const incomingAura = new Map(); // cap → sum af aura bonusser fra andre caps
+        const auraFeedback = new Map(); // donor cap → { type, targets: [worldPos, ...] }
+        actualWon.forEach(({ cap: donor, auraBonus, auraFilter }) => {
+            if (!auraBonus || !auraFilter) return;
+            const pd      = donor.body.position;
+            const targets = [];
+            actualWon.forEach(({ cap: target }) => {
+                if (target === donor) return;
+                const pt        = target.body.position;
+                const dx        = pd.x - pt.x, dz = pd.z - pt.z;
+                const nearby    = Math.sqrt(dx * dx + dz * dz) < NEARBY_RADIUS;
+                const sameSeries = donor.def?.series && donor.def.series === target.def?.series;
+                const matches   = auraFilter === 'nearby'   ? nearby
+                                : auraFilter === 'series'   ? sameSeries
+                                : /* series_or_nearby */       nearby || sameSeries;
+                if (matches) {
+                    incomingAura.set(target, (incomingAura.get(target) ?? 0) + auraBonus);
+                    targets.push({ x: pt.x, y: pt.y, z: pt.z });
+                }
+            });
+            if (targets.length > 0) {
+                const feedType = auraFilter === 'nearby' ? 'rally' : auraFilter === 'series' ? 'crew' : 'rally';
+                auraFeedback.set(donor, { type: feedType, targets, count: targets.length });
+            }
+        });
+
         // ── Phase 3+4: per-cap score med flat bonus + global multiplier-kæde ──
         const flatRelicBonus  = this._gs?.flatRelicBonus   ?? 0;
         const multChain       = this._gs?.multiplierChain  ?? [];
@@ -419,7 +446,8 @@ export class RoundManager {
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
 
         const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
-            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + flatRelicBonus) * (localMultiplier ?? 1));
+            const aura       = incomingAura.get(cap) ?? 0;
+            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + aura + flatRelicBonus) * (localMultiplier ?? 1));
             const finalScore = Math.floor(capScore * globalMult);
             return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain };
         });
@@ -438,6 +466,8 @@ export class RoundManager {
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
                 if (effectMeta) this._spawnEffectFeedback(cap.body.position, x, y, effectMeta);
+                const auraMeta = auraFeedback.get(cap);
+                if (auraMeta)  this._spawnEffectFeedback(cap.body.position, x, y, auraMeta);
                 this._ui.showScoreFloat(x, y, capScore, chain, () => {
                     this._popCapMesh(cap.mesh);
                     this._ui.popCollectIcon(cap.def);
@@ -498,6 +528,19 @@ export class RoundManager {
                         this._ui.showRelicGain(r.icon, oldValue, r.currentValue, this._throwsLeft);
                     });
             }
+            // HALFLIFE: face-down caps med halflife-enchant scorer ½ baseValue ved rundens afslutning
+            const flatBonus = this._gs?.flatRelicBonus ?? 0;
+            updatedFaceDown.forEach(cap => {
+                const liveEnchant = (cap.entryId != null && this._gs)
+                    ? (this._gs.ownedCaps.find(c => c.id === cap.entryId)?.enchant ?? cap.enchant)
+                    : cap.enchant;
+                if (liveEnchant !== 'halflife') return;
+                const halfScore = Math.ceil((1 + flatBonus) / 2);
+                this._totalScore += halfScore;
+                const { x, y } = this._projectToScreen(cap.body.position);
+                this._ui.showScoreFloat(x, y, halfScore, [], null);
+            });
+
             this._phase = 'done';
             this._ui.showResults(
                 this._wonCapsAll.length, this._totalScore,
@@ -522,19 +565,29 @@ export class RoundManager {
             this._render.spawnEffectRing(worldPos, VERY_NEARBY_RADIUS, 0xffd700, holdMs, 350);
         } else if (meta.type === 'magnet') {
             this._render.spawnEffectRing(worldPos, 10, 0xffaa00, 1400, 500);
+        } else if (meta.type === 'rally') {
+            this._render.spawnEffectRing(worldPos, NEARBY_RADIUS, 0x44ffcc, 700, 400);
+            (meta.targets ?? []).forEach(pos =>
+                this._render.spawnEffectRing(pos, 0.7, 0x44ffcc, 400, 250));
+        } else if (meta.type === 'crew') {
+            (meta.targets ?? []).forEach(pos =>
+                this._render.spawnEffectRing(pos, 0.7, 0xaaffaa, 400, 250));
         }
         this._ui.showEffectIndicator(screenX, screenY, meta);
     }
 
     _projectToScreen(worldPos, worldRadius = 0) {
         const cam = this._cam.camera;
+        const vv  = window.visualViewport;
+        const vw  = vv ? vv.width  : window.innerWidth;
+        const vh  = vv ? vv.height : window.innerHeight;
         const c   = new THREE.Vector3(worldPos.x, worldPos.y, worldPos.z).project(cam);
-        const cx  = Math.round((c.x *  0.5 + 0.5) * window.innerWidth);
-        const cy  = Math.round((c.y * -0.5 + 0.5) * window.innerHeight);
+        const cx  = Math.round((c.x *  0.5 + 0.5) * vw);
+        const cy  = Math.round((c.y * -0.5 + 0.5) * vh);
         if (!worldRadius) return { x: cx, y: cy };
         // Project a point offset by worldRadius to get perspective-correct screen size
         const e  = new THREE.Vector3(worldPos.x + worldRadius, worldPos.y, worldPos.z).project(cam);
-        const ex = Math.round((e.x * 0.5 + 0.5) * window.innerWidth);
+        const ex = Math.round((e.x * 0.5 + 0.5) * vw);
         return { x: cx, y: cy, r: Math.abs(ex - cx) };
     }
 

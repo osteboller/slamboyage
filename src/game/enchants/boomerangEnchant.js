@@ -1,6 +1,6 @@
-export function boomerangEnchant(_cap, _ctx, base) {
+export function boomerangEnchant(cap, _ctx, base) {
     if (Math.random() < 0.5) {
-        return { ...base, returnToStack: true, fx: 'boomerang' };
+        return { ...base, spawnCaps: [...(base.spawnCaps ?? []), { def: cap.def, enchant: cap.enchant ?? null }] };
     }
     return base;
 }

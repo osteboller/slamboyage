@@ -7,5 +7,7 @@ export const EFFECT_LABELS = {
     'streak':     'Streak: +1★ per flip this throw',
     'spawn':      'Spawn: adds a copy to the next throw',
     'magnet':     'Lasso: pulls nearby caps closer',
+    'rally':      'Rally: +1★ to each nearby cap this throw',
+    'crew':       'Crew: +1★ to each same-series cap this throw',
     'cue_slam':   'Cue Ball: blasts a random Pewl cap when flipped',
 };

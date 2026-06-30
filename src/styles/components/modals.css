@@ -184,6 +184,24 @@
     box-shadow: var(--shadow-raised), 0 0 0 2px rgba(245,200,66,0.25);
 }
 
+#cap-detail-rarity {
+    display: none;
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 11px;
+    border: 3px solid #000;
+    top: -16px; left: -14px;
+    transform: rotate(-4deg);
+}
+#cap-detail-rarity.rarity--common    { display: block; background: #000;            color: #fff; }
+#cap-detail-rarity.rarity--uncommon  { display: block; background: #5d5f5f;         color: #fff; }
+#cap-detail-rarity.rarity--rare      { display: block; background: var(--clr-red);  color: #fff; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
+#cap-detail-rarity.rarity--legendary { display: block; background: #f5c842;         color: #000; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
+
 /* ─── RELIC / CARD DETAIL ────────────────────────────────────────────────── */
 #relic-detail {
     display: none;
