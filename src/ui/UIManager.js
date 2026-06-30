@@ -156,6 +156,10 @@ export class UIManager {
             el.classList.add('effect-indicator--crew');
             el.textContent = meta.count > 0 ? `👾+${meta.count}` : '👾';
             setTimeout(() => el.remove(), 1100);
+        } else if (meta.type === 'surge') {
+            el.classList.add(meta.success ? 'effect-indicator--surge' : 'effect-indicator--fail');
+            el.textContent = meta.success ? '⚡↩' : '⚡✕';
+            setTimeout(() => el.remove(), meta.success ? 1000 : 800);
         }
     }
 
@@ -1039,6 +1043,24 @@ export class UIManager {
         document.body.appendChild(el);
         const dismiss = () => el.classList.add('enchant-result-sticker--out');
         const timer = setTimeout(dismiss, 2200);
+        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
+        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+    }
+
+    showTransformResult(oldDef, newDef) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker transform-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#5a7a20;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 12px 10px;">
+                <img src="${oldDef.texFront}" class="transform-result-img transform-result-img--old">
+                <span style="font-size:22px;opacity:0.7;">→</span>
+                <img src="${newDef.texFront}" class="transform-result-img">
+            </div>
+            <div class="enchant-result-name" style="color:#5a7a20;">${newDef.name}</div>
+            <div class="enchant-result-desc">${newDef.series?.replace(/_/g, ' ') ?? ''}</div>`;
+        document.body.appendChild(el);
+        const dismiss = () => el.classList.add('enchant-result-sticker--out');
+        const timer = setTimeout(dismiss, 2600);
         el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
         el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
     }

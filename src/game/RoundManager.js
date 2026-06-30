@@ -1,4 +1,4 @@
-import { BODY_TYPES } from '../../lib/cannon.js';
+import { BODY_TYPES, Vec3 } from '../../lib/cannon.js';
 import { POG_H, POG_R, THROWS_PER_ROUND } from '../config/constants.js';
 import { NEARBY_RADIUS, VERY_NEARBY_RADIUS } from './EffectResolver.js';
 import { EffectResolver } from './EffectResolver.js';
@@ -399,7 +399,51 @@ export class RoundManager {
             cap.body.previousPosition.copy(cap.body.position);
         });
 
-        const updatedFaceDown = [...stillDown, ...returnCaps];
+        // ── Phase 2.5: surge chain — resolve synkront, animer bagefter ────────
+        // faceDownPool: mutable pool af caps surge kan flippe (kun stillDown, ikke returnCaps)
+        const faceDownPool     = [...stillDown];
+        const surgeAnimTargets = []; // { cap, step } — til staggered animation
+        const surgeAttempts    = []; // { pos, success, step } — til radius-ring feedback (også ved miss)
+        const surgeQueue       = actualWon.filter(r => (r.flipNearby ?? 0) > 0);
+        const MAX_CHAIN        = 8;
+        let   chainStep        = 0;
+
+        while (surgeQueue.length > 0 && chainStep < MAX_CHAIN) {
+            const surger    = surgeQueue.shift();
+            const sp        = surger.cap.body.position;
+
+            // Find nærmeste face-down cap inden for NEARBY_RADIUS
+            let nearestIdx  = -1;
+            let nearestDist = Infinity;
+            faceDownPool.forEach((cap, idx) => {
+                const p    = cap.body.position;
+                const dist = Math.sqrt((sp.x - p.x) ** 2 + (sp.z - p.z) ** 2);
+                if (dist < NEARBY_RADIUS && dist < nearestDist) {
+                    nearestDist = dist; nearestIdx = idx;
+                }
+            });
+
+            chainStep++;
+            if (nearestIdx === -1) {
+                surgeAttempts.push({ pos: sp, success: false, step: chainStep });
+                continue;
+            }
+
+            const target = faceDownPool.splice(nearestIdx, 1)[0];
+            surgeAnimTargets.push({ cap: target, step: chainStep });
+            surgeAttempts.push({ pos: sp, success: true, step: chainStep, targetPos: target.body.position });
+
+            // Resolve target's effects (inkl. evt. chain-surge)
+            const newAllCaps = [...actualWon.map(r => r.cap), ...faceDownPool, target];
+            const ctx        = this._resolver.buildContext(target, newAllCaps, this._throwIndex, actualWon.length + surgeAnimTargets.length);
+            const result     = this._resolver.resolve(target, ctx);
+            const resolved   = { cap: target, ...result };
+            actualWon.push(resolved);
+
+            if ((result.flipNearby ?? 0) > 0) surgeQueue.push(resolved);
+        }
+
+        const updatedFaceDown = [...faceDownPool, ...returnCaps];
 
         // ── Phase 2b: aura pre-pass — caps med rally/crew giver bonus + samler feedback ──
         const incomingAura = new Map(); // cap → sum af aura bonusser fra andre caps
@@ -457,12 +501,37 @@ export class RoundManager {
         this._totalScore += scoreGained;
         this._throwsLeft--;
 
+        // ── Surge-flip animationer — staggered, kører parallelt med score floats ──
+        // Viser altid en radius-ring ved surgeren (grøn = fandt mål, rød = ingen face-down cap i NEARBY_RADIUS)
+        surgeAttempts.forEach(({ pos, success, step, targetPos }) => {
+            this.delay(() => {
+                const { x, y } = this._projectToScreen(pos);
+                this._spawnEffectFeedback(pos, x, y, { type: 'surge', success, targetPos });
+            }, (step - 1) * 220);
+        });
+        const SURGE_SPIN_MS  = 850;
+        const surgeLandDelay = new Map(); // cap → earliest ms score/pop may fire, so it doesn't vanish mid-hop
+        surgeAnimTargets.forEach(({ cap, step }) => {
+            const startAt = (step - 1) * 220;
+            surgeLandDelay.set(cap, startAt + SURGE_SPIN_MS + 120);
+            this.delay(() => {
+                this._render.animateCapFlipSpin(cap.mesh, 3, SURGE_SPIN_MS, () => {
+                    const euler = new Vec3();
+                    cap.body.quaternion.toEuler(euler);
+                    cap.body.quaternion.setFromEuler(0, euler.y, 0);
+                });
+            }, startAt);
+        });
+
         // ── Pop animations + per-cap score floats ────────────────────────────
         const popDelay   = Math.max(80, 500 / Math.max(actualWon.length, 1));
         const finalScore = this._scoreBase + this._totalScore;
 
+        const scoreDelays = scoredCaps.map(({ cap }, i) => Math.max(i * popDelay, surgeLandDelay.get(cap) ?? 0));
+        const lastIdx      = scoreDelays.reduce((best, d, i) => d > scoreDelays[best] ? i : best, 0);
+
         scoredCaps.forEach(({ cap, capScore, effectMeta, chain }, i) => {
-            const isLast = i === scoredCaps.length - 1;
+            const isLast = i === lastIdx;
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
                 if (effectMeta) this._spawnEffectFeedback(cap.body.position, x, y, effectMeta);
@@ -477,7 +546,7 @@ export class RoundManager {
                         if (this.onScoreSettled) this.onScoreSettled(finalScore);
                     }
                 });
-            }, i * popDelay);
+            }, scoreDelays[i]);
         });
         if (scoredCaps.length === 0) {
             this._ui.setScore(finalScore);
@@ -572,6 +641,13 @@ export class RoundManager {
         } else if (meta.type === 'crew') {
             (meta.targets ?? []).forEach(pos =>
                 this._render.spawnEffectRing(pos, 0.7, 0xaaffaa, 400, 250));
+        } else if (meta.type === 'surge') {
+            const color  = meta.success ? 0x4cff88 : 0xff5555;
+            const holdMs = meta.success ? 600 : 450;
+            this._render.spawnEffectRing(worldPos, NEARBY_RADIUS, color, holdMs, 350);
+            if (meta.success && meta.targetPos) {
+                this._render.spawnEffectRing(meta.targetPos, 1.4, 0xff6622, 300, 200);
+            }
         }
         this._ui.showEffectIndicator(screenX, screenY, meta);
     }

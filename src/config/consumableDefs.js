@@ -79,7 +79,7 @@ export const CONSUMABLE_DEFS = [
         icon:        '🎲',
         description: 'Pick 1 cap from your collection. Transform it into a random new one.',
         sellPrice:   4,
-        usableIn:    ['battle', 'map', 'shop', 'reward'],
+        usableIn:    ['map', 'shop', 'reward'],
     },
     {
         id:          'power_up',

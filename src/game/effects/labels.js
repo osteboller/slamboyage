@@ -10,4 +10,5 @@ export const EFFECT_LABELS = {
     'rally':      'Rally: +1★ to each nearby cap this throw',
     'crew':       'Crew: +1★ to each same-series cap this throw',
     'cue_slam':   'Cue Ball: blasts a random Pewl cap when flipped',
+    'surge':      'Surge: flips the nearest face-down cap and triggers its effect',
 };

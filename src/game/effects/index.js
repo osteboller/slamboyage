@@ -7,6 +7,7 @@ import { spawnEffect }     from './spawnEffect.js';
 import { magnetEffect }    from './magnetEffect.js';
 import { rallyEffect }     from './rallyEffect.js';
 import { crewEffect }      from './crewEffect.js';
+import { surgeEffect }     from './surgeEffect.js';
 
 // Registry: effect ID → handler function
 // Adding a new effect = one line here + one file in this folder
@@ -22,4 +23,5 @@ export const EFFECTS = {
     'rally':      rallyEffect,
     'crew':       crewEffect,
     'cue_slam':   () => ({}), // placeholder — physics handled in RoundManager Phase A (not yet implemented)
+    'surge':      surgeEffect,
 };

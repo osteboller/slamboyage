@@ -39,9 +39,9 @@ export class GameState {
         const byName = name => CAP_DEFS.find(d => d.name === name);
         this.ownedCaps = [
             this._mkCapEntry(byName('Martian Graffiti'), null),      // crew — giver +1 til alle cosmic_caps
-            this._mkCapEntry(byName('Ollien'),           null),      // rally — giver +1 til alle i nærheden
-            this._mkCapEntry(byName('Phone Homie'),      null),      // modtager fra begge
-            this._mkCapEntry(byName("Surfin' Alien"),    null),      // modtager fra begge
+            this._mkCapEntry(byName('Ollien'),           null),      // surge — flipper nærmeste face-down
+            this._mkCapEntry(byName('Phone Homie'),      null),
+            this._mkCapEntry(byName("Surfin' Alien"),    null),      // rally — giver +1 til alle i nærheden
             this._mkCapEntry(byName('Hang Light'),       'halflife'),// scorer 1★ selvom den ikke flippes
             this._mkCapEntry(byName('Space Rockera'),    'gilded'),  // streak + gilded
         ].filter(e => e.def);
@@ -51,7 +51,8 @@ export class GameState {
         this.discardCost    = 2;
         this.shopOffer      = null;
         const mystixx = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
-        this.consumables    = [mystixx ?? null, mystixx ?? null, mystixx ?? null];
+        const muttz   = CONSUMABLE_DEFS.find(c => c.id === 'transform');
+        this.consumables    = [mystixx ?? null, mystixx ?? null, muttz ?? null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 

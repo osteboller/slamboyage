@@ -18,6 +18,7 @@ import { BattleScreen }     from './screens/BattleScreen.js';
 import { RewardScreen }     from './screens/RewardScreen.js';
 import { RunEndScreen }    from './screens/RunEndScreen.js';
 import { ENCHANT_DEFS }   from './config/enchantDefs.js';
+import { CAP_DEFS }       from './config/constants.js';
 
 // ─── ENGINES ─────────────────────────────────────────────────────────────────
 const physics    = new PhysicsEngine();
@@ -50,6 +51,19 @@ consumables.onUse = (def) => {
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
         if (currentScreenName === 'reward' || currentScreenName === 'relic-choice') rewardScreen.reroll?.();
+    }
+    if (def.id === 'transform') {
+        const caps = gameState.ownedCaps;
+        if (caps.length > 0) {
+            ui.showCapPicker('Pick a cap to transform', caps, entry => {
+                const oldDef = entry.def;
+                const pool   = CAP_DEFS.filter(d => d.name !== oldDef.name);
+                const newDef = pool[Math.floor(Math.random() * pool.length)];
+                const live   = gameState.ownedCaps.find(c => c.id === entry.id);
+                if (live) live.def = newDef;
+                ui.showTransformResult(oldDef, newDef);
+            });
+        }
     }
     if (def.id === 'enchant') {
         const caps = gameState.ownedCaps;

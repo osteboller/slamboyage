@@ -17,6 +17,7 @@ const EMPTY_RESULT = Object.freeze({
     spawnCaps:      [],   // cap defs to inject into the next throw's stack
     auraBonus:      0,    // bonus to grant to other matching caps this throw
     auraFilter:     null, // 'nearby' | 'series' | 'series_or_nearby'
+    flipNearby:     0,    // number of nearby face-down caps to surge-flip
 });
 
 export class EffectResolver {

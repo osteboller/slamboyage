@@ -268,6 +268,8 @@ export class ShopScreen {
         };
 
         const all = [
+            { type: 'relic',         price: PACK_PRICES.relic,         choices: relicChoices()        },
+            { type: 'card',          price: PACK_PRICES.card,          choices: cardChoices()         },
             { type: 'rare_cap',      price: PACK_PRICES.rare_cap,      choices: capChoicesRare()      },
             { type: 'legendary_cap', price: PACK_PRICES.legendary_cap, choices: capChoicesLegendary() },
             { type: 'mystery',       price: PACK_PRICES.mystery,       choices: mysteryChoices()      },

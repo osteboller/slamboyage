@@ -140,6 +140,49 @@ export class RenderEngine {
         requestAnimationFrame(tick);
     }
 
+    // Spins capMesh N full rotations then lands face-up. Uses euler.x directly (not slerp)
+    // so we can overshoot by N×360°. Also hops the mesh up off the table mid-flip (sine arc)
+    // so the spin reads as "pop up, flip, land" instead of spinning flat on the surface.
+    // Calls onDone() when animation completes.
+    animateCapFlipSpin(capMesh, spins = 3, durationMs = 900, onDone, hopHeight = 2.4) {
+        const startX = capMesh.rotation.x;
+        const startY = capMesh.rotation.y;
+        const startZ = capMesh.rotation.z;
+        const baseY  = capMesh.position.y;
+        // Half-turn flips face-down→face-up, then N full spins on top for juice
+        const totalAngle = Math.PI + spins * Math.PI * 2;
+
+        capMesh.userData.skipSync = true;
+        const start = performance.now();
+
+        const tick = () => {
+            const t    = Math.min((performance.now() - start) / durationMs, 1);
+            const ease = 1 - Math.pow(1 - t, 2.5); // fast start, slow landing
+            capMesh.rotation.x = startX + totalAngle * ease;
+            capMesh.rotation.y = startY;
+            capMesh.rotation.z = startZ;
+            // Asymmetric arc: quick rise (clipping through neighbours while airborne is fine),
+            // brief hover at the peak for the spin, then a fast drop so it doesn't linger
+            // mid-height through other caps on the way back down.
+            let heightT;
+            if (t < 0.35) {
+                const u = t / 0.35;
+                heightT = 1 - (1 - u) ** 2; // ease-out rise
+            } else if (t < 0.6) {
+                heightT = 1; // hover at peak
+            } else {
+                const u = (t - 0.6) / 0.4;
+                heightT = 1 - u ** 2; // fast accelerating drop
+            }
+            capMesh.position.y = baseY + heightT * hopHeight;
+            if (t < 1) { requestAnimationFrame(tick); return; }
+            capMesh.userData.skipSync = false;
+            capMesh.position.y = baseY;
+            onDone?.();
+        };
+        requestAnimationFrame(tick);
+    }
+
     // Smoothly rotates capMesh from its current quaternion to the target euler over durationMs.
     // Bypasses sync() during animation via skipSync flag; calls onDone(finalQuat) when complete.
     animateCapFlip(capMesh, targetEulerXYZ, durationMs, onDone) {
