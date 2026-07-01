@@ -35,7 +35,7 @@
     cursor: pointer;
     transition: transform 0.12s;
     display: inline-block;
-    overflow: hidden;
+    margin-bottom: 10px;
 }
 
 .cap-thumb-img {
@@ -172,6 +172,37 @@
     pointer-events: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.5);
     line-height: 1;
+}
+
+/* ─── GHOST BADGE (pile overlay) ──────────────────────────────────────────── */
+.cap-thumb-ghost-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 12px;
+    line-height: 1;
+    pointer-events: none;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7));
+}
+
+/* ─── EXTRA BASE VALUE BADGE (pile overlay) ────────────────────────────────── */
+.cap-thumb-carry-badge {
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    background: #cc5500;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1.3;
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    border: 1px solid rgba(0,0,0,0.25);
 }
 
 /* ─── ENCHANT BADGE (2D overlay on cap-detail viewer) ─────────────────────── */

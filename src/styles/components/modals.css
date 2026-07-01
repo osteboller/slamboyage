@@ -178,6 +178,18 @@
     margin-top: 3px;
     font-family: 'Space Grotesk', sans-serif;
 }
+.cap-detail-extra-base {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    background: #cc5500;
+    padding: 1px 4px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 3px;
+}
 
 #cap-detail.cap-detail--lit {
     border-color: #f5c842;

@@ -22,7 +22,17 @@ export class GameState {
     }
 
     _mkCapEntry(def, enchant = null) {
-        return { id: this._nextCapId++, def, enchant };
+        return { id: this._nextCapId++, def, enchant, storedBonus: 0 };
+    }
+
+    saveHalflifeBonus(capId, earnedBonus) {
+        const entry = this.ownedCaps.find(c => c.id === capId);
+        if (entry) entry.storedBonus = Math.floor((entry.storedBonus + earnedBonus) / 2);
+    }
+
+    decayHalflifeBonus(capId) {
+        const entry = this.ownedCaps.find(c => c.id === capId);
+        if (entry) entry.storedBonus = Math.floor(entry.storedBonus / 2);
     }
 
     // ─── RUN ──────────────────────────────────────────────────────────────────
@@ -38,21 +48,22 @@ export class GameState {
         // Test-hånd: demonstrerer crew, rally, halflife og gilded+streak
         const byName = name => CAP_DEFS.find(d => d.name === name);
         this.ownedCaps = [
-            this._mkCapEntry(byName('Martian Graffiti'), null),      // crew — giver +1 til alle cosmic_caps
-            this._mkCapEntry(byName('Ollien'),           null),      // surge — flipper nærmeste face-down
+            this._mkCapEntry(byName('Mecha'),            'feather'),
+            this._mkCapEntry(byName('Martian Graffiti'), null),
+            this._mkCapEntry(byName('Ollien'),           null),
             this._mkCapEntry(byName('Phone Homie'),      null),
-            this._mkCapEntry(byName("Surfin' Alien"),    null),      // rally — giver +1 til alle i nærheden
-            this._mkCapEntry(byName('Hang Light'),       'halflife'),// scorer 1★ selvom den ikke flippes
-            this._mkCapEntry(byName('Space Rockera'),    'gilded'),  // streak + gilded
+            this._mkCapEntry(byName("Surfin' Alien"),    null),
+            this._mkCapEntry(byName('Space Rockera'),    'gilded'),
         ].filter(e => e.def);
         this.ownedRelics    = [];
         this.runNodes       = this._generateNodes(1);
         this.rerollCost     = 1;
         this.discardCost    = 2;
         this.shopOffer      = null;
-        const mystixx = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
-        const muttz   = CONSUMABLE_DEFS.find(c => c.id === 'transform');
-        this.consumables    = [mystixx ?? null, mystixx ?? null, muttz ?? null];
+        const mystixx   = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
+        const twinsies  = CONSUMABLE_DEFS.find(c => c.id === 'clone');
+        const refresh   = CONSUMABLE_DEFS.find(c => c.id === 'refresh');
+        this.consumables    = [mystixx ?? null, twinsies ?? null, refresh ?? null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 

@@ -1,3 +1,6 @@
+import { ENCHANT_DEFS } from '../config/enchantDefs.js';
+import { CAP_DEFS }    from '../config/constants.js';
+
 export class StartScreen {
     constructor({ gameState, ui }) {
         this._gameState    = gameState;
@@ -21,6 +24,23 @@ export class StartScreen {
             if (e.target.closest('#dev-add-score-btn')) {
                 this._gameState.score += 100;
                 this._ui.setScore(this._gameState.score);
+            }
+            if (e.target.closest('#dev-enchant-caps-btn')) {
+                const caps = [...this._gameState.ownedCaps];
+                for (let i = caps.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [caps[i], caps[j]] = [caps[j], caps[i]];
+                }
+                caps.slice(0, ENCHANT_DEFS.length).forEach((entry, i) => {
+                    this._gameState.applyEnchant(entry.id, ENCHANT_DEFS[i].id);
+                });
+            }
+            const seriesBtn = e.target.closest('[data-dev-series]');
+            if (seriesBtn) {
+                const series = seriesBtn.dataset.devSeries;
+                const caps   = CAP_DEFS.filter(d => d.series === series);
+                this._gameState.ownedCaps = [];
+                caps.forEach(def => this._gameState.gainCap(def));
             }
         });
     }
@@ -52,6 +72,15 @@ export class StartScreen {
                     <button id="start-free-btn" class="start-btn secondary">Free Play</button>
                 </div>
             </div>
-            <button id="dev-add-score-btn">DEV +100★</button>`;
+            <div id="dev-btns">
+                <button id="dev-add-score-btn">DEV +100★</button>
+                <button id="dev-enchant-caps-btn">DEV ENCHANT CAPS</button>
+                <div id="dev-series-btns">
+                    <button data-dev-series="pewl_ballz">PEWLS</button>
+                    <button data-dev-series="raptor_strike">RAPTORS</button>
+                    <button data-dev-series="scary_skullz">SKULLZ</button>
+                    <button data-dev-series="cosmic_caps">COSMIC</button>
+                </div>
+            </div>`;
     }
 }

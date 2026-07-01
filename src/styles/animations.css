@@ -59,6 +59,16 @@
 }
 
 .score-float-val { pointer-events: none; }
+
+.score-float-carry {
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff8833;
+    opacity: 0.9;
+    pointer-events: none;
+    line-height: 1;
+    margin-bottom: 1px;
+}
 @keyframes val-pop-anim {
     0%   { transform: scale(1.35); color: #e0b8ff; }
     100% { transform: scale(1);    color: inherit;  }
@@ -129,6 +139,7 @@
 .effect-indicator--rally      { color: #44ffcc; }
 .effect-indicator--crew       { color: #aaffaa; }
 .effect-indicator--surge      { color: #ff6622; font-size: 20px; }
+.effect-indicator--clone      { color: #88aaff; font-size: 22px; }
 .effect-indicator.ind-pop { animation: ind-pop-anim 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 @keyframes effect-ind-anim {

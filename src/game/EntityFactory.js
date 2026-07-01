@@ -13,7 +13,7 @@ export class EntityFactory {
         this._enchantCache = {}; // separate cache for enchant overlay textures
     }
 
-    spawnCap(def, y, enchant = null, entryId = null) {
+    spawnCap(def, y, enchant = null, entryId = null, isGhost = false) {
         const tex = (url) => url ? this._texCache[url] : null;
         const mesh = new THREE.Mesh(
             new THREE.CylinderGeometry(POG_R, POG_R, POG_H, 36),
@@ -27,6 +27,14 @@ export class EntityFactory {
                     : new THREE.MeshStandardMaterial({ color: 0xb0a89a, roughness: 0.88 }),
             ]
         );
+        if (isGhost) {
+            mesh.material.forEach(m => {
+                m.transparent = true;
+                m.opacity     = 0.52;
+                m.emissive    = new THREE.Color(0x1a2a55);
+                m.emissiveIntensity = 0.35;
+            });
+        }
         mesh.castShadow = mesh.receiveShadow = true;
         this._render.addMesh(mesh);
 
@@ -46,7 +54,7 @@ export class EntityFactory {
 
         if (enchant) this._addEnchantOverlay(mesh, enchant);
 
-        return new Cap(mesh, body, def, enchant, entryId);
+        return new Cap(mesh, body, def, enchant, entryId, isGhost);
     }
 
     // capCount bruges til at beregne staktoppen — sendes ind fremfor at læse globalt array

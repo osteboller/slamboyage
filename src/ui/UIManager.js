@@ -50,11 +50,18 @@ export class UIManager {
         document.getElementById('status').textContent = text;
     }
 
-    showScoreFloat(screenX, screenY, baseAmount, multChain = [], onFinalNumber = null) {
+    showScoreFloat(screenX, screenY, baseAmount, multChain = [], onFinalNumber = null, carry = 0) {
         const chain = multChain.filter(m => m > 1);
 
         const el = document.createElement('div');
         el.className = `score-float${baseAmount > 1 ? ' bonus' : ''}`;
+
+        if (carry > 0) {
+            const carryEl = document.createElement('div');
+            carryEl.className   = 'score-float-carry';
+            carryEl.textContent = `⟳+${carry}`;
+            el.appendChild(carryEl);
+        }
 
         const valEl = document.createElement('div');
         valEl.className   = 'score-float-val';
@@ -160,6 +167,10 @@ export class UIManager {
             el.classList.add(meta.success ? 'effect-indicator--surge' : 'effect-indicator--fail');
             el.textContent = meta.success ? '⚡↩' : '⚡✕';
             setTimeout(() => el.remove(), meta.success ? 1000 : 800);
+        } else if (meta.type === 'clone') {
+            el.classList.add('effect-indicator--clone');
+            el.textContent = '👻';
+            setTimeout(() => el.remove(), 1100);
         }
     }
 
@@ -394,11 +405,13 @@ export class UIManager {
     }
 
     // ─── PILE BUTTONS ────────────────────────────────────────────────────────
-    updatePileButtons(remainingDefs, wonDefs) {
-        this._remainingDefs = remainingDefs;
-        this._wonDefs       = wonDefs;
-        const total = remainingDefs.length + wonDefs.length;
-        document.getElementById('pile-rem-count').textContent = `${remainingDefs.length}/${total}`;
+    updatePileButtons(remainingDefs, wonDefs, getExtraBase = null) {
+        this._remainingDefs  = remainingDefs;
+        this._wonDefs        = wonDefs;
+        this._getExtraBase   = typeof getExtraBase === 'function' ? getExtraBase : () => (getExtraBase ?? 0);
+        const total      = remainingDefs.length + wonDefs.length;
+        const stackLimit = this._gameState?.stackSizeLimit ?? total;
+        document.getElementById('pile-rem-count').textContent = `${remainingDefs.length}/${Math.min(total, stackLimit)}`;
         document.getElementById('pile-won-count').textContent = `${wonDefs.length}/${total}`;
     }
 
@@ -682,10 +695,18 @@ export class UIManager {
         dotsEl.innerHTML = defs.map((entry, i) => {
             const def = entry.def ?? entry;
             if (def.texFront) {
+                const ghostBadge  = entry.isGhost
+                    ? `<span class="cap-thumb-ghost-badge">👻</span>` : '';
+                const gsEntry     = entry.entryId != null
+                    ? this._gameState?.ownedCaps.find(c => c.id === entry.entryId) : null;
+                const extraBase   = (gsEntry?.storedBonus ?? 0) + (this._getExtraBase?.(gsEntry?.id) ?? 0);
+                const carryBadge  = extraBase > 0
+                    ? `<span class="cap-thumb-carry-badge">+${extraBase}</span>` : '';
                 return capThumbnailHTML(
                     { ...entry, enchant: this._liveEnchant(entry) },
                     { wrapClass: `cap-thumb${lit ? '' : ' dimmed'}`, imgClass: 'cap-thumb-img',
-                      dimmed: !lit, extraAttrs: `data-idx="${i}" data-lit="${lit}"` }
+                      dimmed: !lit, extraAttrs: `data-idx="${i}" data-lit="${lit}"`,
+                      innerHTML: ghostBadge + carryBadge }
                 );
             }
             const hex = '#' + (def.color ?? 0xaaaaaa).toString(16).padStart(6, '0');
@@ -903,7 +924,16 @@ export class UIManager {
         nameEl.textContent = def.name;
         const seriesLabel  = def.series?.replace(/_/g, ' ') ?? '';
         const effectLabel  = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : '';
-        subEl.textContent  = [seriesLabel, effectLabel].filter(Boolean).join(' · ');
+
+        const gsEntry2     = capOrEntry.entryId != null
+            ? this._gameState?.ownedCaps.find(c => c.id === capOrEntry.entryId)
+            : (capOrEntry.storedBonus != null ? capOrEntry : null);
+        const storedBonus2 = gsEntry2?.storedBonus ?? 0;
+        const extraBase2   = storedBonus2 + (this._getExtraBase?.(gsEntry2?.id) ?? 0);
+
+        subEl.innerHTML = [seriesLabel, effectLabel].filter(Boolean)
+            .map(t => `<span>${t}</span>`).join(' · ')
+            + (extraBase2 > 0 ? ` <span class="cap-detail-extra-base">+${extraBase2} base</span>` : '');
 
         const rarityEl = document.getElementById('cap-detail-rarity');
         if (rarityEl) {
@@ -1032,17 +1062,41 @@ export class UIManager {
         }).join('');
     }
 
-    showEnchantResult(enchantDef) {
+    showEnchantResult(enchantDef, capEntry = null) {
         const el = document.createElement('div');
         el.className = 'enchant-result-sticker';
         el.style.setProperty('--enchant-color', enchantDef.color);
+
+        const capRowHTML = capEntry?.def?.texFront ? `
+            <div class="enchant-result-icon" style="background:${enchantDef.color};display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 12px 10px;">
+                ${capThumbnailHTML({ def: capEntry.def, enchant: null },
+                    { imgClass: 'transform-result-img transform-result-img--old' })}
+                <span style="font-size:22px;opacity:0.7;">→</span>
+                ${capThumbnailHTML({ def: capEntry.def, enchant: enchantDef.id },
+                    { imgClass: 'transform-result-img' })}
+            </div>` : `<div class="enchant-result-icon">${enchantDef.icon}</div>`;
+
         el.innerHTML = `
-            <div class="enchant-result-icon">${enchantDef.icon}</div>
+            ${capRowHTML}
             <div class="enchant-result-name">${enchantDef.name}</div>
             <div class="enchant-result-desc">${enchantDef.description}</div>`;
         document.body.appendChild(el);
         const dismiss = () => el.classList.add('enchant-result-sticker--out');
-        const timer = setTimeout(dismiss, 2200);
+        const timer = setTimeout(dismiss, 2600);
+        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
+        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+    }
+
+    showBlancoResult(count, onOpen) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker transform-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#222;font-size:36px;padding:14px 12px 10px;text-align:center;">🃏</div>
+            <div class="enchant-result-name" style="color:#222;">BLANCO</div>
+            <div class="enchant-result-desc">All ${count} caps rerolled — opening collection…</div>`;
+        document.body.appendChild(el);
+        const dismiss = () => { el.classList.add('enchant-result-sticker--out'); onOpen?.(); };
+        const timer = setTimeout(dismiss, 1400);
         el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
         el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
     }

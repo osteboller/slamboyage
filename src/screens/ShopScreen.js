@@ -304,6 +304,18 @@ export class ShopScreen {
                 pack.choices = (pool.length > 0 ? pool : [...RELIC_DEFS].sort(() => Math.random() - 0.5)).slice(0, 3);
             } else if (pack.type === 'card') {
                 pack.choices = [...CONSUMABLE_DEFS].sort(() => Math.random() - 0.5).slice(0, 3);
+            } else if (pack.type === 'mystery') {
+                const randEnchant = () => ENCHANT_IDS[Math.floor(Math.random() * ENCHANT_IDS.length)];
+                const relic = (RELIC_DEFS.filter(r => !this._gs.hasRelic(r.id)).sort(() => Math.random() - 0.5)[0])
+                    ?? RELIC_DEFS[Math.floor(Math.random() * RELIC_DEFS.length)];
+                const cap   = (CAP_DEFS.filter(c => c.rarity >= 2 && !this._gs.hasCapDef(c)).sort(() => Math.random() - 0.5)[0])
+                    ?? CAP_DEFS[Math.floor(Math.random() * CAP_DEFS.length)];
+                const card  = [...CONSUMABLE_DEFS].sort(() => Math.random() - 0.5)[0];
+                pack.choices = [
+                    { itemType: 'relic', def: relic },
+                    { itemType: 'cap',   def: cap, enchant: randEnchant() },
+                    { itemType: 'card',  def: card },
+                ].sort(() => Math.random() - 0.5);
             } else {
                 const bandNames = new Set(this._band.map(b => b.def.name));
                 pack.choices = CAP_DEFS

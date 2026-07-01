@@ -47,10 +47,29 @@ ui.setGameState(gameState);
 const consumables  = new ConsumableSlots({ gameState, ui });
 consumables.onUse = (def) => {
     if (def.id === 'extra_throw') roundMgr.addThrow();
+    if (def.id === 'power_up')   roundMgr.addVoltage(8);
     if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); }
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
-        if (currentScreenName === 'reward' || currentScreenName === 'relic-choice') rewardScreen.reroll?.();
+        if (currentScreenName === 'reward' || currentScreenName === 'relic-choice' || currentScreenName === 'enchant-reward') rewardScreen.reroll?.();
+    }
+    if (def.id === 'clone') {
+        const remaining = roundMgr.remainingCaps;
+        if (remaining.length > 0) {
+            ui.showCapPicker('Pick a cap to clone', remaining, entry => {
+                roundMgr.addGhostCap(entry.def, entry.enchant);
+            });
+        }
+    }
+    if (def.id === 'white_card') {
+        const caps = gameState.ownedCaps;
+        if (caps.length > 0) {
+            caps.forEach(entry => {
+                const pool = CAP_DEFS.filter(d => d.name !== entry.def.name);
+                entry.def  = pool[Math.floor(Math.random() * pool.length)];
+            });
+            ui.showBlancoResult(caps.length, () => ui.openCollection('caps'));
+        }
     }
     if (def.id === 'transform') {
         const caps = gameState.ownedCaps;
@@ -71,8 +90,8 @@ consumables.onUse = (def) => {
             ui.showCapPicker('Pick a cap to enchant', caps, entry => {
                 const enchantDef = ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)];
                 gameState.applyEnchant(entry.id, enchantDef.id);
-                roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
-                ui.showEnchantResult(enchantDef);
+                if (currentScreenName === 'battle') roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
+                ui.showEnchantResult(enchantDef, entry);
             });
         }
     }
@@ -105,7 +124,7 @@ const battleScreen = new BattleScreen(deps);
 const rewardScreen = new RewardScreen(deps);
 const runEndScreen = new RunEndScreen(deps);
 
-const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
+const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -163,8 +182,8 @@ function showScreen(name, context = null) {
         if (RUN_SCREENS.has(name)) ui.showRunOverlay();
         else                       ui.hideRunOverlay();
 
-        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice']);
-        const contextName = name === 'relic-choice' ? 'reward' : name;
+        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
+        const contextName = (name === 'relic-choice' || name === 'enchant-reward') ? 'reward' : name;
         if (CONSUMABLE_SCREENS.has(name)) { consumables.setContext(contextName); consumables.show(); }
         else                              consumables.hide();
 
@@ -210,8 +229,13 @@ function showScreen(name, context = null) {
                 const loop       = gameState.loop;
                 const ownedCaps  = [...gameState.ownedCaps];
                 const { won: w } = gameState.completeNode(totalScore);
-                if (w) showScreen('reward', nodePlayed);
-                else   showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
+                if (w) {
+                    // TEST: første node → enchant-reward (afstikker). Fjernes når map-integration er klar.
+                    if (nodePlayed.id === 1) showScreen('enchant-reward', nodePlayed);
+                    else                     showScreen('reward', nodePlayed);
+                } else {
+                    showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
+                }
             };
             battleScreen.onExitFreeMode = () => showScreen('start');
             battleScreen.enter(context);
@@ -220,6 +244,11 @@ function showScreen(name, context = null) {
             currentScreen = rewardScreen;
             rewardScreen.onContinue = () => showScreen('shop');
             rewardScreen.enter(context);
+
+        } else if (name === 'enchant-reward') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => showScreen('shop');
+            rewardScreen.enterEnchant(context);
 
         } else if (name === 'relic-choice') {
             currentScreen = rewardScreen;

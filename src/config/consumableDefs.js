@@ -44,9 +44,9 @@ export const CONSUMABLE_DEFS = [
         color:       '#7722cc',
         bg:          '#ede0ff',
         icon:        '✦',
-        description: 'Pick one cap in your stack. Apply a random enchant to it.',
+        description: 'Pick one cap from your collection. Apply a random enchant to it.',
         sellPrice:   5,
-        usableIn:    ['battle'],
+        usableIn:    ['battle', 'map', 'shop', 'reward'],
     },
     {
         id:          'white_card',

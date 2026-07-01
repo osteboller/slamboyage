@@ -29,7 +29,7 @@ export class EffectResolver {
     }
 
     // Build context for one cap relative to all caps in this throw
-    buildContext(cap, allCaps, throwIndex, capsFlippedThisThrow = 0) {
+    buildContext(cap, allCaps, throwIndex, capsFlippedThisThrow = 0, extras = {}) {
         const p  = cap.body.position;
         const distanceFromCenter = Math.sqrt(p.x * p.x + p.z * p.z);
 
@@ -47,7 +47,7 @@ export class EffectResolver {
             return Math.sqrt(dx * dx + dz * dz) < VERY_NEARBY_RADIUS;
         });
 
-        return { distanceFromCenter, nearbyCaps, closeNeighbourCaps, allCaps, throwIndex, capsFlippedThisThrow };
+        return { distanceFromCenter, nearbyCaps, closeNeighbourCaps, allCaps, throwIndex, capsFlippedThisThrow, ...extras };
     }
 
     // ─── PRIVATE ──────────────────────────────────────────────────────────────

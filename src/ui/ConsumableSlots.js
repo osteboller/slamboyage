@@ -44,7 +44,7 @@ export class ConsumableSlots {
             el.classList.toggle('filled', !!def);
 
             if (def) {
-                const stripe = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 5px, rgba(255,255,255,0.55) 5px, rgba(255,255,255,0.55) 10px)`;
+                const stripe = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 5px, #fff 5px, #fff 10px)`;
                 el.style.background = stripe;
                 el.innerHTML = `
                     <div class="gum-slot-inner">

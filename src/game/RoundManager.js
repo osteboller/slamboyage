@@ -59,6 +59,15 @@ export class RoundManager {
         }
     }
 
+    get _geb() {
+        return (id) => (this._voltageBonus ?? 0) + (this._roundCapBonuses?.get(id) ?? 0);
+    }
+
+    addVoltage(amount) {
+        this._voltageBonus = (this._voltageBonus ?? 0) + amount;
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
+    }
+
     addToBase(amount) {
         this._scoreBase += amount;
         this._ui.setScore(this._scoreBase + this._totalScore);
@@ -80,6 +89,56 @@ export class RoundManager {
     }
 
     // Updates enchant on a live cap in the current stack — no-op if cap not in play
+    // Returnerer remaining face-down caps som picker-kompatible entries { id, def, enchant }
+    // _pendingFaceDown er kun populeret mellem kast — under første kast bruges this.caps
+    get remainingCaps() {
+        const pool = this._pendingFaceDown.length > 0 ? this._pendingFaceDown : this.caps;
+        return pool.map((cap, i) => ({ id: i, def: cap.def, enchant: cap.enchant }));
+    }
+
+    // Spawner en ghost-kopi af en cap, shuffler den ind i stacken på en tilfældig position
+    addGhostCap(def, enchant = null) {
+        const ghost = this._factory.spawnCap(def, POG_H * 0.5, enchant, null, true);
+        const pool  = this._pendingFaceDown.length > 0 ? this._pendingFaceDown : this.caps;
+        pool.push(ghost);
+
+        // Shuffle ghost ind på tilfældig position og repositioner alle bodies
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        pool.forEach((cap, i) => {
+            cap.body.position.set(0, POG_H * 0.5 + i * (POG_H + 0.01), 0);
+            cap.body.previousPosition.copy(cap.body.position);
+        });
+
+        if (this._pendingFaceDown.length === 0) this._throwCtrl.setCaps(this.caps);
+        this._ui.updatePileButtons(pool, this._wonCapsAll, this._geb);
+        this._spawnGhostFeedback(ghost);
+    }
+
+    _spawnGhostFeedback(ghost) {
+        // Bounce-in på mesh: skala 0 → 1.25 → 1
+        ghost.mesh.scale.setScalar(0);
+        const start = performance.now();
+        const tick = () => {
+            const t    = Math.min((performance.now() - start) / 380, 1);
+            const ease = t < 0.65
+                ? (t / 0.65) ** 2
+                : 1 + Math.sin((t - 0.65) / 0.35 * Math.PI) * 0.25;
+            ghost.mesh.scale.setScalar(ease);
+            if (t < 1) requestAnimationFrame(tick);
+            else ghost.mesh.scale.setScalar(1);
+        };
+        requestAnimationFrame(tick);
+
+        // Blå ring i 3D + 👻 indikator
+        const pos = ghost.body.position;
+        this._render.spawnEffectRing(pos, 1.8, 0x88aaff, 500, 400);
+        const { x, y } = this._projectToScreen(pos);
+        this._ui.showEffectIndicator(x, y, { type: 'clone' });
+    }
+
     updateLiveCapEnchant(entryId, enchantId) {
         const cap = this.caps.find(c => c.entryId === entryId);
         if (!cap) return;
@@ -143,6 +202,9 @@ export class RoundManager {
         this._pendingFaceDown   = [];
         this._pendingThrowsDone = 0;
         this._pendingSpawnDefs  = [];
+        this._halflifeEarned    = new Map(); // entryId → bonus earned this session
+        this._voltageBonus      = 0;
+        this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
 
         this._throwCtrl.reset();
         this._throwCtrl.setCaps(this.caps);
@@ -163,7 +225,7 @@ export class RoundManager {
         // Last Stand only visible on the last throw — hide at start unless round is 1 throw
         if (relics.some(r => r.type === 'lastThrow') && this._throwsTotal === 1) this._ui.showLastStandBadge();
         else                                                                       this._ui.hideLastStandBadge();
-        this._ui.updatePileButtons(this.caps, []);
+        this._ui.updatePileButtons(this.caps, [], this._geb);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
         this.delay(() => {
@@ -226,7 +288,7 @@ export class RoundManager {
         });
 
         this.caps = this._pendingFaceDown;
-        this._ui.updatePileButtons(this.caps, this._wonCapsAll);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
         this._collisions.reset();
         this._powerBar.reset();
         this._cam.zoomIn();
@@ -291,7 +353,7 @@ export class RoundManager {
         this._ui.setScore(state.scoreBase + state.totalScore);
         this._ui.hideResults();
         this._ui.updateThrowPips(state.throwsLeft, this._throwsTotal);
-        this._ui.updatePileButtons(this.caps, this._wonCapsAll);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
         this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${this._throwsTotal}`);
         this._ui.setActionPrompt('Hold to aim');
     }
@@ -378,17 +440,23 @@ export class RoundManager {
         const allWon    = [...wonNow, ...magnetWon];
 
         // ── Phase 1: resolve effects — positions opdateret af magnet ──────────
-        const allCaps = [...allWon, ...stillDown];
+        const allCaps     = [...allWon, ...stillDown];
+        const roundExtras = {
+            allRoundCaps:   [...this._wonCapsAll, ...this.caps],
+            getStoredBonus: (c) => c.entryId != null && this._gs
+                ? (this._gs.ownedCaps.find(e => e.id === c.entryId)?.storedBonus ?? 0) : 0,
+            voltageBonus:   this._voltageBonus ?? 0,
+            getRoundBonus:  (c) => this._roundCapBonuses?.get(c.entryId) ?? 0,
+        };
         const resolved = allWon.map(cap => {
-            const ctx    = this._resolver.buildContext(cap, allCaps, this._throwIndex, allWon.length);
+            const ctx    = this._resolver.buildContext(cap, allCaps, this._throwIndex, allWon.length, roundExtras);
             const result = this._resolver.resolve(cap, ctx);
             return { cap, ...result };
         });
 
-        // ── Phase 2: partition returnToStack vs scored, collect spawn defs ────
+        // ── Phase 2: partition returnToStack vs scored ────────────────────────
         const actualWon  = resolved.filter(r => !r.returnToStack);
         const returnCaps = resolved.filter(r =>  r.returnToStack).map(r => r.cap);
-        const spawnDefs  = resolved.flatMap(r => r.spawnCaps ?? []);
 
         returnCaps.forEach(cap => {
             cap.body.quaternion.setFromEuler(
@@ -435,7 +503,7 @@ export class RoundManager {
 
             // Resolve target's effects (inkl. evt. chain-surge)
             const newAllCaps = [...actualWon.map(r => r.cap), ...faceDownPool, target];
-            const ctx        = this._resolver.buildContext(target, newAllCaps, this._throwIndex, actualWon.length + surgeAnimTargets.length);
+            const ctx        = this._resolver.buildContext(target, newAllCaps, this._throwIndex, actualWon.length + surgeAnimTargets.length, roundExtras);
             const result     = this._resolver.resolve(target, ctx);
             const resolved   = { cap: target, ...result };
             actualWon.push(resolved);
@@ -443,31 +511,39 @@ export class RoundManager {
             if ((result.flipNearby ?? 0) > 0) surgeQueue.push(resolved);
         }
 
+        // spawnDefs collected AFTER surge so surge-flipped caps' spawn effects are included
+        const spawnDefs = actualWon.flatMap(r => r.spawnCaps ?? []);
+
         const updatedFaceDown = [...faceDownPool, ...returnCaps];
 
-        // ── Phase 2b: aura pre-pass — caps med rally/crew giver bonus + samler feedback ──
-        const incomingAura = new Map(); // cap → sum af aura bonusser fra andre caps
-        const auraFeedback = new Map(); // donor cap → { type, targets: [worldPos, ...] }
+        // ── Phase 2b: crew/rally tilføjer rundevis bonus til _roundCapBonuses ──
+        // Bonus persisterer resten af runden og vises i pile-overlay badges.
+        const auraFeedback = new Map(); // donor cap → { type, targets } — kun til visuel feedback
         actualWon.forEach(({ cap: donor, auraBonus, auraFilter }) => {
             if (!auraBonus || !auraFilter) return;
-            const pd      = donor.body.position;
+            const pd = donor.body.position;
             const targets = [];
-            actualWon.forEach(({ cap: target }) => {
-                if (target === donor) return;
-                const pt        = target.body.position;
-                const dx        = pd.x - pt.x, dz = pd.z - pt.z;
-                const nearby    = Math.sqrt(dx * dx + dz * dz) < NEARBY_RADIUS;
+            // crew: alle caps i runden; rally: same-throw won + face-down (positionsbaseret)
+            const candidateCaps = auraFilter === 'series'
+                ? [...actualWon.map(r => r.cap), ...updatedFaceDown, ...this._wonCapsAll]
+                : [...actualWon.map(r => r.cap), ...updatedFaceDown];
+            candidateCaps.forEach(target => {
+                if (target === donor || target.entryId == null) return;
+                const pt         = target.body.position;
+                const dx         = pd.x - pt.x, dz = pd.z - pt.z;
+                const nearby     = Math.sqrt(dx * dx + dz * dz) < NEARBY_RADIUS;
                 const sameSeries = donor.def?.series && donor.def.series === target.def?.series;
-                const matches   = auraFilter === 'nearby'   ? nearby
-                                : auraFilter === 'series'   ? sameSeries
-                                : /* series_or_nearby */       nearby || sameSeries;
+                const matches    = auraFilter === 'nearby'  ? nearby
+                                 : auraFilter === 'series'  ? sameSeries
+                                 : nearby || sameSeries;
                 if (matches) {
-                    incomingAura.set(target, (incomingAura.get(target) ?? 0) + auraBonus);
+                    this._roundCapBonuses.set(target.entryId,
+                        (this._roundCapBonuses.get(target.entryId) ?? 0) + auraBonus);
                     targets.push({ x: pt.x, y: pt.y, z: pt.z });
                 }
             });
             if (targets.length > 0) {
-                const feedType = auraFilter === 'nearby' ? 'rally' : auraFilter === 'series' ? 'crew' : 'rally';
+                const feedType = auraFilter === 'nearby' ? 'rally' : 'crew';
                 auraFeedback.set(donor, { type: feedType, targets, count: targets.length });
             }
         });
@@ -489,11 +565,21 @@ export class RoundManager {
         const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
 
+        const voltage    = this._voltageBonus ?? 0;
         const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
-            const aura       = incomingAura.get(cap) ?? 0;
-            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + aura + flatRelicBonus) * (localMultiplier ?? 1));
+            const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
+            const gsEntry  = cap.entryId != null && this._gs ? this._gs.ownedCaps.find(c => c.id === cap.entryId) : null;
+            const carry    = gsEntry?.enchant === 'halflife' ? (gsEntry?.storedBonus ?? 0) : 0;
+            if (gsEntry?.enchant === 'halflife' && cap.entryId != null) {
+                this._halflifeEarned.set(cap.entryId, (bonus ?? 0) + roundBonus + voltage);
+            }
+            // Gem effect-bonus i roundCapBonuses så badge viser total ekstra grundværdi
+            if ((bonus ?? 0) > 0 && cap.entryId != null) {
+                this._roundCapBonuses.set(cap.entryId, roundBonus + (bonus ?? 0));
+            }
+            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatRelicBonus + voltage) * (localMultiplier ?? 1));
             const finalScore = Math.floor(capScore * globalMult);
-            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain };
+            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain, carry };
         });
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
 
@@ -530,7 +616,7 @@ export class RoundManager {
         const scoreDelays = scoredCaps.map(({ cap }, i) => Math.max(i * popDelay, surgeLandDelay.get(cap) ?? 0));
         const lastIdx      = scoreDelays.reduce((best, d, i) => d > scoreDelays[best] ? i : best, 0);
 
-        scoredCaps.forEach(({ cap, capScore, effectMeta, chain }, i) => {
+        scoredCaps.forEach(({ cap, capScore, effectMeta, chain, carry }, i) => {
             const isLast = i === lastIdx;
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
@@ -545,7 +631,7 @@ export class RoundManager {
                         if (scoreGained > 0) this._ui.showScoreGain(scoreGained);
                         if (this.onScoreSettled) this.onScoreSettled(finalScore);
                     }
-                });
+                }, carry);
             }, scoreDelays[i]);
         });
         if (scoredCaps.length === 0) {
@@ -558,7 +644,7 @@ export class RoundManager {
         const displayRemaining = hasNextThrow
             ? [...updatedFaceDown, ...spawnDefs]
             : updatedFaceDown;
-        this._ui.updatePileButtons(displayRemaining, this._wonCapsAll);
+        this._ui.updatePileButtons(displayRemaining, this._wonCapsAll, this._geb);
         this._ui.updateThrowPips(this._throwsLeft, this._throwsTotal);
 
         if (hasNextThrow) {
@@ -597,18 +683,29 @@ export class RoundManager {
                         this._ui.showRelicGain(r.icon, oldValue, r.currentValue, this._throwsLeft);
                     });
             }
-            // HALFLIFE: face-down caps med halflife-enchant scorer ½ baseValue ved rundens afslutning
-            const flatBonus = this._gs?.flatRelicBonus ?? 0;
-            updatedFaceDown.forEach(cap => {
-                const liveEnchant = (cap.entryId != null && this._gs)
-                    ? (this._gs.ownedCaps.find(c => c.id === cap.entryId)?.enchant ?? cap.enchant)
-                    : cap.enchant;
-                if (liveEnchant !== 'halflife') return;
-                const halfScore = Math.ceil((1 + flatBonus) / 2);
-                this._totalScore += halfScore;
-                const { x, y } = this._projectToScreen(cap.body.position);
-                this._ui.showScoreFloat(x, y, halfScore, [], null);
-            });
+            // HALFLIFE: persist earned bonuses for flipped caps, decay unflipped
+            if (this._gs) {
+                this._halflifeEarned.forEach((earned, capId) => {
+                    this._gs.saveHalflifeBonus(capId, earned);
+                });
+                updatedFaceDown.forEach(cap => {
+                    const gsEntry = cap.entryId != null
+                        ? this._gs.ownedCaps.find(c => c.id === cap.entryId) : null;
+                    if (gsEntry?.enchant !== 'halflife') return;
+                    // Consolation: score ½ of stored value, then decay it
+                    if (gsEntry.storedBonus > 0) {
+                        const consolation = Math.ceil(gsEntry.storedBonus / 2);
+                        this._totalScore += consolation;
+                        const { x, y } = this._projectToScreen(cap.body.position);
+                        this._ui.showScoreFloat(x, y, consolation, [], null);
+                    }
+                    this._gs.decayHalflifeBonus(cap.entryId);
+                });
+            }
+
+            this._voltageBonus    = 0;
+            this._roundCapBonuses = new Map();
+            this._ui.updatePileButtons(updatedFaceDown, this._wonCapsAll, this._geb);
 
             this._phase = 'done';
             this._ui.showResults(
@@ -641,6 +738,11 @@ export class RoundManager {
         } else if (meta.type === 'crew') {
             (meta.targets ?? []).forEach(pos =>
                 this._render.spawnEffectRing(pos, 0.7, 0xaaffaa, 400, 250));
+        } else if (meta.type === 'absorb') {
+            if ((meta.bonus ?? 0) > 0) {
+                this._render.spawnEffectRing(worldPos, 14, 0xffdd44, 900, 600);
+                this._render.spawnEffectRing(worldPos,  7, 0xffffff, 500, 350);
+            }
         } else if (meta.type === 'surge') {
             const color  = meta.success ? 0x4cff88 : 0xff5555;
             const holdMs = meta.success ? 600 : 450;

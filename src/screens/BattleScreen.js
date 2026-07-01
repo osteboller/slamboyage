@@ -133,9 +133,13 @@ export class BattleScreen {
         if (saveState) {
             this._roundMgr.resumeFrom(saveState);
         } else if (this._node && this._gameState) {
-            const ownedCaps = this._gameState.ownedCaps;
-            const drawCount = Math.min(ownedCaps.length, this._gameState.stackSizeLimit);
-            this._roundMgr.buildStack(drawCount, ownedCaps, this._gameState.score);
+            const ownedCaps    = this._gameState.ownedCaps;
+            const featherCaps  = ownedCaps.filter(c => c.enchant === 'feather');
+            const regularCaps  = ownedCaps.filter(c => c.enchant !== 'feather');
+            const drawCount    = Math.min(regularCaps.length, this._gameState.stackSizeLimit);
+            const shuffled     = [...regularCaps].sort(() => Math.random() - 0.5).slice(0, drawCount);
+            const stackCaps    = [...featherCaps, ...shuffled];
+            this._roundMgr.buildStack(null, stackCaps, this._gameState.score);
         } else {
             this._roundMgr.buildStack();
         }

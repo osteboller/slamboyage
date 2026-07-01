@@ -1,5 +1,6 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
+import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { EFFECT_LABELS } from '../game/effects/labels.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 
@@ -11,7 +12,7 @@ export class RewardScreen {
         this._ui         = ui;
         this._el         = null;
         this._node       = null;
-        this._mode       = 'cap'; // 'cap' | 'relic'
+        this._mode       = 'cap'; // 'cap' | 'relic' | 'enchant'
         this._selected   = null;  // name or relic id
         this.onContinue  = null;
     }
@@ -67,6 +68,37 @@ export class RewardScreen {
         });
     }
 
+    // Afstikker-belønning: enchant valg for caps i samlingen
+    enterEnchant(node = null) {
+        this._node = node;
+        this._mode = 'enchant';
+
+        this._el    = document.createElement('div');
+        this._el.id = 'reward-screen';
+        document.body.appendChild(this._el);
+
+        this._ui.setScore(this._gs.score);
+
+        const choices = this._pickEnchantChoices();
+
+        if (choices.length === 0) {
+            this._doSkip();
+            return;
+        }
+
+        this._choices  = choices;
+        this._selected = null;
+        this._render(choices);
+
+        this._el.addEventListener('click', e => {
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) { this._confirmEnchant(parseInt(quickPick.dataset.key)); return; }
+            const card = e.target.closest('.reward-card[data-key]');
+            if (card) { this._confirmEnchant(parseInt(card.dataset.key)); return; }
+            if (e.target.closest('#reward-skip-btn')) this._doSkip();
+        });
+    }
+
     exit() {
         this._el?.remove();
         this._el = null;
@@ -74,7 +106,9 @@ export class RewardScreen {
 
     reroll() {
         if (!this._el) return;
-        const choices = this._mode === 'relic' ? this._pickRelics() : this._pickCaps();
+        const choices = this._mode === 'enchant' ? this._pickEnchantChoices()
+                      : this._mode === 'relic'   ? this._pickRelics()
+                      : this._pickCaps();
         if (choices.length === 0) return;
         this._choices  = choices;
         this._selected = null;
@@ -101,6 +135,21 @@ export class RewardScreen {
         if (this.onContinue) this.onContinue();
     }
 
+    _confirmEnchant(idx) {
+        const choice = this._choices[idx];
+        if (choice) this._gs.applyEnchant(choice.entry.id, choice.enchantDef.id);
+        if (this.onContinue) this.onContinue();
+    }
+
+    _pickEnchantChoices() {
+        const caps = this._gs.ownedCaps;
+        if (caps.length === 0) return [];
+        return [0, 1, 2].map(() => ({
+            entry:      caps[Math.floor(Math.random() * caps.length)],
+            enchantDef: ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)],
+        }));
+    }
+
     _pickCaps() {
         const unowned = CAP_DEFS.filter(c => !this._gs.ownedCaps.some(o => o.def.name === c.name));
         return unowned.sort(() => Math.random() - 0.5).slice(0, 3);
@@ -114,16 +163,20 @@ export class RewardScreen {
     }
 
     _render(choices) {
-        const nodeLabel = this._node?.type === 'relic'
-            ? 'Relic Event'
-            : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!');
-        const sub = this._mode === 'relic'
-            ? 'Choose a relic — permanent passive bonus'
-            : 'Choose a cap for your collection';
+        const nodeLabel = this._mode === 'enchant'
+            ? 'Afstikker Cleared!'
+            : (this._node?.type === 'relic' ? 'Relic Event' : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!'));
+        const sub = this._mode === 'enchant'
+            ? 'Choose a cap from your collection to enchant'
+            : (this._mode === 'relic'
+                ? 'Choose a relic — permanent passive bonus'
+                : 'Choose a cap for your collection');
 
-        const cardsHTML = this._mode === 'relic'
-            ? this._relicCards(choices)
-            : this._capCards(choices);
+        const cardsHTML = this._mode === 'enchant'
+            ? this._enchantCards(choices)
+            : (this._mode === 'relic'
+                ? this._relicCards(choices)
+                : this._capCards(choices));
 
         this._el.innerHTML = `
             <button id="reward-skip-btn">
@@ -166,6 +219,27 @@ export class RewardScreen {
                 <div class="reward-cap-series">${seriesLabel(cap.series)}</div>
                 ${effectBadge}
                 <button class="reward-quick-pick" data-key="${cap.name}">▶ PICK</button>
+            </div>`;
+        }).join('');
+    }
+
+    _enchantCards(choices) {
+        const seriesLabel = s => (s ?? '').replaceAll('_', ' ');
+        return choices.map((choice, i) => {
+            const { entry, enchantDef } = choice;
+            const oldEnchant = entry.enchant ? ENCHANT_DEFS.find(e => e.id === entry.enchant) : null;
+            const replaceHTML = oldEnchant
+                ? `<div class="reward-enchant-replace">${oldEnchant.icon} ${oldEnchant.name} → replaced</div>`
+                : '';
+            return `<div class="reward-card" data-key="${i}">
+                <div class="reward-rarity reward-rarity--uncommon">ENCHANT</div>
+                ${capThumbnailHTML(entry, { imgClass: 'reward-cap-img' })}
+                <div class="reward-cap-name">${entry.def.name}</div>
+                <div class="reward-cap-series">${seriesLabel(entry.def.series)}</div>
+                <div class="reward-enchant-name" style="color:${enchantDef.color}">${enchantDef.icon} ${enchantDef.name}</div>
+                <div class="reward-enchant-desc">${enchantDef.description}</div>
+                ${replaceHTML}
+                <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
             </div>`;
         }).join('');
     }
