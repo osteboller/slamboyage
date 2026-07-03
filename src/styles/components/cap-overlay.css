@@ -26,6 +26,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
+    max-height: min(50vh, 320px);
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .cap-thumb {
@@ -35,7 +38,10 @@
     cursor: pointer;
     transition: transform 0.12s;
     display: inline-block;
-    margin-bottom: 10px;
+    /* .cap-thumb-carry-badge stikker ned til bottom:-14px + sin egen højde —
+       margin skal dække det, ellers klipper overflow-y:auto den af (usynligt
+       problem indtil scroll blev tilføjet, for der var intet der klippede før). */
+    margin-bottom: 26px;
 }
 
 .cap-thumb-img {

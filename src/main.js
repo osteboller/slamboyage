@@ -15,6 +15,7 @@ import { StartScreen }      from './screens/StartScreen.js';
 import { MapScreen }        from './screens/MapScreen.js';
 import { ShopScreen }       from './screens/ShopScreen.js';
 import { BattleScreen }     from './screens/BattleScreen.js';
+import { TrickShotScreen }  from './screens/TrickShotScreen.js';
 import { RewardScreen }     from './screens/RewardScreen.js';
 import { RunEndScreen }    from './screens/RunEndScreen.js';
 import { ENCHANT_DEFS }   from './config/enchantDefs.js';
@@ -117,14 +118,15 @@ let currentScreenName = 'start';
 let returnToAfterMap  = 'start'; // hvor MAP-back-knappen sender brugeren hen
 const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState };
 
-const startScreen  = new StartScreen(deps);
-const mapScreen    = new MapScreen(deps);
-const shopScreen   = new ShopScreen(deps);
-const battleScreen = new BattleScreen(deps);
-const rewardScreen = new RewardScreen(deps);
-const runEndScreen = new RunEndScreen(deps);
+const startScreen     = new StartScreen(deps);
+const mapScreen       = new MapScreen(deps);
+const shopScreen      = new ShopScreen(deps);
+const battleScreen    = new BattleScreen(deps);
+const trickShotScreen = new TrickShotScreen(deps);
+const rewardScreen    = new RewardScreen(deps);
+const runEndScreen    = new RunEndScreen(deps);
 
-const RUN_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
+const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -220,6 +222,9 @@ function showScreen(name, context = null) {
                 if (node.type === 'relic') showScreen('relic-choice', node);
                 else                       showScreen('battle', node);
             };
+            mapScreen.onTrickShot = (trickShotDef, parentNode) => {
+                showScreen('trickshot', { trickShotDef, parentNode });
+            };
             mapScreen.enter();
 
         } else if (name === 'battle') {
@@ -230,15 +235,19 @@ function showScreen(name, context = null) {
                 const ownedCaps  = [...gameState.ownedCaps];
                 const { won: w } = gameState.completeNode(totalScore);
                 if (w) {
-                    // TEST: første node → enchant-reward (afstikker). Fjernes når map-integration er klar.
-                    if (nodePlayed.id === 1) showScreen('enchant-reward', nodePlayed);
-                    else                     showScreen('reward', nodePlayed);
+                    if (nodePlayed.rewardUpgrade === 'enchant') showScreen('enchant-reward', nodePlayed);
+                    else                                        showScreen('reward', nodePlayed);
                 } else {
                     showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
                 }
             };
             battleScreen.onExitFreeMode = () => showScreen('start');
             battleScreen.enter(context);
+
+        } else if (name === 'trickshot') {
+            currentScreen = trickShotScreen;
+            trickShotScreen.onBack = () => { returnToAfterMap = 'start'; showScreen('map'); };
+            trickShotScreen.enter(context);
 
         } else if (name === 'reward') {
             currentScreen = rewardScreen;

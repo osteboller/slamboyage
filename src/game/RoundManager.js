@@ -2,6 +2,8 @@ import { BODY_TYPES, Vec3 } from '../../lib/cannon.js';
 import { POG_H, POG_R, THROWS_PER_ROUND } from '../config/constants.js';
 import { NEARBY_RADIUS, VERY_NEARBY_RADIUS } from './EffectResolver.js';
 import { EffectResolver } from './EffectResolver.js';
+import { isFaceUp } from './capUtils.js';
+import { resolveTrickShot } from './trickshots/index.js';
 
 export class RoundManager {
     constructor({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState }) {
@@ -42,6 +44,11 @@ export class RoundManager {
 
         // Callback: fired when the last score float's final number is shown — score display is now settled
         this.onScoreSettled = null;
+
+        // Trick Shot state — set by buildTrickShotStack(), cleared by buildStack()
+        this._activeTrickShot = null;
+        // Callback: fired when a Trick Shot's single throw has settled — signature: (success) => {}
+        this.onTrickShotResolved = null;
 
         // Wire throwCtrl — sættes her så main.js ikke behøver kende til den
         this._throwCtrl.onThrowEnd = ({ wonNow, faceDown, miss }) =>
@@ -205,6 +212,7 @@ export class RoundManager {
         this._halflifeEarned    = new Map(); // entryId → bonus earned this session
         this._voltageBonus      = 0;
         this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
+        this._activeTrickShot   = null; // any normal buildStack() call exits Trick Shot mode
 
         this._throwCtrl.reset();
         this._throwCtrl.setCaps(this.caps);
@@ -231,6 +239,19 @@ export class RoundManager {
         this.delay(() => {
             if (this._phase === 'idle') this._ui.setActionPrompt('Hold to aim');
         }, 300);
+    }
+
+    // Bygger en stak til et Trick Shot-forsøg: hele owned-caps-puljen, kun 1 kast.
+    // buildStack() nulstiller _activeTrickShot, så vi sætter den EFTER kaldet.
+    buildTrickShotStack(trickShotDef) {
+        const ownedCaps = this._gs?.ownedCaps ?? [];
+        // scoreBase = nuværende wallet-score (efter cost-fradrag) — der scores intet
+        // under et forsøg, så buildStack's interne setScore skal ramme det rigtige tal.
+        this.buildStack(null, ownedCaps, this._gs?.score ?? 0);
+        this._activeTrickShot = trickShotDef;
+        this._throwsTotal     = 1;
+        this._throwsLeft      = 1;
+        this._ui.updateThrowPips(1, 1);
     }
 
     beginThrow(x, y, z) {
@@ -433,8 +454,6 @@ export class RoundManager {
 
     _resolveAndScore(wonNow, faceDown, miss) {
         // ── Detect caps flipped by magnet animation ────────────────────────────
-        // R[1][1] = 1 - 2(qx² + qz²): positive means local Y points world-up = face-up
-        const isFaceUp  = b => (1 - 2 * (b.quaternion.x ** 2 + b.quaternion.z ** 2)) > 0;
         const magnetWon = faceDown.filter(c => isFaceUp(c.body));
         const stillDown = faceDown.filter(c => !isFaceUp(c.body));
         const allWon    = [...wonNow, ...magnetWon];
@@ -516,6 +535,44 @@ export class RoundManager {
 
         const updatedFaceDown = [...faceDownPool, ...returnCaps];
 
+        // ── Surge-flip animationer — rene visuel/fysik-effekter, ingen scoring ──
+        // Flyttet hertil (før Trick Shot-forket) så surge stadig SES under et forsøg,
+        // ikke kun tælles med usynligt. Viser altid en radius-ring ved surgeren
+        // (grøn = fandt mål, rød = ingen face-down cap i NEARBY_RADIUS).
+        surgeAttempts.forEach(({ pos, success, step, targetPos }) => {
+            this.delay(() => {
+                const { x, y } = this._projectToScreen(pos);
+                this._spawnEffectFeedback(pos, x, y, { type: 'surge', success, targetPos });
+            }, (step - 1) * 220);
+        });
+        const SURGE_SPIN_MS  = 850;
+        const surgeLandDelay = new Map(); // cap → earliest ms score/pop/verdict må fyre, så det ikke forsvinder midt i hoppet
+        surgeAnimTargets.forEach(({ cap, step }) => {
+            const startAt = (step - 1) * 220;
+            surgeLandDelay.set(cap, startAt + SURGE_SPIN_MS + 120);
+            this.delay(() => {
+                this._render.animateCapFlipSpin(cap.mesh, 3, SURGE_SPIN_MS, () => {
+                    const euler = new Vec3();
+                    cap.body.quaternion.toEuler(euler);
+                    cap.body.quaternion.setFromEuler(0, euler.y, 0);
+                });
+            }, startAt);
+        });
+
+        // ── Trick Shot fork: springer scoring/GameState-persistence helt over ──
+        // Effekter + magnet + surge-kæde er allerede kørt ovenfor, så abilities
+        // tæller stadig med i checket. Ingen scoring, ingen halflife/relic-writes.
+        // Ventes med verdikten til sidste surge-spin er landet (eller en minimums-
+        // pause), så spilleren altid når at se cappene ligge stille på bordet først.
+        if (this._activeTrickShot) {
+            const MIN_VERDICT_DELAY = 700;
+            const surgeDelay   = surgeLandDelay.size > 0 ? Math.max(...surgeLandDelay.values()) : 0;
+            const verdictDelay = Math.max(MIN_VERDICT_DELAY, surgeDelay);
+            const wonCaps      = actualWon.map(r => r.cap);
+            this.delay(() => this._resolveTrickShotAttempt(wonCaps, updatedFaceDown), verdictDelay);
+            return;
+        }
+
         // ── Phase 2b: crew/rally tilføjer rundevis bonus til _roundCapBonuses ──
         // Bonus persisterer resten af runden og vises i pile-overlay badges.
         const auraFeedback = new Map(); // donor cap → { type, targets } — kun til visuel feedback
@@ -587,31 +644,20 @@ export class RoundManager {
         this._totalScore += scoreGained;
         this._throwsLeft--;
 
-        // ── Surge-flip animationer — staggered, kører parallelt med score floats ──
-        // Viser altid en radius-ring ved surgeren (grøn = fandt mål, rød = ingen face-down cap i NEARBY_RADIUS)
-        surgeAttempts.forEach(({ pos, success, step, targetPos }) => {
-            this.delay(() => {
-                const { x, y } = this._projectToScreen(pos);
-                this._spawnEffectFeedback(pos, x, y, { type: 'surge', success, targetPos });
-            }, (step - 1) * 220);
-        });
-        const SURGE_SPIN_MS  = 850;
-        const surgeLandDelay = new Map(); // cap → earliest ms score/pop may fire, so it doesn't vanish mid-hop
-        surgeAnimTargets.forEach(({ cap, step }) => {
-            const startAt = (step - 1) * 220;
-            surgeLandDelay.set(cap, startAt + SURGE_SPIN_MS + 120);
-            this.delay(() => {
-                this._render.animateCapFlipSpin(cap.mesh, 3, SURGE_SPIN_MS, () => {
-                    const euler = new Vec3();
-                    cap.body.quaternion.toEuler(euler);
-                    cap.body.quaternion.setFromEuler(0, euler.y, 0);
-                });
-            }, startAt);
-        });
+        const hasNextThrow = this._throwsLeft > 0 && updatedFaceDown.length > 0;
 
         // ── Pop animations + per-cap score floats ────────────────────────────
         const popDelay   = Math.max(80, 500 / Math.max(actualWon.length, 1));
         const finalScore = this._scoreBase + this._totalScore;
+
+        // Runde-ende resultat-overlay må ikke poppe op før sidste score-float er
+        // landet — ellers dækker den skærmen mens spilleren stadig burde se
+        // sidste kasts effekter/scores rulle ud. Kaldes derfor herfra, ikke
+        // synkront længere nede, og kun hvis runden faktisk er slut.
+        const showRoundResults = () => this._ui.showResults(
+            this._wonCapsAll.length, this._totalScore,
+            this._wonCapsAll, updatedFaceDown.length === 0
+        );
 
         const scoreDelays = scoredCaps.map(({ cap }, i) => Math.max(i * popDelay, surgeLandDelay.get(cap) ?? 0));
         const lastIdx      = scoreDelays.reduce((best, d, i) => d > scoreDelays[best] ? i : best, 0);
@@ -629,6 +675,7 @@ export class RoundManager {
                     if (isLast) {
                         this._ui.setScore(finalScore);
                         if (scoreGained > 0) this._ui.showScoreGain(scoreGained);
+                        if (!hasNextThrow) showRoundResults();
                         if (this.onScoreSettled) this.onScoreSettled(finalScore);
                     }
                 }, carry);
@@ -636,10 +683,9 @@ export class RoundManager {
         });
         if (scoredCaps.length === 0) {
             this._ui.setScore(finalScore);
+            if (!hasNextThrow) showRoundResults();
             if (this.onScoreSettled) setTimeout(() => this.onScoreSettled(finalScore), 0);
         }
-
-        const hasNextThrow = this._throwsLeft > 0 && updatedFaceDown.length > 0;
 
         const displayRemaining = hasNextThrow
             ? [...updatedFaceDown, ...spawnDefs]
@@ -708,10 +754,6 @@ export class RoundManager {
             this._ui.updatePileButtons(updatedFaceDown, this._wonCapsAll, this._geb);
 
             this._phase = 'done';
-            this._ui.showResults(
-                this._wonCapsAll.length, this._totalScore,
-                this._wonCapsAll, updatedFaceDown.length === 0
-            );
             this._ui.setStatus('Round over!');
             this._ui.setActionPrompt('Tap to continue');
             if (this.onRoundEnd) this.onRoundEnd({
@@ -719,6 +761,20 @@ export class RoundManager {
                 capsFlipped: this._wonCapsAll.length,
             });
         }
+    }
+
+    // Afgør et Trick Shot-forsøg — kaldes fra _resolveAndScore's fork, aldrig
+    // fra normal scoring. Rører aldrig this._gs, this._totalScore eller this._wonCapsAll.
+    _resolveTrickShotAttempt(wonCaps, faceDownCaps) {
+        const success = resolveTrickShot(this._activeTrickShot.check, wonCaps, faceDownCaps);
+
+        this._throwsLeft = 0;
+        this._phase      = 'done';
+        this._render.setReticleVisible(false);
+        this._ui.setActionPrompt(null);
+        this._ui.setStatus(success ? 'Trick Shot cleared!' : 'Trick Shot missed');
+
+        if (this.onTrickShotResolved) this.onTrickShotResolved(success);
     }
 
     _spawnEffectFeedback(worldPos, screenX, screenY, meta) {

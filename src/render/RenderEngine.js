@@ -1,4 +1,4 @@
-import { CAM_BASE, ZONE_INNER_R, ZONE_OUTER_R } from '../config/constants.js';
+import { CAM_BASE, ZONE_INNER_R, ZONE_OUTER_R, GROUND_HALF_SIZE } from '../config/constants.js';
 
 export class RenderEngine {
     constructor() {
@@ -57,14 +57,15 @@ export class RenderEngine {
 
     _setupGround() {
         // Mørkt bord med grid
+        const groundSize = GROUND_HALF_SIZE * 2;
         const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(60, 60),
+            new THREE.PlaneGeometry(groundSize, groundSize),
             new THREE.MeshStandardMaterial({ color: 0x1e2830, roughness: 0.95 })
         );
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         this.scene.add(ground);
-        this.scene.add(new THREE.GridHelper(60, 60, 0x3a4a4e, 0x2e3e44));
+        this.scene.add(new THREE.GridHelper(groundSize, groundSize, 0x3a4a4e, 0x2e3e44));
 
         // Korkmat — mørk kant
         const border = new THREE.Mesh(

@@ -364,7 +364,17 @@
     line-height: 1;
 }
 #results p    { font-size: 12px; color: var(--text-secondary); margin: 3px 0 6px; font-family: 'Space Grotesk', sans-serif; }
-#wonList      { min-height: 20px; }
+#wonList      { min-height: 20px; max-height: 45vh; overflow-y: auto; overflow-x: hidden; }
+
+@keyframes results-pop-in {
+    0%   { opacity: 0; transform: rotate(2deg) scale(0.4) translateY(-18px); }
+    55%  { opacity: 1; transform: rotate(2deg) scale(1.15) translateY(4px); }
+    75%  { transform: rotate(2deg) scale(0.95) translateY(-1px); }
+    100% { opacity: 1; transform: rotate(2deg) scale(1) translateY(0); }
+}
+#results.results--entering {
+    animation: results-pop-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
 
 /* ─── POWER BAR ──────────────────────────────────────────────────────────── */
 #power-container {

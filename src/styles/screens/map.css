@@ -2,6 +2,10 @@
 #map-screen {
     position: fixed;
     inset: 0;
+    width: 100vw;
+    height: 100vh;
+    width: 100dvw;
+    height: 100dvh; /* override — samme fix som #canvas-container, undgår mobil/fullscreen viewport-slinger */
     background: var(--clr-bg);
     background-image: var(--bg-dot-grid);
     background-size: var(--bg-dot-size);
@@ -9,7 +13,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding-top: clamp(48px, 10vh, 80px);
+    padding-top: clamp(16px, 4vh, 32px);
     overflow: hidden;
 }
 
@@ -65,7 +69,10 @@
     align-items: flex-start;
     justify-content: center;
     gap: 0;
-    overflow-x: hidden;
+    /* Ingen egen overflow her — #map-screen's overflow:hidden klipper allerede
+       vandret hvis nødvendigt. At blande overflow-x:hidden med overflow-y:visible
+       gør browseren overflow-y til "auto" (scroll), uanset hvor eksplicit man er —
+       det var den reelle synder bag gren-badgene der forsvandt i et scroll-felt. */
     padding: clamp(4px, 1vh, 8px) 0 clamp(8px, 2vh, 16px);
 }
 
@@ -76,6 +83,7 @@
 }
 
 .map-node {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -84,6 +92,7 @@
 }
 
 .map-node-circle {
+    position: relative;
     width: clamp(36px, 7vw, 52px);
     height: clamp(36px, 7vw, 52px);
     border-radius: 50%;
@@ -96,6 +105,27 @@
     font-size: 18px;
     color: var(--text-muted);
     transition: all 0.2s;
+}
+
+/* Reward-upgrade-badge på hovednoden — lilla (samme "særlig belønning"-sprog
+   som relic-events) i stedet for grøn, så det ikke læses som "node done" */
+.map-node-ts-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--clr-purple);
+    border: 2px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    color: #000;
+    box-shadow: 1px 1px 0px #000;
+    line-height: 1;
 }
 
 .map-node.done .map-node-circle {
@@ -184,6 +214,122 @@
     flex-shrink: 0;
 }
 .map-line.done { background: #000; }
+
+/* ── Trick Shot-gren (pseudo-node) ──────────────────────────────────────────
+   Hænger under sin parent-node med en lille lodret streg. Viser ALTID reward-
+   ikonet (hvad du får) + et lille badge for udfordringen (hvad du skal gøre) —
+   begge kendt på forhånd. Bliver et almindeligt flueben når den er clearet. */
+.map-branch {
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 2px;
+    z-index: 1;
+}
+.map-branch-connector {
+    width: 3px;
+    height: clamp(12px, 2.2vh, 20px);
+    background: var(--border-subtle);
+}
+.map-branch-node {
+    position: relative;
+    width: clamp(26px, 5vw, 36px);
+    height: clamp(26px, 5vw, 36px);
+    border-radius: 50%;
+    border: 3px solid var(--clr-purple);
+    background: rgba(185, 133, 255, 0.15);
+    box-shadow: 2px 2px 0px var(--clr-purple-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: var(--clr-purple-dark);
+    margin-top: 2px;
+}
+.map-branch-node.locked {
+    opacity: 0.4;
+}
+.map-branch-node.available {
+    box-shadow: var(--shadow-sticker);
+    cursor: pointer;
+    animation: node-pulse 1.4s ease-in-out infinite;
+}
+.map-branch-node.available:hover {
+    background: rgba(185, 133, 255, 0.3);
+}
+.map-branch-node.cleared {
+    border-color: #000;
+    color: #000;
+    background: var(--clr-bg-darker);
+    box-shadow: 2px 2px 0px #000;
+    font-size: 12px;
+}
+
+/* Lille badge på grenen der viser selve udfordringens type (◉/↗) */
+.map-branch-challenge-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #f5c842;
+    border: 2px solid #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 800;
+    color: #000;
+    line-height: 1;
+}
+
+/* ── Map action-bar: "Next" + evt. "Trick Shot" for den aktuelle node ───────
+   Fast placeret nederst til venstre (IKKE del af .map-inner's flow) — ellers
+   optager den samme vertikale plads som gren-badges under noderne skal bruge. */
+.map-action-bar {
+    position: fixed;
+    left: 16px;
+    bottom: 16px;
+    z-index: 216;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.map-action-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 12px 22px;
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+.map-action-btn--next {
+    background: #000;
+    color: #fff;
+    transform: rotate(1deg);
+}
+.map-action-btn--next:hover  { box-shadow: 2px 2px 0px #000; transform: rotate(1deg) translate(2px,2px); }
+.map-action-btn--next:active { box-shadow: none; transform: rotate(1deg) translate(4px,4px); }
+
+.map-action-btn--trickshot {
+    background: #f5c842;
+    color: #000;
+    transform: rotate(-1deg);
+}
+.map-action-btn--trickshot:hover:not(:disabled)  { box-shadow: 2px 2px 0px #000; transform: rotate(-1deg) translate(2px,2px); }
+.map-action-btn--trickshot:active:not(:disabled) { box-shadow: none; transform: rotate(-1deg) translate(4px,4px); }
+.map-action-btn--trickshot:disabled { opacity: 0.4; cursor: not-allowed; }
+.map-trickshot-cost { font-weight: 800; }
 
 /* ── Start/action-knap (delt med shop) ───────────────────────────────────── */
 .map-start-btn {

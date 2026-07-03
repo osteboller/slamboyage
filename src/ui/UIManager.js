@@ -270,7 +270,12 @@ export class UIManager {
             });
         });
 
-        document.getElementById('results').style.display = 'block';
+        const resultsEl = document.getElementById('results');
+        resultsEl.style.display = 'block';
+        resultsEl.classList.remove('results--entering');
+        void resultsEl.offsetWidth; // reflow — genstarter animationen selv hvis den var kørt for nyligt
+        resultsEl.classList.add('results--entering');
+        setTimeout(() => resultsEl.classList.remove('results--entering'), 420);
     }
 
     hideResults() {
@@ -390,6 +395,20 @@ export class UIManager {
     }
     clearRunInfo() {
         document.getElementById('run-info').style.display = 'none';
+    }
+
+    // ─── TRICK SHOT INFO ─────────────────────────────────────────────────────
+    setTrickShotInfo(def) {
+        document.getElementById('trickshot-name').textContent = def.name;
+        document.getElementById('trickshot-desc').textContent = def.description;
+        document.getElementById('trickshot-info').style.display = '';
+    }
+    clearTrickShotInfo() {
+        document.getElementById('trickshot-info').style.display = 'none';
+    }
+    // active = true mens kastet er i gang — dæmper/pulserer headeren så udsynet til bordet er frit
+    setTrickShotActive(active) {
+        document.getElementById('trickshot-info')?.classList.toggle('trickshot-info--active', active);
     }
 
     // ─── THROW PIPS ──────────────────────────────────────────────────────────
@@ -671,6 +690,15 @@ export class UIManager {
         relicDetail.addEventListener('pointerdown', e => e.stopPropagation());
 
         document.addEventListener('pointerdown', () => {
+            // Var en detail-popup åben lige inden dette klik? Gem det, så det
+            // efterfølgende click-event (se capture-listener nedenfor) kan
+            // sluges centralt — ellers rammer det uvægerligt hvad end der lå
+            // under popup'en (køb en cap i shoppen, vælg en anden node osv.)
+            const wasOpen = detail.style.display === 'block'
+                || slamDetail.style.display === 'block'
+                || relicDetail.style.display === 'block';
+            if (wasOpen) this._suppressNextClick = true;
+
             overlay.style.display     = 'none';
             detail.style.display      = 'none';
             slamDetail.style.display  = 'none';
@@ -678,6 +706,17 @@ export class UIManager {
             this._capViewer.hide();
             this._slammerViewer.hide();
         });
+
+        // Central swallow: fanger click i CAPTURE-fasen (før nogen skærms egen
+        // click-handler), så det klik der lukkede en popup ovenfor aldrig kan
+        // nå frem til fx et shop-køb, et node-valg eller et reward-pick —
+        // uanset hvilken skærm popup'en var åbnet fra.
+        document.addEventListener('click', (e) => {
+            if (this._suppressNextClick) {
+                this._suppressNextClick = false;
+                e.stopPropagation();
+            }
+        }, true);
     }
 
     _toggleOverlay(title, defs, lit, anchorEl, overlay) {

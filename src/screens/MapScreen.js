@@ -1,6 +1,7 @@
 import { THROWS_PER_ROUND, SLAMMER_DEFS } from '../config/constants.js';
 import { EFFECT_LABELS } from '../game/effects/labels.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
+import { REWARD_UPGRADE_ICONS } from '../config/trickShotDefs.js';
 
 export class MapScreen {
     constructor({ gameState }) {
@@ -8,6 +9,7 @@ export class MapScreen {
         this._el          = null;
         this.onNodeSelect = null;
         this.onBack       = null;
+        this.onTrickShot  = null;
     }
 
     enter() {
@@ -31,6 +33,23 @@ export class MapScreen {
             }
             if (e.target.closest('#map-back-btn') && this.onBack) {
                 this.onBack();
+                return;
+            }
+            if (e.target.closest('#map-next-btn')) {
+                const nodeDef = this._gameState.currentNode;
+                if (nodeDef && this.onNodeSelect) this.onNodeSelect(nodeDef);
+                return;
+            }
+            if (e.target.closest('#map-trickshot-btn')) {
+                const nodeDef = this._gameState.currentNode;
+                if (nodeDef?.trickShot && this.onTrickShot) this.onTrickShot(nodeDef.trickShot, nodeDef);
+                return;
+            }
+            const branchNode = e.target.closest('.map-branch-node.available');
+            if (branchNode) {
+                const idx     = parseInt(branchNode.dataset.tsIdx, 10);
+                const nodeDef = this._gameState.runNodes[idx];
+                if (nodeDef?.trickShot && this.onTrickShot) this.onTrickShot(nodeDef.trickShot, nodeDef);
                 return;
             }
             const node = e.target.closest('.map-node.current');
@@ -173,15 +192,77 @@ export class MapScreen {
             const scoreHTML = isRelic ? '' :
                 `<div class="map-node-score">Goal<span class="map-node-score-val">${node.clearScore}★</span></div>`;
 
+            // Reward-upgrade-badge: vises på HOVEDNODEN når en Trick Shot er clearet,
+            // og viser hvilken opgraderings-type der er vundet (ikke et generisk ✓ —
+            // det ville forveksles med node-cirklens egen "done"-tilstand).
+            const rewardIcon  = node.rewardUpgrade ? (REWARD_UPGRADE_ICONS[node.rewardUpgrade] ?? '✦') : null;
+            const tsBadgeHTML = (!isRelic && rewardIcon)
+                ? `<div class="map-node-ts-badge" title="Reward upgraded: ${node.rewardUpgrade}">${rewardIcon}</div>`
+                : '';
+
+            // Trick Shot-gren: kun synlig på noder der ikke er passeret endnu.
+            // Viser ALTID reward-ikonet (hvad du får) + et lille badge for selve
+            // udfordringen (hvad du skal gøre) — begge dele kendes på forhånd,
+            // ligesom hovednoden viser sin clearScore på forhånd. Først når den
+            // er clearet skifter den til et almindeligt flueben (som andre done-noder).
+            let branchHTML = '';
+            if (!isRelic && node.trickShot && i >= gs.nodeIndex) {
+                const isCurrent = i === gs.nodeIndex;
+                const cleared   = !!node.rewardUpgrade;
+                const canAfford = gs.canAfford(node.trickShot.cost);
+                let branchCls   = 'map-branch-node';
+                let branchInner;
+                let branchTitle;
+                if (cleared) {
+                    branchCls  += ' cleared';
+                    branchInner = '✓';
+                    branchTitle = `${node.trickShot.name} — cleared`;
+                } else {
+                    const branchRewardIcon = REWARD_UPGRADE_ICONS[node.trickShot.rewardType] ?? '✦';
+                    branchInner = `${branchRewardIcon}<div class="map-branch-challenge-badge">${node.trickShot.icon}</div>`;
+                    if (isCurrent && canAfford) {
+                        branchCls  += ' available';
+                        branchTitle = `${node.trickShot.name} (−${node.trickShot.cost}★)`;
+                    } else if (isCurrent) {
+                        branchCls  += ' locked';
+                        branchTitle = `${node.trickShot.name} — need ${node.trickShot.cost}★`;
+                    } else {
+                        branchCls  += ' locked';
+                        branchTitle = node.trickShot.name;
+                    }
+                }
+                branchHTML = `
+                    <div class="map-branch">
+                        <div class="map-branch-connector"></div>
+                        <div class="${branchCls}" data-ts-idx="${i}" title="${branchTitle}">${branchInner}</div>
+                    </div>`;
+            }
+
             return `<div class="map-node-wrap">
                 <div class="${cls}" data-idx="${i}">
                     ${nameHTML}
-                    <div class="map-node-circle">${icon}</div>
+                    <div class="map-node-circle">${icon}${tsBadgeHTML}</div>
                     ${scoreHTML}
+                    ${branchHTML}
                 </div>
                 ${line}
             </div>`;
         }).join('');
+
+        // Action-bar for den aktuelle node: "Next" er altid der, "Trick Shot"
+        // dukker op ved siden af hvis noden har en og den ikke er clearet endnu.
+        const current = gs.currentNode;
+        const currentTS = (current && !current.rewardUpgrade && current.trickShot)
+            ? current.trickShot : null;
+        const actionBarHTML = current ? `
+            <div class="map-action-bar">
+                <button id="map-next-btn" class="map-action-btn map-action-btn--next">Next ▶</button>
+                ${currentTS ? `
+                <button id="map-trickshot-btn" class="map-action-btn map-action-btn--trickshot"
+                        ${gs.canAfford(currentTS.cost) ? '' : 'disabled'}>
+                    🎲 ${currentTS.name} <span class="map-trickshot-cost">−${currentTS.cost}★</span>
+                </button>` : ''}
+            </div>` : '';
 
         return `<div class="map-inner">
             <div class="map-topbar">
@@ -189,6 +270,7 @@ export class MapScreen {
             </div>
             <div class="map-hint">Tap a node to play</div>
             <div class="map-path">${nodesHTML}</div>
+            ${actionBarHTML}
         </div>`;
     }
 }

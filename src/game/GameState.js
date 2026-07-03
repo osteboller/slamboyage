@@ -1,6 +1,7 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
+import { TRICK_SHOTS } from '../config/trickShotDefs.js';
 
 const _commonCaps = CAP_DEFS.filter(c => c.rarity === 1);
 
@@ -188,6 +189,19 @@ export class GameState {
         if (entry) entry.enchant = enchantId;
     }
 
+    // ─── TRICK SHOT ───────────────────────────────────────────────────────────
+    attemptTrickShot(cost) {
+        if (!this.canAfford(cost)) return false;
+        this.score -= cost;
+        return true;
+    }
+
+    // Markerer at nodens reward-skærm skal opgraderes (fx til enchant-valg)
+    markRewardUpgraded(nodeId, type = 'enchant') {
+        const node = this.runNodes.find(n => n.id === nodeId);
+        if (node) node.rewardUpgrade = type;
+    }
+
     // ─── PRIVATE ──────────────────────────────────────────────────────────────
     _generateNodes(loop) {
         const scale = 1 + (loop - 1) * 0.5; // loop 1: ×1.0 | loop 2: ×1.5 | loop 3: ×2.0
@@ -197,6 +211,16 @@ export class GameState {
             name:       `${loop}-${i + 1}`,
             clearScore: Math.ceil(n.baseClear * scale),
         }));
+
+        // Tilknyt Trick Shots til 2 tilfældige battle-noder (MAP_AND_SHOP_SPEC.md: "2 per run").
+        // battles[0] (1-1) udelukkes — spilleren starter med 0★ og kan aldrig have råd der.
+        const eligibleBattles = battles.slice(1);
+        const shuffledBattles = [...eligibleBattles].sort(() => Math.random() - 0.5);
+        const shuffledShots   = [...TRICK_SHOTS].sort(() => Math.random() - 0.5);
+        shuffledBattles.slice(0, Math.min(2, TRICK_SHOTS.length)).forEach((battle, i) => {
+            battle.trickShot = shuffledShots[i];
+        });
+
         // Layout: 1-1, 1-2, [relic event], 1-3, 1-4, 1-5
         return [
             battles[0],

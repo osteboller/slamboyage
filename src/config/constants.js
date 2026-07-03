@@ -25,6 +25,9 @@ export const CAM_CLOSE = { x: 0, y: 12, z: 8  }; // zoomed ind (idle/aiming) —
 export const ZONE_INNER_R = 4.5; // inner bonus zone — gold ring on field
 export const ZONE_OUTER_R = 9.0; // outer bonus zone — blue ring on field
 
+// Bordpladens kant — halvdelen af 60×60 PlaneGeometry i RenderEngine._setupGround()
+export const GROUND_HALF_SIZE = 30;
+
 // power:     blast-kraftmultiplikator  (1.0 = standard)
 // precision: jo højere, jo langsommere svinger power-baren (nemmere at time)
 // mass:      slammer-legemets masse    (tungere = mere kinetisk energi)

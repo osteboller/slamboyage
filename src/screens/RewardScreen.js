@@ -137,7 +137,9 @@ export class RewardScreen {
 
     _confirmEnchant(idx) {
         const choice = this._choices[idx];
-        if (choice) this._gs.applyEnchant(choice.entry.id, choice.enchantDef.id);
+        if (!choice) return;
+        this._gs.applyEnchant(choice.entry.id, choice.enchantDef.id);
+        this._ui.showEnchantResult(choice.enchantDef, choice.entry);
         if (this.onContinue) this.onContinue();
     }
 
@@ -164,7 +166,7 @@ export class RewardScreen {
 
     _render(choices) {
         const nodeLabel = this._mode === 'enchant'
-            ? 'Afstikker Cleared!'
+            ? 'Enchant Reward'
             : (this._node?.type === 'relic' ? 'Relic Event' : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!'));
         const sub = this._mode === 'enchant'
             ? 'Choose a cap from your collection to enchant'
