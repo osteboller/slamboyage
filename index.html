@@ -35,6 +35,7 @@
     <link rel="stylesheet" href="src/styles/screens/reward.css">
     <link rel="stylesheet" href="src/styles/screens/run-end.css">
     <link rel="stylesheet" href="src/styles/screens/shop.css">
+    <link rel="stylesheet" href="src/styles/screens/trickshot.css">
 </head>
 <body>
     <div id="canvas-container"></div>
@@ -87,6 +88,21 @@
         <div id="first-strike-badge" style="display:none">① ×4</div>
         <div id="last-stand-badge"   style="display:none">⑤ ×4</div>
         <span id="run-node-name"></span><br>GOAL: <b id="run-goal-score"></b>★
+    </div>
+
+    <!-- Trick Shot criteria header — vises kun under et trick shot-forsøg -->
+    <div id="trickshot-info" style="display:none">
+        <div id="trickshot-name"></div>
+        <p id="trickshot-desc"></p>
+    </div>
+
+    <!-- Trick Shot result overlay -->
+    <div id="trickshot-result">
+        <h2 id="trickshot-result-title"></h2>
+        <div id="trickshot-result-btns">
+            <button id="trickshot-retry-btn"></button>
+            <button id="trickshot-back-btn">⌂ Back to Map</button>
+        </div>
     </div>
 
     <!-- Throw pips (i bottom-bar nedenunder) -->
