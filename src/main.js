@@ -17,6 +17,7 @@ import { ShopScreen }       from './screens/ShopScreen.js';
 import { BattleScreen }     from './screens/BattleScreen.js';
 import { TrickShotScreen }  from './screens/TrickShotScreen.js';
 import { RewardScreen }     from './screens/RewardScreen.js';
+import { BossShopScreen }   from './screens/BossShopScreen.js';
 import { RunEndScreen }    from './screens/RunEndScreen.js';
 import { ENCHANT_DEFS }   from './config/enchantDefs.js';
 import { CAP_DEFS }       from './config/constants.js';
@@ -89,11 +90,19 @@ consumables.onUse = (def) => {
         const caps = gameState.ownedCaps;
         if (caps.length > 0) {
             ui.showCapPicker('Pick a cap to enchant', caps, entry => {
-                const enchantDef = ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)];
+                const pool = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
+                const enchantDef = pool[Math.floor(Math.random() * pool.length)];
                 gameState.applyEnchant(entry.id, enchantDef.id);
                 if (currentScreenName === 'battle') roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
                 ui.showEnchantResult(enchantDef, entry);
             });
+        }
+    }
+    if (def.id === 'skip_trickshot') {
+        const node = gameState.currentNode;
+        if (node?.trickShot && !node.rewardUpgrade) {
+            gameState.markRewardUpgraded(node.id, node.trickShot.rewardType);
+            mapScreen.refresh();
         }
     }
 };
@@ -124,9 +133,10 @@ const shopScreen      = new ShopScreen(deps);
 const battleScreen    = new BattleScreen(deps);
 const trickShotScreen = new TrickShotScreen(deps);
 const rewardScreen    = new RewardScreen(deps);
+const bossShopScreen  = new BossShopScreen(deps);
 const runEndScreen    = new RunEndScreen(deps);
 
-const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
+const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'relic-choice', 'enchant-reward', 'boss-reward', 'boss-shop']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -208,6 +218,9 @@ function showScreen(name, context = null) {
                 }
             };
             startScreen.onFreeMode    = () => showScreen('battle', null);
+            // Dev-genvej: gameState.startRun() + nodeIndex/score er allerede sat af
+            // knappen selv — kald IKKE startRun() igen her, det ville nulstille nodeIndex.
+            startScreen.onDevSkipToBoss = () => { battleSaveState = null; resumeScreen = null; returnToAfterMap = 'start'; showScreen('map'); };
             startScreen.enter();
 
         } else if (name === 'map') {
@@ -233,9 +246,10 @@ function showScreen(name, context = null) {
                 const nodePlayed = gameState.currentNode;
                 const loop       = gameState.loop;
                 const ownedCaps  = [...gameState.ownedCaps];
-                const { won: w } = gameState.completeNode(totalScore);
-                if (w) {
-                    if (nodePlayed.rewardUpgrade === 'enchant') showScreen('enchant-reward', nodePlayed);
+                const result     = gameState.completeNode(totalScore);
+                if (result.won) {
+                    if (result.isBoss)                          showScreen('boss-reward', { bossShards: result.bossShards, parentNode: nodePlayed });
+                    else if (nodePlayed.rewardUpgrade === 'enchant') showScreen('enchant-reward', nodePlayed);
                     else                                        showScreen('reward', nodePlayed);
                 } else {
                     showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
@@ -258,6 +272,20 @@ function showScreen(name, context = null) {
             currentScreen = rewardScreen;
             rewardScreen.onContinue = () => showScreen('shop');
             rewardScreen.enterEnchant(context);
+
+        } else if (name === 'boss-reward') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => showScreen('boss-shop');
+            rewardScreen.enterBoss(context);
+
+        } else if (name === 'boss-shop') {
+            currentScreen = bossShopScreen;
+            bossShopScreen.onContinue = () => {
+                returnToAfterMap = 'start';
+                if (gameState.isRunComplete) gameState.nextLoop();
+                showScreen('map');
+            };
+            bossShopScreen.enter();
 
         } else if (name === 'relic-choice') {
             currentScreen = rewardScreen;

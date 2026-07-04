@@ -4,6 +4,7 @@ import { NEARBY_RADIUS, VERY_NEARBY_RADIUS } from './EffectResolver.js';
 import { EffectResolver } from './EffectResolver.js';
 import { isFaceUp } from './capUtils.js';
 import { resolveTrickShot } from './trickshots/index.js';
+import { getBossThrowMultiplier } from './bossModifiers/index.js';
 
 export class RoundManager {
     constructor({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState }) {
@@ -50,6 +51,9 @@ export class RoundManager {
         // Callback: fired when a Trick Shot's single throw has settled — signature: (success) => {}
         this.onTrickShotResolved = null;
 
+        // Boss-node state — set via setActiveBoss(), cleared by buildStack()
+        this._activeBoss = null;
+
         // Wire throwCtrl — sættes her så main.js ikke behøver kende til den
         this._throwCtrl.onThrowEnd = ({ wonNow, faceDown, miss }) =>
             this._handleThrowEnd(wonNow, faceDown, miss);
@@ -64,6 +68,12 @@ export class RoundManager {
             this._ui.updateThrowPips(this._throwsLeft, this._throwsLeft + this._throwIndex);
             if (this._throwsLeft > 1) this._ui.hideLastStandBadge();
         }
+    }
+
+    // Aktiverer en boss-gimmick for den kommende runde — kaldes af BattleScreen
+    // EFTER buildStack(), da buildStack() selv nulstiller _activeBoss til null.
+    setActiveBoss(bossDef) {
+        this._activeBoss = bossDef ?? null;
     }
 
     get _geb() {
@@ -105,7 +115,12 @@ export class RoundManager {
 
     // Spawner en ghost-kopi af en cap, shuffler den ind i stacken på en tilfældig position
     addGhostCap(def, enchant = null) {
-        const ghost = this._factory.spawnCap(def, POG_H * 0.5, enchant, null, true);
+        // Unikt (negativt) id pr. ghost — IKKE null. Ellers kolliderer flere
+        // ghosts på samme _roundCapBonuses-nøgle, og guards som `entryId != null`
+        // forhindrer helt at en ghosts egen effekt-bonus (fx absorb) bliver
+        // gemt/vist som badge, selvom den stadig tæller korrekt med i scoren.
+        const ghostEntryId = this._nextGhostId--;
+        const ghost = this._factory.spawnCap(def, POG_H * 0.5, enchant, ghostEntryId, true);
         const pool  = this._pendingFaceDown.length > 0 ? this._pendingFaceDown : this.caps;
         pool.push(ghost);
 
@@ -213,6 +228,8 @@ export class RoundManager {
         this._voltageBonus      = 0;
         this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
         this._activeTrickShot   = null; // any normal buildStack() call exits Trick Shot mode
+        this._nextGhostId       = -1; // unikke negative ids til Twinsies-ghosts denne runde
+        this._activeBoss        = null; // sættes eksplicit af BattleScreen EFTER dette kald
 
         this._throwCtrl.reset();
         this._throwCtrl.setCaps(this.caps);
@@ -622,6 +639,17 @@ export class RoundManager {
         const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
 
+        // Boss-gimmick multiplier (Even Steven/Odd Todd/No Glam Fam) — holdes UDENFOR
+        // positionChain, så den ikke optræder i score-floatens visuelle multiplier-kæde
+        // (der kun viser tal > 1 — boss-effekten kan jo netop være 0).
+        const bossMult = this._activeBoss
+            ? getBossThrowMultiplier(this._activeBoss.gimmick, {
+                actualWonCount: actualWon.length,
+                ownedCaps:      this._gs?.ownedCaps ?? [],
+            })
+            : 1;
+        const finalGlobalMult = globalMult * bossMult;
+
         const voltage    = this._voltageBonus ?? 0;
         const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
             const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
@@ -635,7 +663,7 @@ export class RoundManager {
                 this._roundCapBonuses.set(cap.entryId, roundBonus + (bonus ?? 0));
             }
             const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatRelicBonus + voltage) * (localMultiplier ?? 1));
-            const finalScore = Math.floor(capScore * globalMult);
+            const finalScore = Math.floor(capScore * finalGlobalMult);
             return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain, carry };
         });
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
@@ -709,8 +737,9 @@ export class RoundManager {
                 });
             }
 
+            const bossVetoMsg = bossMult === 0 && actualWon.length > 0 ? ` · ${this._activeBoss.name}: 0pts!` : '';
             const flippedMsg = actualWon.length > 0
-                ? `${actualWon.length} flipped · ${updatedFaceDown.length} left`
+                ? `${actualWon.length} flipped · ${updatedFaceDown.length} left${bossVetoMsg}`
                 : `Miss! · ${updatedFaceDown.length} left`;
             this._ui.setStatus(miss && actualWon.length === 0
                 ? `Miss! · ${updatedFaceDown.length} left`

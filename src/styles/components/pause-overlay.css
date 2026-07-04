@@ -9,40 +9,10 @@
     -webkit-backdrop-filter: blur(2px);
     align-items: center;
     justify-content: center;
+    padding: 16px 0; /* luft foroven/forneden på lave/landscape-skærme */
 }
 #pause-overlay.open {
     display: flex;
-}
-
-/* Score sticker — øverst til venstre, synlig bag panelet */
-#pause-score-sticker {
-    position: fixed;
-    top: 5rem;
-    left: 1.5rem;
-    z-index: 285;
-    background: var(--clr-bg-panel);
-    border: 4px solid var(--border-ink);
-    box-shadow: var(--shadow-raised);
-    padding: 10px 16px;
-    transform: rotate(-3deg);
-    pointer-events: none;
-}
-.pause-score-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-secondary);
-    margin: 0 0 2px;
-}
-#pause-score-val {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 36px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.04em;
-    color: var(--text-primary);
 }
 
 /* Pause panel */
@@ -54,6 +24,8 @@
     box-shadow: 8px 8px 0px 0px #000;
     transform: rotate(2deg);
     width: clamp(280px, 85%, 400px);
+    max-height: 100%;
+    overflow-y: auto;
     padding: 1.5rem;
     animation: pause-panel-in 0.2s ease-out forwards;
 }

@@ -1,7 +1,7 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
-import { EFFECT_LABELS } from '../game/effects/labels.js';
+import { effectName } from '../game/effects/labels.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 
 const SKIP_BONUS = 5;
@@ -12,8 +12,9 @@ export class RewardScreen {
         this._ui         = ui;
         this._el         = null;
         this._node       = null;
-        this._mode       = 'cap'; // 'cap' | 'relic' | 'enchant'
+        this._mode       = 'cap'; // 'cap' | 'relic' | 'enchant' | 'boss'
         this._selected   = null;  // name or relic id
+        this._bossShards = 0;
         this.onContinue  = null;
     }
 
@@ -99,6 +100,52 @@ export class RewardScreen {
         });
     }
 
+    // Boss-belønning: vælg mellem 3 rare/legendary caps. Skip giver Shards i
+    // stedet for ★ — den normale ★-reward-økonomi er jo lukket ved en boss.
+    // context: { bossShards, parentNode }
+    enterBoss(context = null) {
+        this._node       = context?.parentNode ?? null;
+        this._mode       = 'boss';
+        this._bossShards = context?.bossShards ?? 0;
+
+        // Threshold-Shards er garanteret uanset cap-valg — tildel dem med det samme
+        if (this._bossShards > 0) this._gs.addShards(this._bossShards);
+
+        this._el    = document.createElement('div');
+        this._el.id = 'reward-screen';
+        document.body.appendChild(this._el);
+
+        this._ui.setScore(this._gs.score);
+
+        const choices = this._pickBossCaps();
+
+        if (choices.length === 0) {
+            this._doBossSkip();
+            return;
+        }
+
+        this._choices  = choices;
+        this._selected = null;
+        this._render(choices);
+
+        this._el.addEventListener('click', e => {
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) { this._confirm(quickPick.dataset.key); return; }
+            const card = e.target.closest('.reward-card[data-key]');
+            if (card) {
+                const key = card.dataset.key;
+                const def = this._choices.find(c => c.name === key);
+                if (def) this._ui.showCapDetail(def, false, {
+                    label:    'PICK',
+                    color:    '#000',
+                    callback: () => this._confirm(key),
+                });
+                return;
+            }
+            if (e.target.closest('#reward-skip-btn')) this._doBossSkip();
+        });
+    }
+
     exit() {
         this._el?.remove();
         this._el = null;
@@ -108,6 +155,7 @@ export class RewardScreen {
         if (!this._el) return;
         const choices = this._mode === 'enchant' ? this._pickEnchantChoices()
                       : this._mode === 'relic'   ? this._pickRelics()
+                      : this._mode === 'boss'    ? this._pickBossCaps()
                       : this._pickCaps();
         if (choices.length === 0) return;
         this._choices  = choices;
@@ -121,6 +169,12 @@ export class RewardScreen {
         this._gs.score += SKIP_BONUS;
         this._ui.setScore(this._gs.score);
         this._ui.showScoreGain(SKIP_BONUS);
+        if (this.onContinue) this.onContinue();
+    }
+
+    // Boss-skip giver Shards, ikke ★ — den normale reward-økonomi gælder ikke her
+    _doBossSkip() {
+        this._gs.addShards(1);
         if (this.onContinue) this.onContinue();
     }
 
@@ -146,15 +200,26 @@ export class RewardScreen {
     _pickEnchantChoices() {
         const caps = this._gs.ownedCaps;
         if (caps.length === 0) return [];
-        return [0, 1, 2].map(() => ({
-            entry:      caps[Math.floor(Math.random() * caps.length)],
-            enchantDef: ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)],
-        }));
+        return [0, 1, 2].map(() => {
+            const entry = caps[Math.floor(Math.random() * caps.length)];
+            // Udeluk capens nuværende enchant — at "vinde" det den allerede har er ingen reward
+            const pool  = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
+            const enchantDef = pool[Math.floor(Math.random() * pool.length)];
+            return { entry, enchantDef };
+        });
     }
 
     _pickCaps() {
         const unowned = CAP_DEFS.filter(c => !this._gs.ownedCaps.some(o => o.def.name === c.name));
         return unowned.sort(() => Math.random() - 0.5).slice(0, 3);
+    }
+
+    // Boss-reward: kun rare/legendary, uowned foretrukket, duplikater som fallback
+    _pickBossCaps() {
+        const pool    = CAP_DEFS.filter(c => (c.rarity ?? 1) >= 3);
+        const unowned = pool.filter(c => !this._gs.ownedCaps.some(o => o.def.name === c.name));
+        const source  = unowned.length >= 3 ? unowned : pool;
+        return [...source].sort(() => Math.random() - 0.5).slice(0, 3);
     }
 
     _pickRelics() {
@@ -165,11 +230,11 @@ export class RewardScreen {
     }
 
     _render(choices) {
-        const nodeLabel = this._mode === 'enchant'
-            ? 'Enchant Reward'
+        const nodeLabel = this._mode === 'enchant' ? 'Enchant Reward'
+            : this._mode === 'boss' ? `Boss Defeated! +${this._bossShards}🔶`
             : (this._node?.type === 'relic' ? 'Relic Event' : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!'));
-        const sub = this._mode === 'enchant'
-            ? 'Choose a cap from your collection to enchant'
+        const sub = this._mode === 'enchant' ? 'Choose a cap from your collection to enchant'
+            : this._mode === 'boss' ? 'Choose a rare cap — or skip for +1 more Shard'
             : (this._mode === 'relic'
                 ? 'Choose a relic — permanent passive bonus'
                 : 'Choose a cap for your collection');
@@ -180,9 +245,11 @@ export class RewardScreen {
                 ? this._relicCards(choices)
                 : this._capCards(choices));
 
+        const skipLabel = this._mode === 'boss' ? '+1🔶' : `+${SKIP_BONUS}★`;
+
         this._el.innerHTML = `
             <button id="reward-skip-btn">
-                SKIP &nbsp;<span class="reward-skip-bonus">+${SKIP_BONUS}★</span>
+                SKIP &nbsp;<span class="reward-skip-bonus">${skipLabel}</span>
             </button>
             <div class="reward-title-box">
                 <h2 class="reward-title">${nodeLabel}</h2>
@@ -211,7 +278,7 @@ export class RewardScreen {
         const seriesLabel = s => s.replaceAll('_', ' ');
         return caps.map(cap => {
             const r           = this._rarityInfo(cap.rarity ?? 1);
-            const effectLabel = cap.effect ? EFFECT_LABELS[cap.effect] ?? cap.effect : '';
+            const effectLabel = cap.effect ? effectName(cap.effect) : '';
             const effectBadge = effectLabel
                 ? `<div class="reward-effect">${effectLabel}</div>` : '';
             return `<div class="reward-card" data-key="${cap.name}">

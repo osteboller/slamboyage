@@ -1,11 +1,12 @@
 import { THROWS_PER_ROUND, SLAMMER_DEFS } from '../config/constants.js';
-import { EFFECT_LABELS } from '../game/effects/labels.js';
+import { effectName } from '../game/effects/labels.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
 import { REWARD_UPGRADE_ICONS } from '../config/trickShotDefs.js';
 
 export class MapScreen {
-    constructor({ gameState }) {
+    constructor({ gameState, ui }) {
         this._gameState   = gameState;
+        this._ui          = ui;
         this._el          = null;
         this.onNodeSelect = null;
         this.onBack       = null;
@@ -45,11 +46,24 @@ export class MapScreen {
                 if (nodeDef?.trickShot && this.onTrickShot) this.onTrickShot(nodeDef.trickShot, nodeDef);
                 return;
             }
-            const branchNode = e.target.closest('.map-branch-node.available');
+            // Boss-node: klik viser/skjuler info-sticker (samme mekanik som
+            // enchant/transform-resultater) — går ALDRIG direkte i kamp herfra,
+            // "Next"-knappen er den eneste vej ind, så info kan læses uden risiko.
+            const bossNode = e.target.closest('.map-node--boss');
+            if (bossNode) {
+                const idx     = parseInt(bossNode.dataset.idx, 10);
+                const nodeDef = this._gameState.runNodes[idx];
+                if (nodeDef?.boss) this._ui.showBossInfoSticker(nodeDef.boss);
+                return;
+            }
+            // Trick Shot-gren: klik viser/skjuler info-sticker (samme mekanik som
+            // boss-noden) — går ALDRIG direkte ind i udfordringen herfra,
+            // "⚡"-knappen i action-baren er den eneste vej ind.
+            const branchNode = e.target.closest('.map-branch-node');
             if (branchNode) {
                 const idx     = parseInt(branchNode.dataset.tsIdx, 10);
                 const nodeDef = this._gameState.runNodes[idx];
-                if (nodeDef?.trickShot && this.onTrickShot) this.onTrickShot(nodeDef.trickShot, nodeDef);
+                if (nodeDef?.trickShot) this._ui.showTrickShotInfoSticker(nodeDef.trickShot);
                 return;
             }
             const node = e.target.closest('.map-node.current');
@@ -96,7 +110,7 @@ export class MapScreen {
 
         // Caps
         const capsHTML = gs.ownedCaps.map(({ def, enchant }) => {
-            const effectLabel = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : null;
+            const effectLabel = def.effect ? effectName(def.effect) : null;
             const badges = [
                 effectLabel ? `<span class="col-badge effect">${effectLabel}</span>`  : '',
                 enchant     ? `<span class="col-badge enchant">${enchant}</span>`     : '',
@@ -175,19 +189,24 @@ export class MapScreen {
 
         const nodesHTML = gs.runNodes.map((node, i) => {
             const isRelic = node.type === 'relic';
-            let cls = 'map-node' + (isRelic ? ' map-node--relic' : '');
+            const isBoss  = !!node.boss;
+            let cls = 'map-node' + (isRelic ? ' map-node--relic' : '') + (isBoss ? ' map-node--boss' : '');
             let icon = '';
             if      (i < gs.nodeIndex)  { cls += ' done';    icon = '✓'; }
-            else if (i === gs.nodeIndex) { cls += ' current'; icon = isRelic ? '◎' : '▶'; }
-            else                         { cls += ' locked';  icon = isRelic ? '◎' : '?'; }
+            else if (i === gs.nodeIndex) { cls += ' current'; icon = isRelic ? '◎' : (isBoss ? node.boss.icon : '▶'); }
+            else                         { cls += ' locked';  icon = isRelic ? '◎' : (isBoss ? node.boss.icon : '?'); }
 
             const line = i < gs.runNodes.length - 1
                 ? `<div class="map-line ${i < gs.nodeIndex ? 'done' : ''}"></div>`
                 : '';
 
+            // Bossens identitet + gimmick vises fra start (ikke skjult som Trick Shot) —
+            // spilleren skal kunne indrette sin cap-samling efter det på forhånd.
             const nameHTML = isRelic
                 ? `<div class="map-node-name map-node-relic-label">Relic</div>`
-                : `<div class="map-node-name">${node.name}</div>`;
+                : isBoss
+                    ? `<div class="map-node-name" title="${node.boss.description}">${node.boss.name}</div>`
+                    : `<div class="map-node-name">${node.name}</div>`;
 
             const scoreHTML = isRelic ? '' :
                 `<div class="map-node-score">Goal<span class="map-node-score-val">${node.clearScore}★</span></div>`;
@@ -265,9 +284,6 @@ export class MapScreen {
             </div>` : '';
 
         return `<div class="map-inner">
-            <div class="map-topbar">
-                <h1 class="map-title">SLAMBERZ</h1>
-            </div>
             <div class="map-hint">Tap a node to play</div>
             <div class="map-path">${nodesHTML}</div>
             ${actionBarHTML}

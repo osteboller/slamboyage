@@ -9,6 +9,7 @@ export class StartScreen {
         this.onNewRun      = null; // () => {}
         this.onContinueRun = null; // () => {}
         this.onFreeMode    = null; // () => {}
+        this.onDevSkipToBoss = null; // () => {}
     }
 
     enter() {
@@ -41,6 +42,12 @@ export class StartScreen {
                 const caps   = CAP_DEFS.filter(d => d.series === series);
                 this._gameState.ownedCaps = [];
                 caps.forEach(def => this._gameState.gainCap(def));
+            }
+            if (e.target.closest('#dev-skip-to-boss-btn')) {
+                this._gameState.startRun();
+                this._gameState.nodeIndex = this._gameState.runNodes.length - 1; // sidste node = boss
+                this._gameState.score     = 999; // nok til at teste "sidste chance"-shop-advarslen med
+                if (this.onDevSkipToBoss) this.onDevSkipToBoss();
             }
         });
     }
@@ -75,11 +82,13 @@ export class StartScreen {
             <div id="dev-btns">
                 <button id="dev-add-score-btn">DEV +100★</button>
                 <button id="dev-enchant-caps-btn">DEV ENCHANT CAPS</button>
+                <button id="dev-skip-to-boss-btn">DEV SKIP TO BOSS</button>
                 <div id="dev-series-btns">
                     <button data-dev-series="pewl_ballz">PEWLS</button>
                     <button data-dev-series="raptor_strike">RAPTORS</button>
                     <button data-dev-series="scary_skullz">SKULLZ</button>
                     <button data-dev-series="cosmic_caps">COSMIC</button>
+                    <button data-dev-series="dawgz">DAWGZ</button>
                 </div>
             </div>`;
     }

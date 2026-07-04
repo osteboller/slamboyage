@@ -38,6 +38,21 @@
     white-space: nowrap;
 }
 
+/* ── "Sidste chance"-advarsel før en boss-node ─────────────────────────────── */
+.shop-boss-warning {
+    align-self: center;
+    background: #f2c8c8;
+    border: 3px solid #7a1f28;
+    box-shadow: 3px 3px 0px #4a1015;
+    padding: 6px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(10px, 1.8vw, 13px);
+    font-weight: 700;
+    color: #7a1f28;
+    text-align: center;
+    transform: rotate(1deg);
+}
+
 /* ── 2-kolonne grid: venstre (band+packs) og højre (actions) ─────────────── */
 .shop-main {
     flex: 1;
@@ -315,6 +330,27 @@ button.band-price-tag.cant-afford {
     color: var(--text-muted);
     cursor: default;
     pointer-events: none;
+}
+/* Ability-navn under pris-skiltet — under artworket i stedet for oven på det. */
+.band-effect-sticker {
+    position: absolute;
+    bottom: -48px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #000;
+    color: #fff;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: clamp(7px, 1.6vw, 9px);
+    line-height: 1.6;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    z-index: 1;
 }
 .band-price-tag.band-sold-label {
     background: #444;

@@ -59,6 +59,9 @@ export class BattleScreen {
             this._ui.clearRunInfo();
         }
 
+        if (node?.boss) this._ui.setBossInfo(node.boss);
+        else            this._ui.clearBossInfo();
+
         this._roundMgr.onNewStack = () => { this._settleMaxR = 0; };
 
         this._roundMgr.onRoundEnd = ({ totalScore, capsFlipped }) => {
@@ -69,6 +72,7 @@ export class BattleScreen {
         };
 
         this._roundMgr.onScoreSettled = (totalScore) => {
+            this._ui.setBossActive(false); // resultatet er synligt igen — vis boss-headeren fuldt
             if (!this._node || !this._pendingBattleResult) return;
             const { won } = this._pendingBattleResult;
             // Short pause so the gain float is visible before the goal starts counting down
@@ -97,6 +101,7 @@ export class BattleScreen {
         this._input.onRelease = (x, y, z) => {
             if (this._ui.isOverlayOpen()) return;
             if (this._roundMgr.phase !== 'idle') return;
+            this._ui.setBossActive(true); // dæmp/puls boss-headeren mens kastet spiller ud
             this._roundMgr.beginThrow(x, y, z);
         };
 
@@ -133,6 +138,11 @@ export class BattleScreen {
         if (saveState) {
             this._roundMgr.resumeFrom(saveState);
         } else if (this._node && this._gameState) {
+            // Boss-node: ★ nulstilles her — "sidste chance"-advarslen i shoppen før
+            // har allerede fortalt spilleren dette. Kampens score konverteres til
+            // Shards via GameState.completeNode/calculateBossShards i stedet.
+            if (this._node.boss) this._gameState.score = 0;
+
             const ownedCaps    = this._gameState.ownedCaps;
             const featherCaps  = ownedCaps.filter(c => c.enchant === 'feather');
             const regularCaps  = ownedCaps.filter(c => c.enchant !== 'feather');
@@ -140,6 +150,8 @@ export class BattleScreen {
             const shuffled     = [...regularCaps].sort(() => Math.random() - 0.5).slice(0, drawCount);
             const stackCaps    = [...featherCaps, ...shuffled];
             this._roundMgr.buildStack(null, stackCaps, this._gameState.score);
+            // buildStack() nulstiller _activeBoss til null — sæt den derfor EFTER
+            this._roundMgr.setActiveBoss(this._node.boss ?? null);
         } else {
             this._roundMgr.buildStack();
         }
@@ -157,6 +169,8 @@ export class BattleScreen {
         this._roundMgr.onRoundEnd    = null;
         this._roundMgr.onScoreSettled = null;
         this._ui.clearRunInfo();
+        this._ui.setBossActive(false);
+        this._ui.clearBossInfo();
         this._ui.hidePauseOverlay();
         document.getElementById('corner-btns').style.display = 'none';
 

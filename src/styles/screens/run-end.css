@@ -2,6 +2,10 @@
 #run-end-screen {
     position: fixed;
     inset: 0;
+    width: 100vw;
+    height: 100vh;
+    width: 100dvw;
+    height: 100dvh; /* override — undgår mobil/fullscreen viewport-slinger, se map-screen */
     background: var(--clr-bg);
     background-image: var(--bg-dot-grid);
     background-size: var(--bg-dot-size);
@@ -9,6 +13,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 16px 0; /* luft foroven/forneden på lave/landscape-skærme */
+    overflow: hidden;
     animation: screen-fade-in 0.3s ease-out;
 }
 
@@ -19,6 +25,8 @@
     gap: 18px;
     padding: 32px 24px;
     max-width: 380px;
+    max-height: 100%;
+    overflow-y: auto;
     width: 100%;
     text-align: center;
 }

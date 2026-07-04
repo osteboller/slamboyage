@@ -103,4 +103,15 @@ export const CONSUMABLE_DEFS = [
         sellPrice:   5,
         usableIn:    ['battle'],
     },
+    {
+        id:          'skip_trickshot',
+        name:        'SKIPPY',
+        flavor:      'Peanut Pass™',
+        color:       '#996633',
+        bg:          '#f5e6d0',
+        icon:        '⏭',
+        description: 'Skip the current Trick Shot challenge — instantly claim its reward.',
+        sellPrice:   4,
+        usableIn:    ['map'],
+    },
 ];

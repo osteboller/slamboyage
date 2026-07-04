@@ -2,6 +2,7 @@ import { CAP_DEFS } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
+import { BOSS_DEFS } from '../config/bossDefs.js';
 
 const _commonCaps = CAP_DEFS.filter(c => c.rarity === 1);
 
@@ -20,6 +21,7 @@ export class GameState {
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
+        this.shards         = 0; // run-scoped valuta — kun til boss-shoppen
     }
 
     _mkCapEntry(def, enchant = null) {
@@ -45,11 +47,12 @@ export class GameState {
         this._loop          = 1;
         this.nodeIndex      = 0;
         this.score          = 0;
+        this.shards         = 0;
         this.stackSizeLimit = 10;
         // Test-hånd: demonstrerer crew, rally, halflife og gilded+streak
         const byName = name => CAP_DEFS.find(d => d.name === name);
         this.ownedCaps = [
-            this._mkCapEntry(byName('Mecha'),            'feather'),
+            this._mkCapEntry(byName('Raptor Fusion'),    'halflife'),
             this._mkCapEntry(byName('Martian Graffiti'), null),
             this._mkCapEntry(byName('Ollien'),           null),
             this._mkCapEntry(byName('Phone Homie'),      null),
@@ -63,8 +66,8 @@ export class GameState {
         this.shopOffer      = null;
         const mystixx   = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
         const twinsies  = CONSUMABLE_DEFS.find(c => c.id === 'clone');
-        const refresh   = CONSUMABLE_DEFS.find(c => c.id === 'refresh');
-        this.consumables    = [mystixx ?? null, twinsies ?? null, refresh ?? null];
+        const skippy    = CONSUMABLE_DEFS.find(c => c.id === 'skip_trickshot');
+        this.consumables    = [mystixx ?? null, twinsies ?? null, skippy ?? null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
     }
 
@@ -80,6 +83,7 @@ export class GameState {
 
     // Called after a node battle with the player's full accumulated score.
     // If score >= clearScore, the node costs clearScore ★ and the rest carries forward.
+    // Boss-noder er en undtagelse: ★ konverteres til Shards i stedet for at carry'e videre.
     completeNode(totalScore) {
         const node = this.currentNode;
         if (!node) return { won: false };
@@ -88,6 +92,11 @@ export class GameState {
             return { won: true };
         }
         const won = totalScore >= node.clearScore;
+        if (node.boss) {
+            this.score = 0; // boss-rundens ★ er kun til threshold-udregning, carry'er ikke
+            this.nodeIndex++;
+            return { won, isBoss: true, bossShards: won ? this.calculateBossShards(totalScore) : 0 };
+        }
         if (won) this.score = totalScore - node.clearScore;
         this.nodeIndex++;
         return { won };
@@ -202,6 +211,20 @@ export class GameState {
         if (node) node.rewardUpgrade = type;
     }
 
+    // ─── BOSS ─────────────────────────────────────────────────────────────────
+    // Placeholder-thresholds — skal balanceres når vi har rigtige score-tal at teste imod.
+    calculateBossShards(totalScore) {
+        let shards = 1; // garanteret for at vinde
+        if (totalScore > 500)   shards++;
+        if (totalScore > 2000)  shards++;
+        if (totalScore > 10000) shards++;
+        return shards;
+    }
+
+    addShards(amount) {
+        this.shards += amount;
+    }
+
     // ─── PRIVATE ──────────────────────────────────────────────────────────────
     _generateNodes(loop) {
         const scale = 1 + (loop - 1) * 0.5; // loop 1: ×1.0 | loop 2: ×1.5 | loop 3: ×2.0
@@ -221,14 +244,26 @@ export class GameState {
             battle.trickShot = shuffledShots[i];
         });
 
-        // Layout: 1-1, 1-2, [relic event], 1-3, 1-4, 1-5
+        // Boss-node: en ekstra, sværere afsluttende node. Synlig fra start (samme
+        // som Trick Shot) — se MapScreen for badge/preview.
+        const bossDef  = BOSS_DEFS[Math.floor(Math.random() * BOSS_DEFS.length)];
+        const bossNode = {
+            type:       'battle',
+            id:         6,
+            name:       `${loop}-BOSS`,
+            clearScore: Math.ceil(BASE_NODES[4].baseClear * scale * (bossDef.clearScoreMultiplier ?? 1.5)),
+            boss:       bossDef,
+        };
+
+        // Layout: 1-1, 1-2, 1-3, [relic event], 1-4, 1-5, [BOSS]
         return [
             battles[0],
             battles[1],
-            { type: 'relic', name: `${loop}-R` },
             battles[2],
+            { type: 'relic', name: `${loop}-R` },
             battles[3],
             battles[4],
+            bossNode,
         ];
     }
 }

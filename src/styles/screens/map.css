@@ -13,7 +13,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding-top: clamp(16px, 4vh, 32px);
+    padding-top: clamp(48px, 10vh, 80px); /* topbar med "SLAMBERZ" er fjernet — den plads den brugte skulle i sig selv give nok luft i bunden til grenene, uden at top-paddingen behøvede sænkes */
     overflow: hidden;
 }
 
@@ -23,21 +23,6 @@
     display: flex;
     flex-direction: column;
     gap: clamp(8px, 2vh, 20px);
-}
-
-.map-topbar {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-}
-
-.map-title {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 20px;
-    font-weight: 800;
-    color: #000;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
 }
 
 .map-info {
@@ -150,6 +135,41 @@
     opacity: 0.3;
     box-shadow: none;
 }
+
+/* ── Boss-node — større, rødt "fare"-tema, identitet altid tydeligt synlig ── */
+.map-node--boss .map-node-circle {
+    width: clamp(44px, 8vw, 62px);
+    height: clamp(44px, 8vw, 62px);
+    font-size: 24px;
+    border-color: #7a1f28;
+    box-shadow: 3px 3px 0px #4a1015;
+}
+.map-node--boss.done .map-node-circle {
+    border-color: #000;
+    background: var(--clr-bg-darker);
+}
+.map-node--boss.current .map-node-circle {
+    border-color: #7a1f28;
+    background: #f2c8c8;
+    box-shadow: 5px 5px 0px #4a1015;
+    animation: boss-node-pulse 1.4s ease-in-out infinite;
+}
+.map-node--boss.current:hover .map-node-circle {
+    background: #f5d8d8;
+}
+.map-node--boss.locked .map-node-circle {
+    opacity: 0.6; /* mere synlig end almindelige locked-noder — identitet skal kunne ses fra start */
+    border-color: #7a1f28;
+}
+@keyframes boss-node-pulse {
+    0%, 100% { box-shadow: 5px 5px 0px #4a1015, 0 0 0 0 rgba(122,31,40,0); }
+    50%      { box-shadow: 5px 5px 0px #4a1015, 0 0 0 8px rgba(122,31,40,0.3); }
+}
+.map-node--boss .map-node-name {
+    color: #7a1f28;
+    font-weight: 800;
+}
+.map-node--boss.locked .map-node-name { opacity: 0.7; }
 
 .map-node-label { display: none; }
 .map-node-name {

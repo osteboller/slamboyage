@@ -1,6 +1,6 @@
 import { DEFAULT_MASS, STACK_COUNT, SLAMMER_DEFS, CAP_DEFS, THROWS_PER_ROUND } from '../config/constants.js';
 import { CapViewer }      from './CapViewer.js';
-import { EFFECT_LABELS }  from '../game/effects/labels.js';
+import { effectName, effectDesc } from '../game/effects/labels.js';
 import { RELIC_DEFS }     from '../config/relicDefs.js';
 import { ENCHANT_DEFS }      from '../config/enchantDefs.js';
 import { capThumbnailHTML }  from './capThumbnail.js';
@@ -411,6 +411,20 @@ export class UIManager {
         document.getElementById('trickshot-info')?.classList.toggle('trickshot-info--active', active);
     }
 
+    // ─── BOSS INFO ───────────────────────────────────────────────────────────
+    setBossInfo(bossDef) {
+        document.getElementById('boss-info-name').textContent = `${bossDef.icon} ${bossDef.name}`;
+        document.getElementById('boss-info-desc').textContent = bossDef.description;
+        document.getElementById('boss-info').style.display = '';
+    }
+    clearBossInfo() {
+        document.getElementById('boss-info').style.display = 'none';
+    }
+    // active = true mens kastet er i gang — dæmper/pulserer headeren så udsynet til bordet er frit
+    setBossActive(active) {
+        document.getElementById('boss-info')?.classList.toggle('boss-info--active', active);
+    }
+
     // ─── THROW PIPS ──────────────────────────────────────────────────────────
     updateThrowPips(throwsLeft, throwsTotal) {
         const el = document.getElementById('throw-pips');
@@ -445,9 +459,6 @@ export class UIManager {
 
     // ─── PAUSE OVERLAY ───────────────────────────────────────────────────────
     showPauseOverlay() {
-        const scoreEl = document.getElementById('score');
-        document.getElementById('pause-score-val').textContent =
-            scoreEl ? scoreEl.textContent : '0';
         document.getElementById('pause-overlay').classList.add('open');
     }
     hidePauseOverlay() {
@@ -738,7 +749,10 @@ export class UIManager {
                     ? `<span class="cap-thumb-ghost-badge">👻</span>` : '';
                 const gsEntry     = entry.entryId != null
                     ? this._gameState?.ownedCaps.find(c => c.id === entry.entryId) : null;
-                const extraBase   = (gsEntry?.storedBonus ?? 0) + (this._getExtraBase?.(gsEntry?.id) ?? 0);
+                // Brug cappens EGEN entryId her — ikke gsEntry?.id, som er undefined
+                // for caps uden en GameState-post (ghosts fra Twinsies) og derfor
+                // ikke matcher hvad _roundCapBonuses rent faktisk er nøglet efter.
+                const extraBase   = (gsEntry?.storedBonus ?? 0) + (this._getExtraBase?.(entry.entryId) ?? 0);
                 const carryBadge  = extraBase > 0
                     ? `<span class="cap-thumb-carry-badge">+${extraBase}</span>` : '';
                 return capThumbnailHTML(
@@ -787,7 +801,7 @@ export class UIManager {
         if (!gs) return;
 
         const capsHTML = gs.ownedCaps.map(({ id, def, enchant }) => {
-            const effectLabel = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : null;
+            const effectLabel = def.effect ? effectName(def.effect) : null;
             const badges = [
                 effectLabel ? `<span class="col-badge effect">${effectLabel}</span>` : '',
                 enchant     ? `<span class="col-badge enchant">${enchant}</span>`    : '',
@@ -958,17 +972,22 @@ export class UIManager {
         const detail    = document.getElementById('cap-detail');
         const nameEl    = document.getElementById('cap-detail-name');
         const subEl     = document.getElementById('cap-detail-sub');
+        const descEl    = document.getElementById('cap-detail-desc');
         const actionEl  = document.getElementById('cap-detail-action');
 
         nameEl.textContent = def.name;
         const seriesLabel  = def.series?.replace(/_/g, ' ') ?? '';
-        const effectLabel  = def.effect ? (EFFECT_LABELS[def.effect] ?? def.effect) : '';
+        const effectLabel  = def.effect ? effectName(def.effect) : '';
+        if (descEl) descEl.textContent = def.effect ? effectDesc(def.effect) : '';
 
         const gsEntry2     = capOrEntry.entryId != null
             ? this._gameState?.ownedCaps.find(c => c.id === capOrEntry.entryId)
             : (capOrEntry.storedBonus != null ? capOrEntry : null);
         const storedBonus2 = gsEntry2?.storedBonus ?? 0;
-        const extraBase2   = storedBonus2 + (this._getExtraBase?.(gsEntry2?.id) ?? 0);
+        // Samme fix som pile-overlayet: brug cappens/entryens EGEN id, ikke
+        // gsEntry2?.id — ellers matcher ghosts (uden GameState-post) aldrig.
+        const lookupId2    = capOrEntry.entryId ?? capOrEntry.id ?? null;
+        const extraBase2   = storedBonus2 + (this._getExtraBase?.(lookupId2) ?? 0);
 
         subEl.innerHTML = [seriesLabel, effectLabel].filter(Boolean)
             .map(t => `<span>${t}</span>`).join(' · ')
@@ -1101,6 +1120,60 @@ export class UIManager {
         }).join('');
     }
 
+    // Fælles mount for de "sticker"-resultat-popups (enchant/transform/blanco):
+    // klik ØVERALT på skærmen skipper dem hurtigere — ikke kun et klik ramt
+    // præcis på selve stickeren — og det klik sluges centralt (samme
+    // _suppressNextClick-mekanisme som cap-detail bruger) så det ikke også
+    // rammer noget bagved.
+    _mountDismissableSticker(el, duration, onDismiss = null) {
+        document.body.appendChild(el);
+        let timer;
+        const cleanup = () => {
+            clearTimeout(timer);
+            document.removeEventListener('pointerdown', onAnyPointerdown);
+        };
+        const dismiss = () => {
+            cleanup();
+            el.classList.add('enchant-result-sticker--out');
+            if (onDismiss) onDismiss();
+        };
+        const onAnyPointerdown = () => {
+            this._suppressNextClick = true;
+            dismiss();
+        };
+        timer = setTimeout(dismiss, duration);
+        // Udskudt til næste tick — ellers fanger denne listener det SAMME klik
+        // der lige åbnede stickeren (kaldet der udløste den kan stadig være
+        // midt i sin egen pointerdown-bobling, fx via showCapPicker).
+        setTimeout(() => document.addEventListener('pointerdown', onAnyPointerdown), 0);
+        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+    }
+
+    // Boss-info-sticker fra kortet — klik hvor som helst (eller vent) skjuler den
+    // igen, ligesom enchant/transform-resultaterne. Ren info, ingen handling.
+    showBossInfoSticker(bossDef) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#7a1f28;font-size:32px;padding:14px 12px 10px;text-align:center;color:#fff;">${bossDef.icon}</div>
+            <div class="enchant-result-name" style="color:#7a1f28;">${bossDef.name}</div>
+            <div class="enchant-result-desc">${bossDef.description}</div>`;
+        this._mountDismissableSticker(el, 5000);
+    }
+
+    // Trick Shot-info-sticker fra kortet — samme mekanik som boss-info-stickeren.
+    // Ren info (navn/beskrivelse/pris), ingen handling — kun "⚡"-knappen i
+    // action-baren rent faktisk starter forsøget.
+    showTrickShotInfoSticker(trickShotDef) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#f5c842;font-size:32px;padding:14px 12px 10px;text-align:center;color:#000;">${trickShotDef.icon}</div>
+            <div class="enchant-result-name" style="color:#a68000;">${trickShotDef.name}</div>
+            <div class="enchant-result-desc">${trickShotDef.description} (−${trickShotDef.cost}★)</div>`;
+        this._mountDismissableSticker(el, 5000);
+    }
+
     showEnchantResult(enchantDef, capEntry = null) {
         const el = document.createElement('div');
         el.className = 'enchant-result-sticker';
@@ -1119,11 +1192,7 @@ export class UIManager {
             ${capRowHTML}
             <div class="enchant-result-name">${enchantDef.name}</div>
             <div class="enchant-result-desc">${enchantDef.description}</div>`;
-        document.body.appendChild(el);
-        const dismiss = () => el.classList.add('enchant-result-sticker--out');
-        const timer = setTimeout(dismiss, 2600);
-        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
-        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+        this._mountDismissableSticker(el, 2600);
     }
 
     showBlancoResult(count, onOpen) {
@@ -1133,11 +1202,7 @@ export class UIManager {
             <div class="enchant-result-icon" style="background:#222;font-size:36px;padding:14px 12px 10px;text-align:center;">🃏</div>
             <div class="enchant-result-name" style="color:#222;">BLANCO</div>
             <div class="enchant-result-desc">All ${count} caps rerolled — opening collection…</div>`;
-        document.body.appendChild(el);
-        const dismiss = () => { el.classList.add('enchant-result-sticker--out'); onOpen?.(); };
-        const timer = setTimeout(dismiss, 1400);
-        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
-        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+        this._mountDismissableSticker(el, 1400, onOpen);
     }
 
     showTransformResult(oldDef, newDef) {
@@ -1151,11 +1216,7 @@ export class UIManager {
             </div>
             <div class="enchant-result-name" style="color:#5a7a20;">${newDef.name}</div>
             <div class="enchant-result-desc">${newDef.series?.replace(/_/g, ' ') ?? ''}</div>`;
-        document.body.appendChild(el);
-        const dismiss = () => el.classList.add('enchant-result-sticker--out');
-        const timer = setTimeout(dismiss, 2600);
-        el.addEventListener('pointerdown', () => { clearTimeout(timer); dismiss(); });
-        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+        this._mountDismissableSticker(el, 2600);
     }
 
     // Cap-picker overlay: shows all owned caps, calls onPick(entry) when one is tapped

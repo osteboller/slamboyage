@@ -1,6 +1,6 @@
 import { CAP_DEFS } from '../config/constants.js';
 import { CAP_PRICE } from '../config/mapData.js';
-import { EFFECT_LABELS } from '../game/effects/labels.js';
+import { effectName } from '../game/effects/labels.js';
 import { RELIC_DEFS } from '../config/relicDefs.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
@@ -455,7 +455,7 @@ export class ShopScreen {
     _packCapCards(caps) {
         return caps.map(cap => {
             const r     = this._rarityInfo(cap.rarity ?? 1);
-            const effL  = cap.effect ? (EFFECT_LABELS[cap.effect] ?? cap.effect) : '';
+            const effL  = cap.effect ? effectName(cap.effect) : '';
             const badge = effL ? `<div class="reward-effect">${effL}</div>` : '';
             return `<div class="reward-card" data-key="${cap.name}">
                 <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
@@ -499,7 +499,7 @@ export class ShopScreen {
             }
             const entry  = { def: item.def, enchant: item.enchant ?? null };
             const r      = this._rarityInfo(item.def.rarity ?? 1);
-            const effL   = item.def.effect ? (EFFECT_LABELS[item.def.effect] ?? item.def.effect) : '';
+            const effL   = item.def.effect ? effectName(item.def.effect) : '';
             const eDef   = item.enchant ? ENCHANT_DEFS.find(e => e.id === item.enchant) : null;
             return `<div class="reward-card" data-key="${i}">
                 <div class="reward-rarity reward-rarity--${r.cls}">CAP · ${r.label}</div>
@@ -562,11 +562,19 @@ export class ShopScreen {
         const canReroll  = gs.canAfford(gs.rerollCost);
         const canDiscard = gs.ownedCaps.length > 0;
 
+        // Boss-nodens ★ nulstilles helt ved kampens start — sidste chance for
+        // at bruge det hele her, ellers går det tabt.
+        const bossWarningHTML = nextNode?.boss ? `
+            <div class="shop-boss-warning">
+                ⚠ Last chance to spend your ★ — ${nextNode.boss.name} resets your score to 0!
+            </div>` : '';
+
         return `
 <div class="shop-inner">
 
   <!-- ── Title ───────────────────────────────────────────────────────── -->
   <div class="shop-title-sticker">SHOP</div>
+  ${bossWarningHTML}
 
   <!-- ── 2-kolonne: venstre (band+packs) | højre (actions) ───────────── -->
   <div class="shop-main">
@@ -657,6 +665,7 @@ export class ShopScreen {
                 </div>`;
             }
 
+            const bandEffL = item.def.effect ? effectName(item.def.effect) : '';
             return `<div class="band-item ${animClass}" ${animStyle}>
                 <div class="band-slot-box">
                     ${capThumbnailHTML({ def: item.def, enchant: item.enchant, id: item.def.name }, { imgClass: 'band-cap-img', idAttr: 'data-cap-name' })}
@@ -665,6 +674,7 @@ export class ShopScreen {
                         data-band-idx="${i}" ${canBuy ? '' : 'disabled'}>
                     ${item.price}★
                 </button>
+                ${bandEffL ? `<div class="band-effect-sticker">${bandEffL}</div>` : ''}
             </div>`;
         }).join('');
     }
