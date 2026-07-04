@@ -36,6 +36,7 @@
     <link rel="stylesheet" href="src/styles/screens/run-end.css">
     <link rel="stylesheet" href="src/styles/screens/shop.css">
     <link rel="stylesheet" href="src/styles/screens/trickshot.css">
+    <link rel="stylesheet" href="src/styles/screens/boss-shop.css">
 </head>
 <body>
     <div id="canvas-container"></div>
@@ -61,10 +62,6 @@
 
     <!-- ── Pause overlay (run mode) ──────────────────────────────────────────── -->
     <div id="pause-overlay">
-        <div id="pause-score-sticker">
-            <p class="pause-score-label">Score</p>
-            <div id="pause-score-val">0</div>
-        </div>
         <div id="pause-panel">
             <div class="pause-header">
                 <h2>Paused</h2>
@@ -94,6 +91,12 @@
     <div id="trickshot-info" style="display:none">
         <div id="trickshot-name"></div>
         <p id="trickshot-desc"></p>
+    </div>
+
+    <!-- Boss gimmick header — vises kun under en boss-kamp -->
+    <div id="boss-info" style="display:none">
+        <div id="boss-info-name"></div>
+        <p id="boss-info-desc"></p>
     </div>
 
     <!-- Trick Shot result overlay -->
@@ -236,6 +239,7 @@
         <div id="cap-detail-rarity"></div>
         <div id="cap-detail-name"></div>
         <div id="cap-detail-sub"></div>
+        <div id="cap-detail-desc"></div>
         <div class="cap-viewer-wrap">
             <div id="cap-viewer-container"></div>
             <button id="cap-detail-action" style="display:none"></button>
