@@ -2,7 +2,7 @@
 
 ## Hvad er lavet (dag 10)
 
-### Trick Shot — fuld map-integration 
+### Trick Shot — fuld map-integration
 
 Sidste punkt fra dag 9's prioritetsliste er nu færdigt. Egen `TrickShotScreen` (ikke en gren af `BattleScreen`), genbruger den delte 3D-infrastruktur men har sit eget `enter()`/`exit()`/loop.
 
