@@ -1,4 +1,4 @@
-import { CAP_DEFS } from '../config/constants.js';
+import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
@@ -13,11 +13,11 @@ export class GameState {
         this.nodeIndex      = 0;
         this.stackSizeLimit = 10;
         this.ownedCaps      = [];
-        this.ownedRelics    = [];
+        this.ownedSlammers  = [];
         this._loop          = 1;
         this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
-        this.rerollCost     = 1;
-        this.discardCost    = 2;
+        this._rerollCostBase  = 1;
+        this._discardCostBase = 2;
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
@@ -59,10 +59,15 @@ export class GameState {
             this._mkCapEntry(byName("Surfin' Alien"),    null),
             this._mkCapEntry(byName('Space Rockera'),    'gilded'),
         ].filter(e => e.def);
-        this.ownedRelics    = [];
+        // Starter-slammer: altid Regal Pug — den er bevidst passiv-løs, hvilket
+        // passer perfekt som en "neutral" starter. Fremtidig idé: karaktervalg
+        // med egne startere — se docs/slammer-passives-draft.md.
+        this.ownedSlammers  = [];
+        const starterSlammer = SLAMMER_DEFS.find(s => s.name === 'Regal Pug');
+        if (starterSlammer) this.addSlammer(starterSlammer);
         this.runNodes       = this._generateNodes(1);
-        this.rerollCost     = 1;
-        this.discardCost    = 2;
+        this._rerollCostBase  = 1;
+        this._discardCostBase = 2;
         this.shopOffer      = null;
         const mystixx   = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
         const twinsies  = CONSUMABLE_DEFS.find(c => c.id === 'clone');
@@ -76,8 +81,8 @@ export class GameState {
         this._loop++;
         this.nodeIndex   = 0;
         this.runNodes    = this._generateNodes(this._loop);
-        this.rerollCost  = 1;
-        this.discardCost = 2;
+        this._rerollCostBase  = 1;
+        this._discardCostBase = 2;
         this.shopOffer   = null;
     }
 
@@ -87,7 +92,7 @@ export class GameState {
     completeNode(totalScore) {
         const node = this.currentNode;
         if (!node) return { won: false };
-        if (node.type === 'relic') {
+        if (node.type === 'slammer') {
             this.nodeIndex++;
             return { won: true };
         }
@@ -102,15 +107,18 @@ export class GameState {
         return { won };
     }
 
-    // ─── RELICS ───────────────────────────────────────────────────────────────
+    // ─── SLAMMER PASSIVES ─────────────────────────────────────────────────────
+    // Erstatter det tidligere relic-system 1:1 — se docs/slammer-passives-draft.md.
+    // Passiver virker for ALLE ejede slammere, uanset hvilken man rent faktisk
+    // kaster med (jf. "Besluttet" #1 i draften).
     // Individual multipliers in application order — lets the UI reveal them one by one
     get multiplierChain() {
-        const global = this.ownedRelics
-            .filter(r => r.type === 'globalMultiplier')
-            .map(r => r.value);
-        const saver = this.ownedRelics
-            .filter(r => r.type === 'throwSaver' && (r.currentValue ?? 1.0) > 1.0)
-            .map(r => r.currentValue);
+        const global = this.ownedSlammers
+            .filter(s => s.passive?.type === 'globalMultiplier')
+            .map(s => s.passive.value);
+        const saver = this.ownedSlammers
+            .filter(s => s.passive?.type === 'throwSaver' && (s.passive.currentValue ?? 1.0) > 1.0)
+            .map(s => s.passive.currentValue);
         return [...global, ...saver];
     }
 
@@ -118,25 +126,33 @@ export class GameState {
         return this.multiplierChain.reduce((m, v) => m * v, 1);
     }
 
-    get flatRelicBonus() {
-        return this.ownedRelics
-            .filter(r => r.type === 'flatBonus')
-            .reduce((sum, r) => sum + r.value, 0);
+    get flatSlammerBonus() {
+        return this.ownedSlammers
+            .filter(s => s.passive?.type === 'flatBonus')
+            .reduce((sum, s) => sum + s.passive.value, 0);
     }
 
     get throwBonus() {
-        return this.ownedRelics
-            .filter(r => r.type === 'extraThrow')
-            .reduce((sum, r) => sum + r.value, 0);
+        return this.ownedSlammers
+            .filter(s => s.passive?.type === 'extraThrow')
+            .reduce((sum, s) => sum + s.passive.value, 0);
     }
 
-    hasRelic(relicId)  { return this.ownedRelics.some(r => r.id === relicId); }
+    hasSlammer(name)  { return this.ownedSlammers.some(s => s.name === name); }
 
-    addRelic(relicDef) {
-        const entry = { ...relicDef };
-        if (entry.type === 'throwSaver') entry.currentValue = 1.0;
-        this.ownedRelics.push(entry);
-        if (entry.type === 'stackSize') this.stackSizeLimit += entry.value;
+    addSlammer(slammerDef) {
+        const entry = { ...slammerDef, passive: slammerDef.passive ? { ...slammerDef.passive } : null };
+        if (entry.passive?.type === 'throwSaver') entry.passive.currentValue = 1.0;
+        this.ownedSlammers.push(entry);
+        if (entry.passive?.type === 'stackSize') this.stackSizeLimit += entry.passive.value;
+    }
+
+    sellSlammer(name) {
+        const entry = this.ownedSlammers.find(s => s.name === name);
+        if (!entry) return;
+        this.score += entry.sellPrice ?? 0;
+        if (entry.passive?.type === 'stackSize') this.stackSizeLimit -= entry.passive.value;
+        this.ownedSlammers = this.ownedSlammers.filter(s => s.name !== name);
     }
 
     // ─── CONSUMABLES ──────────────────────────────────────────────────────────
@@ -165,6 +181,16 @@ export class GameState {
     canAfford(price)      { return this.score >= price; }
     hasCapDef(capDef)     { return this.ownedCaps.some(c => c.def.name === capDef.name); }
 
+    // Discount-slammer (Bargain Bin) — halverer alle shop-priser (band, packs, reroll, discard).
+    get shopDiscountMult() {
+        return this.ownedSlammers.some(s => s.passive?.type === 'shopDiscount') ? 0.5 : 1;
+    }
+    // Underliggende "råt" beløb ganges med rabatten ved aflæsning — selve
+    // fordoblingen (useReroll/useDiscard) sker på råt-feltet, så rabatten altid
+    // regnes frisk og ikke driver skævt hvis slammeren hentes midt i et shop-besøg.
+    get rerollCost()  { return Math.max(1, Math.ceil(this._rerollCostBase  * this.shopDiscountMult)); }
+    get discardCost() { return Math.max(1, Math.ceil(this._discardCostBase * this.shopDiscountMult)); }
+
     gainCap(capDef) {
         this.ownedCaps.push(this._mkCapEntry(capDef));
     }
@@ -182,14 +208,14 @@ export class GameState {
 
     // Reroll top band — cost doubles each use per loop
     useReroll() {
-        this.score      -= this.rerollCost;
-        this.rerollCost *= 2;
+        this.score           -= this.rerollCost;
+        this._rerollCostBase *= 2;
     }
 
     // Discard a cap — costs the player ★, doubles each use per loop
     useDiscard(capId) {
-        this.score       -= this.discardCost;
-        this.discardCost *= 2;
+        this.score            -= this.discardCost;
+        this._discardCostBase *= 2;
         this.ownedCaps    = this.ownedCaps.filter(c => c.id !== capId);
     }
 
@@ -209,6 +235,12 @@ export class GameState {
     markRewardUpgraded(nodeId, type = 'enchant') {
         const node = this.runNodes.find(n => n.id === nodeId);
         if (node) node.rewardUpgrade = type;
+    }
+
+    // Trick Shot-opgraderingen erstatter nodens baseline-reward, den lægger
+    // ikke oveni (reward-chests-draft.md "Besluttet" #7). null/undefined = ingen reward.
+    effectiveReward(node) {
+        return node?.rewardUpgrade ?? node?.reward ?? null;
     }
 
     // ─── BOSS ─────────────────────────────────────────────────────────────────
@@ -235,13 +267,48 @@ export class GameState {
             clearScore: Math.ceil(n.baseClear * scale),
         }));
 
-        // Tilknyt Trick Shots til 2 tilfældige battle-noder (MAP_AND_SHOP_SPEC.md: "2 per run").
-        // battles[0] (1-1) udelukkes — spilleren starter med 0★ og kan aldrig have råd der.
+        // Node 1 (battles[0]): altid helt tom — 0★ ved start, ingen baseline-
+        // reward og aldrig noget Trick Shot (se også eligibleBattles nedenfor).
+        battles[0].reward = null;
+
+        // Baseline-reward-rulle pr. node (jf. reward-chests-draft.md "Besluttet"
+        // #6) — knyttet til NODEN, ikke til om den har et Trick Shot. Placeholder-
+        // vægte, tunes senere iterativt (ikke mere DaM-research, jf. draften).
         const eligibleBattles = battles.slice(1);
-        const shuffledBattles = [...eligibleBattles].sort(() => Math.random() - 0.5);
-        const shuffledShots   = [...TRICK_SHOTS].sort(() => Math.random() - 0.5);
-        shuffledBattles.slice(0, Math.min(2, TRICK_SHOTS.length)).forEach((battle, i) => {
-            battle.trickShot = shuffledShots[i];
+        const REWARD_ROLL = ['silver', 'silver', 'silver', 'enchant', 'mystery'];
+        eligibleBattles.forEach(b => {
+            b.reward = REWARD_ROLL[Math.floor(Math.random() * REWARD_ROLL.length)];
+        });
+
+        // "Pity"-loft (draftens punkt 12): mindst 1 (nogle gange 2) af de 4 noder
+        // skal mangle baseline-reward, men højst 1 af dem må forblive HELT tom
+        // (uden Trick Shot) — resten af de reward-løse noder SKAL kompenseres.
+        const noRewardCount    = Math.random() < 0.5 ? 1 : 2;
+        const shuffledForEmpty = [...eligibleBattles].sort(() => Math.random() - 0.5);
+        const emptyNodes       = shuffledForEmpty.slice(0, noRewardCount);
+        emptyNodes.forEach(b => { b.reward = null; });
+
+        // Trick Shots: 2 pr. run (MAP_AND_SHOP_SPEC.md). Alle reward-løse noder
+        // udover den ene "frikort"-tomme SKAL have et Trick Shot — resten af
+        // pladserne fordeles tilfældigt mellem den valgfrie tomme node og de
+        // almindelige noder, så det varierer om den ender helt tom eller ej.
+        const shuffledShots = [...TRICK_SHOTS].sort(() => Math.random() - 0.5);
+        const tsCount       = Math.min(2, TRICK_SHOTS.length);
+        const mustGetTS     = Math.max(0, emptyNodes.length - 1);
+        const emptyShuffled = [...emptyNodes].sort(() => Math.random() - 0.5);
+        const restShuffled  = eligibleBattles.filter(b => !emptyNodes.includes(b)).sort(() => Math.random() - 0.5);
+        const guaranteed    = emptyShuffled.slice(0, mustGetTS);
+        const optionalPool  = [...emptyShuffled.slice(mustGetTS), ...restShuffled].sort(() => Math.random() - 0.5);
+        const tsTargets     = [...guaranteed, ...optionalPool].slice(0, tsCount);
+
+        // Trick Shot-reward-typen tildeles PR. NODE (ikke fast pr. trick-shot-
+        // type) og må aldrig matche nodens egen baseline — ellers er clearing
+        // meningsløst (draftens punkt 9). Inkluderer aldrig sølv (punkt 11).
+        const TS_REWARD_ROLL = ['gold', 'gold', 'gold', 'enchant', 'mystery'];
+        tsTargets.forEach((battle, i) => {
+            const excluded = (battle.reward === 'enchant' || battle.reward === 'mystery') ? battle.reward : null;
+            const pool     = TS_REWARD_ROLL.filter(t => t !== excluded);
+            battle.trickShot = { ...shuffledShots[i], rewardType: pool[Math.floor(Math.random() * pool.length)] };
         });
 
         // Boss-node: en ekstra, sværere afsluttende node. Synlig fra start (samme
@@ -255,12 +322,12 @@ export class GameState {
             boss:       bossDef,
         };
 
-        // Layout: 1-1, 1-2, 1-3, [relic event], 1-4, 1-5, [BOSS]
+        // Layout: 1-1, 1-2, 1-3, [slammer event], 1-4, 1-5, [BOSS]
         return [
             battles[0],
             battles[1],
             battles[2],
-            { type: 'relic', name: `${loop}-R` },
+            { type: 'slammer', name: `${loop}-R` },
             battles[3],
             battles[4],
             bossNode,

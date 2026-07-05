@@ -286,6 +286,9 @@
 }
 #first-strike-badge, #last-stand-badge {
     position: absolute;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     font-size: 11px;
@@ -293,6 +296,13 @@
     white-space: nowrap;
     border: 3px solid #000;
     pointer-events: none;
+}
+.slammer-badge-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid #000;
 }
 #first-strike-badge {
     top: -46px;
@@ -378,6 +388,37 @@
     font-size: 11px;
     color: #f2c8c8;
     margin: 2px 0 0;
+}
+
+/* Pr.-kast parity-feedback (Even Steven/Odd Todd) — sidder ØVERST PÅ selve
+   gimmick-stickeren (ikke løs nede ved scoren), så check/kryds altid vises
+   lige ved siden af forklaringen på HVORFOR kastet tæller eller ej. */
+#boss-info-feedback {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 17px;
+    border: 3px solid #000;
+    box-shadow: 2px 2px 0px #000;
+    transform: rotate(6deg);
+}
+#boss-info-feedback.boss-info-feedback--show { display: flex; }
+#boss-info-feedback.boss-info-feedback--pass { background: #2a9d5c; color: #fff; }
+#boss-info-feedback.boss-info-feedback--fail { background: #e05050; color: #fff; }
+#boss-info-feedback.boss-info-feedback--pop  { animation: boss-info-feedback-pop 0.5s ease-out; }
+@keyframes boss-info-feedback-pop {
+    0%   { transform: rotate(6deg) scale(0.4); opacity: 0; }
+    35%  { transform: rotate(6deg) scale(1.25); opacity: 1; }
+    60%  { transform: rotate(6deg) scale(1);    opacity: 1; }
+    100% { transform: rotate(6deg) scale(1);    opacity: 1; }
 }
 
 /* ─── RESULTS PANEL ──────────────────────────────────────────────────────── */

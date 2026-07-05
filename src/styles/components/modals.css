@@ -221,6 +221,24 @@
 #cap-detail-rarity.rarity--rare      { display: block; background: var(--clr-red);  color: #fff; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
 #cap-detail-rarity.rarity--legendary { display: block; background: #f5c842;         color: #000; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
 
+#slammer-detail-rarity {
+    display: none;
+    position: absolute;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 5px 11px;
+    border: 3px solid #000;
+    top: -16px; left: -14px;
+    transform: rotate(-4deg);
+}
+#slammer-detail-rarity.rarity--common    { display: block; background: #000;            color: #fff; }
+#slammer-detail-rarity.rarity--uncommon  { display: block; background: #5d5f5f;         color: #fff; }
+#slammer-detail-rarity.rarity--rare      { display: block; background: var(--clr-red);  color: #fff; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
+#slammer-detail-rarity.rarity--legendary { display: block; background: #f5c842;         color: #000; top: -16px; right: -14px; left: auto; transform: rotate(4deg); }
+
 /* ─── RELIC / CARD DETAIL ────────────────────────────────────────────────── */
 #relic-detail {
     display: none;
@@ -310,9 +328,21 @@
     margin: 10px auto 0;
     width: 160px;
 }
-#slammer-equip-btn {
+#slammer-detail-passive {
+    margin: 8px auto 0;
+    width: 160px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.3;
+}
+#slammer-detail-actions {
+    display: flex;
+    gap: 6px;
     margin-top: 12px;
-    width: 100%;
+}
+#slammer-equip-btn {
+    flex: 1;
     padding: 8px 0;
     background: #000;
     color: #fff;
@@ -328,6 +358,38 @@
 #slammer-equip-btn:active {
     box-shadow: var(--shadow-pressed);
     transform: translate(2px, 2px);
+}
+#slammer-sell-btn {
+    flex: 1;
+    padding: 8px 0;
+    background: var(--clr-red);
+    color: #fff;
+    border: 3px solid #000;
+    box-shadow: var(--shadow-sticker);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.08s;
+}
+#slammer-sell-btn:active {
+    box-shadow: var(--shadow-pressed);
+    transform: translate(2px, 2px);
+}
+
+/* Korte viewports (mobil landskab-tilstand) — #cap-detail/#slammer-detail er
+   dead-centreret uden højde-loft, så på et kort viewport går toppen (rarity-
+   badgen, som bevidst stikker -16px uden for panelets egen kant) og bunden
+   (equip/sell-knapperne) uden for det synlige billede. `overflow`+scroll ville
+   løse det, men ville SAMTIDIG klippe rarity-badgen (den ligger uden for
+   panelets boks via negativ offset) — skalerer derfor i stedet HELE popup'en
+   proportionalt ned omkring dens eget centrum, så alt (badge inklusive)
+   forbliver synligt og placeret korrekt.
+*/
+@media (max-height: 520px) {
+    #cap-detail     { transform: translate(-50%, -50%) rotate(-1deg) scale(0.72); }
+    #slammer-detail { transform: translate(-50%, -50%) rotate(1deg)  scale(0.72); }
 }
 #slammer-equip-btn:disabled {
     background: var(--clr-bg-darker);

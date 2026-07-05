@@ -35,17 +35,62 @@ export const GROUND_HALF_SIZE = 30;
 // mass:      fysik-legemets masse — tung slammer afbøjes ikke af caps, ruller langsommere
 // precision: power-barens svingehastighed — høj = langsom bar = nemmere at time
 // rating:    UI-visning 1–5, uafhængigt af de mekaniske værdier
+// Rarity: 1=common 2=uncommon 3=rare 4=legendary (samme skala som CAP_DEFS).
+// sellPrice pr. rarity: 2★/4★/7★/12★ (se docs/slammer-passives-draft.md).
+// passive: samme shape som RELIC_DEFS brugte — { id, name, icon, type, value, description, [rarity|parity] }.
+// null = ingen passiv endnu (kun Regal Pug, bevidst — den var "ekstra" allerede før udvidelsen).
 export const SLAMMER_DEFS = [
-    { name: 'Raptor Slammer', type: 'raptor', texFront: 'assets/slammers/raptor_slammer_front.png', texBack: 'assets/slammers/raptor_slammer_b.png', rimColor: 0x7a5410, mass: 3.5, power: 0.55, precision: 1.00, rating: { power: 3, precision: 3, weight: 3 } },
-    { name: 'Yin Yang',       type: 'holo',   texFront: 'assets/slammers/ying_yang.png',            texBack: 'assets/slammers/ying_yang_b.png',         rimColor: 0x111111, mass: 2.5, power: 0.48, precision: 1.40, rating: { power: 2, precision: 5, weight: 2 } },
-    { name: 'Skull Slammer',  type: 'skull',  texFront: 'assets/slammers/skull_slammer.png',        texBack: 'assets/slammers/skull_slammer_b.png',     rimColor: 0x000000, mass: 5.0, power: 0.62, precision: 0.65, rating: { power: 4, precision: 1, weight: 4 } },
+    { name: 'Raptor Slammer', type: 'raptor', texFront: 'assets/slammers/raptor_slammer_front.png', texBack: 'assets/slammers/raptor_slammer_b.png', rimColor: 0x7a5410, mass: 3.5, power: 0.55, precision: 1.00, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'uncommon_ground', name: 'Uncommon Ground', icon: '◐', type: 'rarityMultiplier', rarity: 2, value: 3, description: 'Uncommon caps score ×3' } },
+    { name: 'Yin Yang',       type: 'holo',   texFront: 'assets/slammers/ying_yang.png',            texBack: 'assets/slammers/ying_yang_b.png',         rimColor: 0x111111, mass: 2.5, power: 0.48, precision: 1.40, rating: { power: 2, precision: 5, weight: 2 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'twin_stack', name: 'Twin Stack', icon: '⬡', type: 'stackSize', value: 5, description: 'Stack size +5' } },
+    { name: 'Skull Slammer',  type: 'skull',  texFront: 'assets/slammers/skull_slammer.png',        texBack: 'assets/slammers/skull_slammer_b.png',     rimColor: 0x000000, mass: 5.0, power: 0.62, precision: 0.65, rating: { power: 4, precision: 1, weight: 4 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'power_surge', name: 'Power Surge', icon: '◆', type: 'flatBonus', value: 2, description: '+2★ to every cap scored' } },
     // Placeholder-stats — afventer gennemtænkning af hele slammer-systemet.
-    { name: 'Corgi Butt',     type: 'corgi',  texFront: 'assets/slammers/slammer_dawgz_01_corgi_butt.png',    texBack: 'assets/slammers/slammer_dawgz_01_corgi_butt_b.png',    rimColor: 0xd9a441, mass: 3.0, power: 0.50, precision: 1.10, rating: { power: 3, precision: 4, weight: 2 } },
-    { name: 'Game of Bones',  type: 'bones',  texFront: 'assets/slammers/slammer_dawgz_02_game_of_bones.png', texBack: 'assets/slammers/slammer_dawgz_02_game_of_bones_b.png', rimColor: 0xcac2b0, mass: 4.0, power: 0.58, precision: 0.90, rating: { power: 4, precision: 2, weight: 4 } },
-    { name: 'Raptor Sigil',   type: 'raptor', texFront: 'assets/slammers/10_raptor_sigel.png',        texBack: 'assets/slammers/raptor_slammer_b.png',            rimColor: 0xccaa33, mass: 3.5, power: 0.56, precision: 1.05, rating: { power: 3, precision: 4, weight: 3 } },
-    { name: 'Alien Bronze',   type: 'alien',  texFront: 'assets/slammers/alien_slammer_bronze.png',   texBack: 'assets/slammers/alien_slammer_bronze_back_2.png', rimColor: 0xcd7f32, mass: 4.2, power: 0.60, precision: 0.80, rating: { power: 4, precision: 2, weight: 4 } },
-    { name: 'Alien Silver',   type: 'alien',  texFront: 'assets/slammers/alien_slammer_silver.png',   texBack: 'assets/slammers/alien_slammer_silver_back.png',   rimColor: 0xc0c0c0, mass: 3.2, power: 0.52, precision: 1.15, rating: { power: 3, precision: 4, weight: 3 } },
-    { name: 'Alien Gold',     type: 'alien',  texFront: 'assets/slammers/alien_slammer_pizza.png',    texBack: 'assets/slammers/alien_slammer_gold_back.png',     rimColor: 0xffd700, mass: 2.8, power: 0.50, precision: 1.30, rating: { power: 2, precision: 5, weight: 2 } },
+    { name: 'Corgi Butt',     type: 'corgi',  texFront: 'assets/slammers/slammer_dawgz_01_corgi_butt.png',    texBack: 'assets/slammers/slammer_dawgz_01_corgi_butt_b.png',    rimColor: 0xd9a441, mass: 3.0, power: 0.50, precision: 1.10, rating: { power: 3, precision: 4, weight: 2 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'bargain_bin', name: 'Bargain Bin', icon: '%', type: 'shopDiscount', value: 0.5, description: 'All shop prices ×0.5' } },
+    { name: 'Game of Bones',  type: 'bones',  texFront: 'assets/slammers/slammer_dawgz_02_game_of_bones.png', texBack: 'assets/slammers/slammer_dawgz_02_game_of_bones_b.png', rimColor: 0xcac2b0, mass: 4.0, power: 0.58, precision: 0.90, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'deep_bag', name: 'Deep Bag', icon: '▣', type: 'stackSize', value: 3, description: 'Stack size +3' } },
+    { name: 'Raptor Sigil',   type: 'raptor', texFront: 'assets/slammers/10_raptor_sigel.png',        texBack: 'assets/slammers/raptor_slammer_b.png',            rimColor: 0xccaa33, mass: 3.5, power: 0.56, precision: 1.05, rating: { power: 3, precision: 4, weight: 3 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'first_strike', name: 'First Strike', icon: '①', type: 'firstThrow', value: 4, description: 'First throw of a round ×4' } },
+    { name: 'Alien Bronze',   type: 'alien',  texFront: 'assets/slammers/alien_slammer_bronze.png',   texBack: 'assets/slammers/alien_slammer_bronze_back_2.png', rimColor: 0xcd7f32, mass: 4.2, power: 0.60, precision: 0.80, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'extra_arm', name: 'Extra Arm', icon: '✋', type: 'extraThrow', value: 1, description: '+1 throw every round' } },
+    { name: 'Alien Silver',   type: 'alien',  texFront: 'assets/slammers/alien_slammer_silver.png',   texBack: 'assets/slammers/alien_slammer_silver_b.png',   rimColor: 0xc0c0c0, mass: 3.2, power: 0.52, precision: 1.15, rating: { power: 3, precision: 4, weight: 3 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'rare_find', name: 'Rare Find', icon: '◇', type: 'rarityMultiplier', rarity: 3, value: 4, description: 'Rare caps score ×4' } },
+    { name: 'Alien Gold',     type: 'alien',  texFront: 'assets/slammers/alien_slammer_pizza.png',    texBack: 'assets/slammers/alien_slammer_gold_b.png',     rimColor: 0xffd700, mass: 2.8, power: 0.50, precision: 1.30, rating: { power: 2, precision: 5, weight: 2 },
+        rarity: 4, sellPrice: 12,
+        passive: { id: 'legendary_status', name: 'Legendary Status', icon: '★', type: 'rarityMultiplier', rarity: 4, value: 5, description: 'Legendary caps score ×5' } },
+    { name: 'Regal Pug',      type: 'corgi',  texFront: 'assets/slammers/slammer_dawgz_03_regal_pug.png',     texBack: 'assets/slammers/slammer_dawgz_03_regal_pug_b.png',     rimColor: 0xb8860b, mass: 3.3, power: 0.53, precision: 1.05, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 1, sellPrice: 2,
+        passive: null }, // bevidst passiv-løs — se docs/slammer-passives-draft.md
+    { name: 'Swamp Skull',    type: 'skull',  texFront: 'assets/slammers/skull_slam_swamp.png',       texBack: 'assets/slammers/skull_slam_swamp_b.png',       rimColor: 0x3a4a2a, mass: 4.6, power: 0.59, precision: 0.75, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'iron_discipline', name: 'Iron Discipline', icon: '⊛', type: 'throwSaver', value: 0.1, description: 'Each unused throw adds ×0.1 · Current: ×1.0' } },
+    { name: 'Voodoo Skull',   type: 'skull',  texFront: 'assets/slammers/skull_slam_voodoo.png',      texBack: 'assets/slammers/skull_slam_voodoo_b.png',      rimColor: 0xb0aec0, mass: 3.6, power: 0.54, precision: 1.20, rating: { power: 3, precision: 4, weight: 3 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'magnet', name: 'Magnet', icon: '◉', type: 'flatBonus', value: 1, description: '+1★ to every cap scored' } },
+    // Crypt Keeper har ingen egen bagside endnu — genbruger seriens fælles
+    // Skull-bagside (jf. "fælles bagside pr. serie"-konvention i slammer-passives-draft.md).
+    { name: 'Crypt Keeper',   type: 'skull',  texFront: 'assets/slammers/skull_slam_crypt_keeper.png', texBack: 'assets/slammers/skull_slammer_b.png',         rimColor: 0x1a1a1a, mass: 4.0, power: 0.57, precision: 0.95, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 4, sellPrice: 12,
+        passive: { id: 'last_stand', name: 'Last Stand', icon: '⑤', type: 'lastThrow', value: 4, description: 'Last throw of a round ×4' } },
+    { name: 'Pewl 69',        type: 'pewl',   texFront: 'assets/slammers/pewlz_slammer_69.png',       texBack: 'assets/slammers/pewlz_slammer_69_b.png',       rimColor: 0xd4af37, mass: 2.6, power: 0.49, precision: 1.25, rating: { power: 2, precision: 4, weight: 2 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'even_steven_slam', name: 'Even Steven', icon: '⚁', type: 'parityMultiplier', parity: 'even', value: 2, description: 'Throws with an EVEN number of flips score ×2' } },
+    { name: 'Pewl 420',       type: 'pewl',   texFront: 'assets/slammers/pewlz_slammer_420.png',      texBack: 'assets/slammers/pewlz_slammer_420_b.png',      rimColor: 0x4a7a3a, mass: 3.4, power: 0.51, precision: 1.10, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'common_touch', name: 'Common Touch', icon: '●', type: 'rarityMultiplier', rarity: 1, value: 2, description: 'Common caps score ×2' } },
+    { name: 'Pewl 666',       type: 'pewl',   texFront: 'assets/slammers/pewlz_slammer_666.png',      texBack: 'assets/slammers/pewlz_slammer_666_b.png',      rimColor: 0x5a1a1a, mass: 4.4, power: 0.61, precision: 0.70, rating: { power: 4, precision: 1, weight: 4 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'odd_todd_slam', name: 'Odd Todd', icon: '⚂', type: 'parityMultiplier', parity: 'odd', value: 2, description: 'Throws with an ODD number of flips score ×2' } },
 ];
 
 // ─── SETTLE / DÆMPNING ───────────────────────────────────────────────────────

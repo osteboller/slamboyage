@@ -53,7 +53,8 @@ consumables.onUse = (def) => {
     if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); }
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
-        if (currentScreenName === 'reward' || currentScreenName === 'relic-choice' || currentScreenName === 'enchant-reward') rewardScreen.reroll?.();
+        const rerollableRewardScreens = new Set(['reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
+        if (rerollableRewardScreens.has(currentScreenName)) rewardScreen.reroll?.();
     }
     if (def.id === 'clone') {
         const remaining = roundMgr.remainingCaps;
@@ -136,7 +137,7 @@ const rewardScreen    = new RewardScreen(deps);
 const bossShopScreen  = new BossShopScreen(deps);
 const runEndScreen    = new RunEndScreen(deps);
 
-const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'relic-choice', 'enchant-reward', 'boss-reward', 'boss-shop']);
+const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -169,7 +170,9 @@ document.getElementById('map-btn')?.addEventListener('click', () => {
     if (document.getElementById('map-screen')) { closePeekMap(); return; }
     mapScreen.onBack       = closePeekMap;
     mapScreen.onNodeSelect = null;
+    mapScreen.onTrickShot  = null;
     mapScreen.enter();
+    mapScreen.setPeekMode(true);
     if (mapScreen._el) mapScreen._el.style.animation = 'screen-fade-in 0.18s ease-out forwards';
 });
 
@@ -194,8 +197,9 @@ function showScreen(name, context = null) {
         if (RUN_SCREENS.has(name)) ui.showRunOverlay();
         else                       ui.hideRunOverlay();
 
-        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'relic-choice', 'enchant-reward']);
-        const contextName = (name === 'relic-choice' || name === 'enchant-reward') ? 'reward' : name;
+        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
+        const rewardLikeScreens = new Set(['slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
+        const contextName = rewardLikeScreens.has(name) ? 'reward' : name;
         if (CONSUMABLE_SCREENS.has(name)) { consumables.setContext(contextName); consumables.show(); }
         else                              consumables.hide();
 
@@ -232,12 +236,13 @@ function showScreen(name, context = null) {
             };
             mapScreen.onNodeSelect = (node) => {
                 returnToAfterMap = 'start';
-                if (node.type === 'relic') showScreen('relic-choice', node);
-                else                       showScreen('battle', node);
+                if (node.type === 'slammer') showScreen('slammer-choice', node);
+                else                         showScreen('battle', node);
             };
             mapScreen.onTrickShot = (trickShotDef, parentNode) => {
                 showScreen('trickshot', { trickShotDef, parentNode });
             };
+            mapScreen.setPeekMode(false);
             mapScreen.enter();
 
         } else if (name === 'battle') {
@@ -248,9 +253,11 @@ function showScreen(name, context = null) {
                 const ownedCaps  = [...gameState.ownedCaps];
                 const result     = gameState.completeNode(totalScore);
                 if (result.won) {
-                    if (result.isBoss)                          showScreen('boss-reward', { bossShards: result.bossShards, parentNode: nodePlayed });
-                    else if (nodePlayed.rewardUpgrade === 'enchant') showScreen('enchant-reward', nodePlayed);
-                    else                                        showScreen('reward', nodePlayed);
+                    if (result.isBoss) { showScreen('boss-reward', { bossShards: result.bossShards, parentNode: nodePlayed }); return; }
+                    // Cap-valget (3 stk) er en fast, garanteret reward efter HVER node —
+                    // den ekstra kiste/enchant/mystery-reward (hvis noden har en) følger
+                    // bagefter, se 'reward'-routen nedenfor.
+                    showScreen('reward', nodePlayed);
                 } else {
                     showScreen('run-end', { node: nodePlayed, totalScore, loop, ownedCaps });
                 }
@@ -265,13 +272,33 @@ function showScreen(name, context = null) {
 
         } else if (name === 'reward') {
             currentScreen = rewardScreen;
-            rewardScreen.onContinue = () => showScreen('shop');
+            rewardScreen.onContinue = () => {
+                // Efter det garanterede cap-valg: nodens EGEN ekstra reward-type følger
+                // (hvis den har en) — Trick Shot-opgraderingen erstatter baseline, den
+                // stabler ikke (reward-chests-draft.md "Besluttet" #7).
+                const effectiveReward = gameState.effectiveReward(context);
+                if      (effectiveReward === 'enchant') showScreen('enchant-reward', context);
+                else if (effectiveReward === 'mystery') showScreen('mystery-reward', context);
+                else if (effectiveReward === 'gold')    showScreen('chest-reward', { node: context, tier: 'gold' });
+                else if (effectiveReward === 'silver')  showScreen('chest-reward', { node: context, tier: 'silver' });
+                else showScreen('shop'); // ingen ekstra reward — direkte til shop
+            };
             rewardScreen.enter(context);
 
         } else if (name === 'enchant-reward') {
             currentScreen = rewardScreen;
             rewardScreen.onContinue = () => showScreen('shop');
             rewardScreen.enterEnchant(context);
+
+        } else if (name === 'chest-reward') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => showScreen('shop');
+            rewardScreen.enterChest(context);
+
+        } else if (name === 'mystery-reward') {
+            currentScreen = rewardScreen;
+            rewardScreen.onContinue = () => showScreen('shop');
+            rewardScreen.enterMystery(context);
 
         } else if (name === 'boss-reward') {
             currentScreen = rewardScreen;
@@ -287,7 +314,7 @@ function showScreen(name, context = null) {
             };
             bossShopScreen.enter();
 
-        } else if (name === 'relic-choice') {
+        } else if (name === 'slammer-choice') {
             currentScreen = rewardScreen;
             rewardScreen.onContinue = () => {
                 gameState.completeNode(0);

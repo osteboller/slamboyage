@@ -328,6 +328,22 @@
     line-height: 1.4;
 }
 
+/* Bonus-sticker på Trick Shot-info-stickeren — viser hvad rewarden opgraderes
+   TIL, som et ekstra "påklistret" mærke nederst, adskilt fra selve beskrivelsen. */
+.trickshot-reward-bonus {
+    background: #f5c842;
+    color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+    padding: 6px 10px;
+    border-top: 3px solid #000;
+    margin-top: -1px;
+}
+
 .transform-result-img {
     width: 54px;
     height: 54px;

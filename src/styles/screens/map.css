@@ -338,8 +338,17 @@
     color: #fff;
     transform: rotate(1deg);
 }
-.map-action-btn--next:hover  { box-shadow: 2px 2px 0px #000; transform: rotate(1deg) translate(2px,2px); }
-.map-action-btn--next:active { box-shadow: none; transform: rotate(1deg) translate(4px,4px); }
+.map-action-btn--next:hover:not(:disabled)  { box-shadow: 2px 2px 0px #000; transform: rotate(1deg) translate(2px,2px); }
+.map-action-btn--next:active:not(:disabled) { box-shadow: none; transform: rotate(1deg) translate(4px,4px); }
+.map-action-btn--next:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Peek-mode (map-btn fra shop/battle) — knapperne skal se tydeligt inaktive ud,
+   så man ikke tror man kan springe videre/bruge Trick Shot herfra. */
+.map-action-bar--peek .map-action-btn {
+    filter: grayscale(1);
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 
 .map-action-btn--trickshot {
     background: #f5c842;

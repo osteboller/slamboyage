@@ -261,6 +261,46 @@
     box-shadow: 2px 2px 0px #8b5a00;
     color: #c87f00;
 }
+
+/* Uncommon-garanteret pack — matcher rarity--uncommon farven brugt i cap/slammer-detail */
+.pack--uncommon .pack-icon-box {
+    background: rgba(93,95,95,0.15);
+    border-color: #5d5f5f;
+    box-shadow: 3px 3px 0px #3a3b3b;
+}
+.pack--uncommon .pack-type  { color: #5d5f5f; }
+.pack--uncommon .pack-price {
+    border-color: #5d5f5f;
+    box-shadow: 2px 2px 0px #3a3b3b;
+    color: #5d5f5f;
+}
+
+/* Rare-garanteret pack (caps eller slammers) — matcher rarity--rare farven */
+.pack--rare .pack-icon-box {
+    background: rgba(211,47,47,0.12);
+    border-color: var(--clr-red);
+    box-shadow: 3px 3px 0px #7a1f1f;
+}
+.pack--rare .pack-type  { color: var(--clr-red); }
+.pack--rare .pack-price {
+    border-color: var(--clr-red);
+    box-shadow: 2px 2px 0px #7a1f1f;
+    color: var(--clr-red);
+}
+
+/* Holo pack — alle 3 valg garanteret enchantede, shimmer-baggrund så den skiller sig ud */
+.pack--holo .pack-icon-box {
+    background: linear-gradient(135deg, #ff9a9e, #fad0c4, #a1c4fd, #c2e9fb, #ff9a9e);
+    background-size: 300% 300%;
+    animation: pack-holo-shift 3s ease infinite;
+    border-color: #000;
+}
+.pack--holo .pack-type { color: #7722cc; }
+@keyframes pack-holo-shift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
 .pack-choice--card .pack-relic-icon {
     font-size: 32px;
     text-align: center;

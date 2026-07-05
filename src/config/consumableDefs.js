@@ -99,7 +99,7 @@ export const CONSUMABLE_DEFS = [
         color:       '#1144aa',
         bg:          '#d8e8ff',
         icon:        '◈',
-        description: 'Next throw: all Relics trigger one extra time.',
+        description: 'Next throw: all Slammer passives trigger one extra time.',
         sellPrice:   5,
         usableIn:    ['battle'],
     },

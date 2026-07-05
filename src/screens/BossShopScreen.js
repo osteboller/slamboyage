@@ -1,6 +1,6 @@
-import { CAP_DEFS } from '../config/constants.js';
-import { RELIC_DEFS } from '../config/relicDefs.js';
+import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
+import { pickWeightedItems } from '../config/rarityWeights.js';
 
 // Dedikeret shop der kun vises efter en clearet boss-node. Bruger Shards (run-
 // scoped valuta, kun tjent ved bosses), ikke ★ — den almindelige ShopScreen er
@@ -40,16 +40,17 @@ export class BossShopScreen {
     // ─── PRIVATE ──────────────────────────────────────────────────────────────
 
     _buildOffer() {
-        const rareCaps = CAP_DEFS.filter(c =>
-            (c.rarity ?? 1) >= 3 && !this._gs.ownedCaps.some(o => o.def.name === c.name));
-        const relics = RELIC_DEFS.filter(r => !this._gs.hasRelic(r.id));
+        // Owned caps sorteres ikke fra — duplikater er fair spil. Rarity vægtes
+        // efter gs.loop ligesom resten af shoppen (rarityWeights.js).
+        const rareCaps = CAP_DEFS.filter(c => (c.rarity ?? 1) >= 3);
+        const slammers = SLAMMER_DEFS.filter(s => !this._gs.hasSlammer(s.name));
 
-        const capItems = [...rareCaps].sort(() => Math.random() - 0.5).slice(0, 3)
+        const capItems = pickWeightedItems(rareCaps, this._gs.loop, 3)
             .map(def => ({ kind: 'cap', def, cost: (def.rarity ?? 1) >= 4 ? 3 : 2, bought: false }));
-        const relicItems = [...relics].sort(() => Math.random() - 0.5).slice(0, 2)
-            .map(def => ({ kind: 'relic', def, cost: 3, bought: false }));
+        const slammerItems = [...slammers].sort(() => Math.random() - 0.5).slice(0, 2)
+            .map(def => ({ kind: 'slammer', def, cost: 3, bought: false }));
 
-        return [...capItems, ...relicItems];
+        return [...capItems, ...slammerItems];
     }
 
     _buy(idx) {
@@ -57,7 +58,7 @@ export class BossShopScreen {
         if (!item || item.bought || this._gs.shards < item.cost) return;
         this._gs.shards -= item.cost;
         if (item.kind === 'cap') this._gs.gainCap(item.def);
-        else                     this._gs.addRelic(item.def);
+        else                     this._gs.addSlammer(item.def);
         item.bought = true;
         this._render();
     }
@@ -67,7 +68,7 @@ export class BossShopScreen {
             const canAfford = !item.bought && this._gs.shards >= item.cost;
             const thumbHTML = item.kind === 'cap'
                 ? capThumbnailHTML(item.def, { imgClass: 'boss-shop-cap-img' })
-                : `<div class="boss-shop-relic-icon">${item.def.icon}</div>`;
+                : `<img class="boss-shop-cap-img" src="${item.def.texFront}" alt="${item.def.name}">`;
             const costHTML = item.bought ? 'SOLD' : `${item.cost}🔶`;
             return `<div class="boss-shop-item ${item.bought ? 'bought' : ''} ${canAfford ? '' : 'cant-afford'}" data-idx="${i}">
                 ${thumbHTML}

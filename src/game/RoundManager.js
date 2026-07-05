@@ -244,12 +244,14 @@ export class RoundManager {
         this._ui.hideResults();
         this._ui.updateThrowPips(this._throwsTotal, this._throwsTotal);
 
-        const relics = this._gs?.ownedRelics ?? [];
-        if (relics.some(r => r.type === 'firstThrow')) this._ui.showFirstStrikeBadge();
-        else                                            this._ui.hideFirstStrikeBadge();
+        const slammers = this._gs?.ownedSlammers ?? [];
+        const firstStrikeSlammer = slammers.find(s => s.passive?.type === 'firstThrow');
+        if (firstStrikeSlammer) this._ui.showFirstStrikeBadge(firstStrikeSlammer);
+        else                    this._ui.hideFirstStrikeBadge();
         // Last Stand only visible on the last throw — hide at start unless round is 1 throw
-        if (relics.some(r => r.type === 'lastThrow') && this._throwsTotal === 1) this._ui.showLastStandBadge();
-        else                                                                       this._ui.hideLastStandBadge();
+        const lastStandSlammer = slammers.find(s => s.passive?.type === 'lastThrow');
+        if (lastStandSlammer && this._throwsTotal === 1) this._ui.showLastStandBadge(lastStandSlammer);
+        else                                              this._ui.hideLastStandBadge();
         this._ui.updatePileButtons(this.caps, [], this._geb);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
@@ -341,8 +343,8 @@ export class RoundManager {
         this._phase = 'idle';
 
         if (this._throwsLeft === 1) {
-            const hasLastStand = (this._gs?.ownedRelics ?? []).some(r => r.type === 'lastThrow');
-            if (hasLastStand) this._ui.showLastStandBadge();
+            const lastStandSlammer = (this._gs?.ownedSlammers ?? []).find(s => s.passive?.type === 'lastThrow');
+            if (lastStandSlammer) this._ui.showLastStandBadge(lastStandSlammer);
         }
     }
 
@@ -623,7 +625,7 @@ export class RoundManager {
         });
 
         // ── Phase 3+4: per-cap score med flat bonus + global multiplier-kæde ──
-        const flatRelicBonus  = this._gs?.flatRelicBonus   ?? 0;
+        const flatSlammerBonus = this._gs?.flatSlammerBonus ?? 0;
         const multChain       = this._gs?.multiplierChain  ?? [];
         const doubleStacks    = this._gs?.activeDouble ?? 0;
         if (doubleStacks > 0 && this._gs) { this._gs.activeDouble = 0; this._ui.hideDoubleBadge(); }
@@ -631,12 +633,17 @@ export class RoundManager {
 
         const isFirstThrow    = this._pendingThrowsDone === 0;
         const isLastThrow     = this._throwsLeft === 1;
-        const relics          = this._gs?.ownedRelics ?? [];
-        const firstMult       = isFirstThrow ? relics.filter(r => r.type === 'firstThrow').reduce((m, r) => m * r.value, 1) : 1;
-        const lastMult        = isLastThrow  ? relics.filter(r => r.type === 'lastThrow' ).reduce((m, r) => m * r.value, 1) : 1;
+        const slammers        = this._gs?.ownedSlammers ?? [];
+        const firstMult       = isFirstThrow ? slammers.filter(s => s.passive?.type === 'firstThrow').reduce((m, s) => m * s.passive.value, 1) : 1;
+        const lastMult        = isLastThrow  ? slammers.filter(s => s.passive?.type === 'lastThrow' ).reduce((m, s) => m * s.passive.value, 1) : 1;
         if (isFirstThrow) this._ui.hideFirstStrikeBadge();
         if (isLastThrow)  this._ui.hideLastStandBadge();
-        const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : [])];
+        // Parity-slammere (Even Steven/Odd Todd) — hele kastets antal flips afgør
+        // om de matcher, ligesom boss-gimmicken, men her som en ren bonus (ikke veto).
+        const flipCount       = actualWon.length;
+        const parityMult      = slammers.filter(s => s.passive?.type === 'parityMultiplier')
+            .reduce((m, s) => (flipCount % 2 === (s.passive.parity === 'even' ? 0 : 1) ? m * s.passive.value : m), 1);
+        const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : []), ...(parityMult > 1 ? [parityMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
 
         // Boss-gimmick multiplier (Even Steven/Odd Todd/No Glam Fam) — holdes UDENFOR
@@ -650,6 +657,14 @@ export class RoundManager {
             : 1;
         const finalGlobalMult = globalMult * bossMult;
 
+        // Parity-boss feedback (Even Steven/Odd Todd) — et grønt flueben/rødt kryds
+        // pr. kast så spilleren straks kan se OM og HVORFOR kastet scorer 0, i
+        // stedet for bare at se en score-float på +0 uden forklaring.
+        if (this._activeBoss && actualWon.length > 0 &&
+            (this._activeBoss.gimmick === 'even_steven' || this._activeBoss.gimmick === 'odd_todd')) {
+            this._ui.showBossThrowFeedback(bossMult > 0);
+        }
+
         const voltage    = this._voltageBonus ?? 0;
         const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
             const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
@@ -662,9 +677,15 @@ export class RoundManager {
             if ((bonus ?? 0) > 0 && cap.entryId != null) {
                 this._roundCapBonuses.set(cap.entryId, roundBonus + (bonus ?? 0));
             }
-            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatRelicBonus + voltage) * (localMultiplier ?? 1));
-            const finalScore = Math.floor(capScore * finalGlobalMult);
-            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: positionChain, carry };
+            // Rarity-slammere (Common/Uncommon/Rare/Legendary-fokus) — kun caps af den
+            // matchende rarity ganges, så det vises i DENNE caps egen chain, ikke i
+            // den delte positionChain (som gælder alle caps i kastet).
+            const rarityMult = slammers.filter(s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === (cap.def?.rarity ?? 1))
+                .reduce((m, s) => m * s.passive.value, 1);
+            const capChain   = rarityMult > 1 ? [...positionChain, rarityMult] : positionChain;
+            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1));
+            const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult);
+            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry };
         });
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
 
@@ -749,13 +770,14 @@ export class RoundManager {
         } else {
             // Unused throws → grow throwSaver multiplier
             if (this._throwsLeft > 0 && this._gs) {
-                this._gs.ownedRelics
-                    .filter(r => r.type === 'throwSaver')
-                    .forEach(r => {
-                        const oldValue = r.currentValue ?? 1.0;
-                        r.currentValue = oldValue + this._throwsLeft * r.value;
-                        r.description  = `Each unused throw adds ×${r.value} · Current: ×${r.currentValue.toFixed(1)}`;
-                        this._ui.showRelicGain(r.icon, oldValue, r.currentValue, this._throwsLeft);
+                this._gs.ownedSlammers
+                    .filter(s => s.passive?.type === 'throwSaver')
+                    .forEach(s => {
+                        const p = s.passive;
+                        const oldValue = p.currentValue ?? 1.0;
+                        p.currentValue = oldValue + this._throwsLeft * p.value;
+                        p.description  = `Each unused throw adds ×${p.value} · Current: ×${p.currentValue.toFixed(1)}`;
+                        this._ui.showRelicGain(p.icon, oldValue, p.currentValue, this._throwsLeft);
                     });
             }
             // HALFLIFE: persist earned bonuses for flipped caps, decay unflipped

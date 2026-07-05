@@ -1,7 +1,6 @@
-import { THROWS_PER_ROUND, SLAMMER_DEFS } from '../config/constants.js';
+import { THROWS_PER_ROUND } from '../config/constants.js';
 import { effectName } from '../game/effects/labels.js';
-import { RELIC_DEFS } from '../config/relicDefs.js';
-import { REWARD_UPGRADE_ICONS } from '../config/trickShotDefs.js';
+import { REWARD_TYPE_ICONS } from '../config/trickShotDefs.js';
 
 export class MapScreen {
     constructor({ gameState, ui }) {
@@ -11,6 +10,15 @@ export class MapScreen {
         this.onNodeSelect = null;
         this.onBack       = null;
         this.onTrickShot  = null;
+        this._peek        = false; // sand mens kortet er et "peek"-overlay (fx via map-btn fra shop)
+    }
+
+    // Peek-mode: kortet vises kun til info/orientering — "Next"/"Trick Shot"-knapperne
+    // skal se og fungere som inaktive, ellers kan man springe resten af shoppen over
+    // og risikere at dræne score uden at have haft chancen for at bruge den.
+    setPeekMode(active) {
+        this._peek = active;
+        if (this._el) this._render();
     }
 
     enter() {
@@ -64,6 +72,14 @@ export class MapScreen {
                 const idx     = parseInt(branchNode.dataset.tsIdx, 10);
                 const nodeDef = this._gameState.runNodes[idx];
                 if (nodeDef?.trickShot) this._ui.showTrickShotInfoSticker(nodeDef.trickShot);
+                return;
+            }
+            // Reward-badge på selve node-cirklen: klik viser/skjuler forklarings-
+            // sticker (samme mekanik som boss/Trick Shot-info) i stedet for at
+            // starte kampen — matcher badgen selv om noden er done/current/locked.
+            const rewardBadge = e.target.closest('.map-node-ts-badge[data-reward]');
+            if (rewardBadge) {
+                this._ui.showRewardInfoSticker(rewardBadge.dataset.reward);
                 return;
             }
             const node = e.target.closest('.map-node.current');
@@ -122,24 +138,17 @@ export class MapScreen {
             </div>`;
         }).join('');
 
-        // Slammers — all available (owned concept not yet tracked)
-        const slammersHTML = SLAMMER_DEFS.map(s => `
-            <div class="col-cap">
-                <img class="col-cap-img" src="${s.texFront}" alt="${s.name}">
-                <div class="col-cap-name">${s.name}</div>
-            </div>`).join('');
-
-        // Relics — show owned ones, or empty state
-        const relicsHTML = gs.ownedRelics.length > 0
-            ? gs.ownedRelics.map(r => `
-                <div class="col-relic">
-                    <div class="col-relic-icon">${r.icon}</div>
-                    <div class="col-relic-name">${r.name}</div>
-                    <div class="col-relic-desc">${r.description}</div>
+        // Slammers — ejede slammere, med deres passive (relic-erstatning)
+        const slammersHTML = gs.ownedSlammers.length > 0
+            ? gs.ownedSlammers.map(s => `
+                <div class="col-cap">
+                    <img class="col-cap-img" src="${s.texFront}" alt="${s.name}">
+                    <div class="col-cap-name">${s.name}</div>
+                    ${s.passive ? `<span class="col-badge effect">${s.passive.icon} ${s.passive.name}</span>` : ''}
                 </div>`).join('')
             : `<div class="col-relics-empty">
                 <span class="col-relics-icon">⬡</span>
-                <p>No relics yet.<br>Win the final node of each loop to find one.</p>
+                <p>No slammers yet.<br>Win the slammer event node to find one.</p>
                </div>`;
 
         // Throw pips
@@ -154,10 +163,7 @@ export class MapScreen {
                         Caps <span class="col-tab-count">${gs.ownedCaps.length}</span>
                     </button>
                     <button class="col-tab ${activeTab === 'slammers' ? 'active' : ''}" data-target="slammers">
-                        Slammers
-                    </button>
-                    <button class="col-tab ${activeTab === 'relics'   ? 'active' : ''}" data-target="relics">
-                        Relics
+                        Slammers <span class="col-tab-count">${gs.ownedSlammers.length}</span>
                     </button>
                     <button id="map-collection-close" class="col-close">✕</button>
                 </div>
@@ -167,9 +173,6 @@ export class MapScreen {
                 </div>
                 <div class="col-content" data-content="slammers">
                     <div class="col-grid">${slammersHTML}</div>
-                </div>
-                <div class="col-content" data-content="relics">
-                    <div class="col-relic-grid">${relicsHTML}</div>
                 </div>
 
                 <div class="col-footer">
@@ -188,13 +191,13 @@ export class MapScreen {
         const gs = this._gameState;
 
         const nodesHTML = gs.runNodes.map((node, i) => {
-            const isRelic = node.type === 'relic';
+            const isSlammerNode = node.type === 'slammer';
             const isBoss  = !!node.boss;
-            let cls = 'map-node' + (isRelic ? ' map-node--relic' : '') + (isBoss ? ' map-node--boss' : '');
+            let cls = 'map-node' + (isSlammerNode ? ' map-node--relic' : '') + (isBoss ? ' map-node--boss' : '');
             let icon = '';
             if      (i < gs.nodeIndex)  { cls += ' done';    icon = '✓'; }
-            else if (i === gs.nodeIndex) { cls += ' current'; icon = isRelic ? '◎' : (isBoss ? node.boss.icon : '▶'); }
-            else                         { cls += ' locked';  icon = isRelic ? '◎' : (isBoss ? node.boss.icon : '?'); }
+            else if (i === gs.nodeIndex) { cls += ' current'; icon = isSlammerNode ? '◎' : (isBoss ? node.boss.icon : '▶'); }
+            else                         { cls += ' locked';  icon = isSlammerNode ? '◎' : (isBoss ? node.boss.icon : '?'); }
 
             const line = i < gs.runNodes.length - 1
                 ? `<div class="map-line ${i < gs.nodeIndex ? 'done' : ''}"></div>`
@@ -202,21 +205,24 @@ export class MapScreen {
 
             // Bossens identitet + gimmick vises fra start (ikke skjult som Trick Shot) —
             // spilleren skal kunne indrette sin cap-samling efter det på forhånd.
-            const nameHTML = isRelic
-                ? `<div class="map-node-name map-node-relic-label">Relic</div>`
+            const nameHTML = isSlammerNode
+                ? `<div class="map-node-name map-node-relic-label">Slammer</div>`
                 : isBoss
                     ? `<div class="map-node-name" title="${node.boss.description}">${node.boss.name}</div>`
                     : `<div class="map-node-name">${node.name}</div>`;
 
-            const scoreHTML = isRelic ? '' :
+            const scoreHTML = isSlammerNode ? '' :
                 `<div class="map-node-score">Goal<span class="map-node-score-val">${node.clearScore}★</span></div>`;
 
-            // Reward-upgrade-badge: vises på HOVEDNODEN når en Trick Shot er clearet,
-            // og viser hvilken opgraderings-type der er vundet (ikke et generisk ✓ —
-            // det ville forveksles med node-cirklens egen "done"-tilstand).
-            const rewardIcon  = node.rewardUpgrade ? (REWARD_UPGRADE_ICONS[node.rewardUpgrade] ?? '✦') : null;
-            const tsBadgeHTML = (!isRelic && rewardIcon)
-                ? `<div class="map-node-ts-badge" title="Reward upgraded: ${node.rewardUpgrade}">${rewardIcon}</div>`
+            // Reward-badge: viser nodens EFFEKTIVE reward-type (baseline fra
+            // start, eller den opgraderede type efter et clearet Trick Shot) —
+            // synlig FRA START, ikke kun efter clearing (reward-chests-draft.md
+            // "Besluttet" #4). Ikke et generisk ✓ — det ville forveksles med
+            // node-cirklens egen "done"-tilstand.
+            const effectiveReward = gs.effectiveReward(node);
+            const rewardIcon  = (!isBoss && effectiveReward) ? (REWARD_TYPE_ICONS[effectiveReward] ?? '✦') : null;
+            const tsBadgeHTML = (!isSlammerNode && rewardIcon)
+                ? `<div class="map-node-ts-badge" data-reward="${effectiveReward}" title="Reward: ${effectiveReward}">${rewardIcon}</div>`
                 : '';
 
             // Trick Shot-gren: kun synlig på noder der ikke er passeret endnu.
@@ -225,7 +231,7 @@ export class MapScreen {
             // ligesom hovednoden viser sin clearScore på forhånd. Først når den
             // er clearet skifter den til et almindeligt flueben (som andre done-noder).
             let branchHTML = '';
-            if (!isRelic && node.trickShot && i >= gs.nodeIndex) {
+            if (!isSlammerNode && node.trickShot && i >= gs.nodeIndex) {
                 const isCurrent = i === gs.nodeIndex;
                 const cleared   = !!node.rewardUpgrade;
                 const canAfford = gs.canAfford(node.trickShot.cost);
@@ -237,7 +243,7 @@ export class MapScreen {
                     branchInner = '✓';
                     branchTitle = `${node.trickShot.name} — cleared`;
                 } else {
-                    const branchRewardIcon = REWARD_UPGRADE_ICONS[node.trickShot.rewardType] ?? '✦';
+                    const branchRewardIcon = REWARD_TYPE_ICONS[node.trickShot.rewardType] ?? '✦';
                     branchInner = `${branchRewardIcon}<div class="map-branch-challenge-badge">${node.trickShot.icon}</div>`;
                     if (isCurrent && canAfford) {
                         branchCls  += ' available';
@@ -273,12 +279,13 @@ export class MapScreen {
         const current = gs.currentNode;
         const currentTS = (current && !current.rewardUpgrade && current.trickShot)
             ? current.trickShot : null;
+        const peekDisabled = this._peek ? 'disabled' : '';
         const actionBarHTML = current ? `
-            <div class="map-action-bar">
-                <button id="map-next-btn" class="map-action-btn map-action-btn--next">Next ▶</button>
+            <div class="map-action-bar ${this._peek ? 'map-action-bar--peek' : ''}">
+                <button id="map-next-btn" class="map-action-btn map-action-btn--next" ${peekDisabled}>Next ▶</button>
                 ${currentTS ? `
                 <button id="map-trickshot-btn" class="map-action-btn map-action-btn--trickshot"
-                        ${gs.canAfford(currentTS.cost) ? '' : 'disabled'}>
+                        ${gs.canAfford(currentTS.cost) && !this._peek ? '' : 'disabled'}>
                     🎲 ${currentTS.name} <span class="map-trickshot-cost">−${currentTS.cost}★</span>
                 </button>` : ''}
             </div>` : '';
