@@ -97,6 +97,7 @@
     <div id="boss-info" style="display:none">
         <div id="boss-info-name"></div>
         <p id="boss-info-desc"></p>
+        <span id="boss-info-feedback"></span>
     </div>
 
     <!-- Trick Shot result overlay -->
@@ -162,7 +163,7 @@
                 <div class="help-icon">🎒</div>
                 <div>
                     <strong>Bag</strong>
-                    <p>Open the Bag to see your caps, relics and cards — and to equip a different slammer.</p>
+                    <p>Open the Bag to see your caps, slammers and cards — and to equip a different slammer.</p>
                 </div>
             </div>
         </div>
@@ -256,10 +257,15 @@
 
     <!-- Slammer detail popup -->
     <div id="slammer-detail">
+        <div id="slammer-detail-rarity"></div>
         <div id="slammer-detail-name"></div>
         <div id="slammer-viewer-container"></div>
         <div id="slammer-detail-stats"></div>
-        <button id="slammer-equip-btn" style="display:none"></button>
+        <div id="slammer-detail-passive" style="display:none"></div>
+        <div id="slammer-detail-actions">
+            <button id="slammer-equip-btn" style="display:none"></button>
+            <button id="slammer-sell-btn" style="display:none"></button>
+        </div>
     </div>
 
     <div id="results">
