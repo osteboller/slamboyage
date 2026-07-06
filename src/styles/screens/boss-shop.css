@@ -21,8 +21,14 @@
     max-width: 780px;
     max-height: 100%;
     overflow-y: auto;
-    /* Ekstra bund-padding så indhold aldrig kan scrolle ind under den nu
-       fast-positionerede Continue-knap. */
+    /* Toppen skal kun cleare Next-knappen — nogenlunde samme fodaftryk som
+       Shards-pillen havde der før byttet, så den oprindelige lille top-
+       padding er stadig rigtig. BUNDEN skal nu derimod cleare BÅDE Shards-
+       pillen OG consumable-slots-baren (#consumable-slots, permanent bund-
+       højre til venstre for Shards, se consumables.css) — de sidder side om
+       side dernede nu i stedet for kun Continue-knappen alene, så bunden
+       beholder den STORE padding (samme værdi som Continue-knappen krævede
+       tidligere, tilfældigvis næsten identisk fodaftryk). */
     padding: clamp(16px, 3vh, 32px) 24px clamp(64px, 10vh, 90px);
     display: flex;
     flex-direction: column;
@@ -44,14 +50,15 @@
     transform: rotate(-2deg);
 }
 
-/* Flyttet ud af den normale flex-flow og op til toppen, mellem titel-skiltet
-   og pause/burger-ikonet (#pause-btn sidder fast top:16px right:16px, 40px
-   bred) — frigør vertikal plads til bånd/priser/info-stickers nedenunder,
-   som ellers var for trængt sammen. */
+/* Overtager score-stickerens faste bund-højre-plads (BossShopScreen skjuler
+   #score-display eksplicit mens denne skærm er aktiv — 0★ er meningsløst
+   her, scoren nulstilles jo allerede ved selve boss-kampens start). Byttet
+   plads med Next-knappen (se .boss-shop-continue-btn) — Shards er ikke en
+   handling, så den hører hjemme dernede, ikke oppe ved burger-menuen. */
 .boss-shop-balance {
     position: fixed;
-    top: 16px;
-    right: 68px;
+    bottom: 16px;
+    right: 16px;
     z-index: 210;
     font-family: 'JetBrains Mono', monospace;
     font-size: clamp(12px, 2vw, 16px);
@@ -88,13 +95,15 @@
 /* Slammer-rækken hælder den anden vej end cap-rækken for sticker-æstetikken */
 .boss-shop-band-row--slammers .boss-shop-band { transform: rotate(2deg); }
 
-/* Overtager score-stickerens faste bund-højre-plads (BossShopScreen skjuler
-   #score-display eksplicit mens denne skærm er aktiv — 0★ er meningsløst
-   her, scoren nulstilles jo allerede ved selve boss-kampens start). */
+/* Flyttet op til toppen, mellem titel-skiltet og pause/burger-ikonet
+   (#pause-btn sidder fast top:16px right:16px, 40px bred) — samme placering
+   som Skip-knappen bruger i reward-skærmene (top:14px right:70px), så det
+   opfører sig som en genkendelig top-højre primær handling i stedet for at
+   dele plads med Shards-visningen. */
 .boss-shop-continue-btn {
     position: fixed;
-    bottom: 16px;
-    right: 16px;
+    top: 16px;
+    right: 68px;
     z-index: 210;
     padding: 10px 22px;
     background: #000;
