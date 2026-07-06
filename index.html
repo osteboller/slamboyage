@@ -80,10 +80,17 @@
 
     <!-- Run info (node + goal) — vises kun under battle -->
     <div id="run-info" style="display:none">
-        <div id="double-badge"       style="display:none">×2</div>
-        <div id="voltage-badge"      style="display:none">⚡+0</div>
-        <div id="first-strike-badge" style="display:none">① ×4</div>
-        <div id="last-stand-badge"   style="display:none">⑤ ×4</div>
+        <!-- Slammer-passiv-badges: fælles flex-stack (vertikal) så et vilkårligt
+             antal samtidigt aktive badges altid arrangeres uden at overlappe (se
+             hud.css). Rarity/Parity/Flat Bonus-badges tilføjes dynamisk her via JS
+             (transiente — poppes ind lige efter et kast, ikke synlige før). -->
+        <div id="slammer-badge-stack">
+            <div id="double-badge"       style="display:none">×2</div>
+            <div id="amplify-badge"      style="display:none">◈ ×1</div>
+            <div id="voltage-badge"      style="display:none">⚡+0</div>
+            <div id="first-strike-badge" style="display:none">① ×4</div>
+            <div id="last-stand-badge"   style="display:none">⑤ ×4</div>
+        </div>
         <span id="run-node-name"></span><br>GOAL: <b id="run-goal-score"></b>★
     </div>
 
@@ -97,6 +104,7 @@
     <div id="boss-info" style="display:none">
         <div id="boss-info-name"></div>
         <p id="boss-info-desc"></p>
+        <div id="boss-info-penalty" style="display:none"></div>
         <span id="boss-info-feedback"></span>
     </div>
 
@@ -235,6 +243,9 @@
         <div id="cap-overlay-dots"></div>
     </div>
 
+    <!-- Delt dæmpnings-lag bag cap/slammer/relic-detail, se modals.css -->
+    <div id="detail-backdrop"></div>
+
     <!-- Cap detail popup -->
     <div id="cap-detail">
         <div id="cap-detail-rarity"></div>
@@ -259,7 +270,10 @@
     <div id="slammer-detail">
         <div id="slammer-detail-rarity"></div>
         <div id="slammer-detail-name"></div>
-        <div id="slammer-viewer-container"></div>
+        <div class="slammer-viewer-wrap">
+            <div id="slammer-viewer-container"></div>
+            <button id="slammer-detail-action" style="display:none"></button>
+        </div>
         <div id="slammer-detail-stats"></div>
         <div id="slammer-detail-passive" style="display:none"></div>
         <div id="slammer-detail-actions">
