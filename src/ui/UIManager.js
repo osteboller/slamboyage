@@ -1058,42 +1058,40 @@ export class UIManager {
     // ─── PAUSE OVERLAY SETUP (én gang, persistent) ───────────────────────────
     _buildPauseOverlay() {
         const overlay = document.getElementById('pause-overlay');
+        const panel   = document.getElementById('pause-panel');
         const hide    = () => this.hidePauseOverlay();
 
         document.getElementById('pause-btn')
             .addEventListener('pointerdown', e => { e.stopPropagation(); this.showPauseOverlay(); });
 
-        document.getElementById('pause-close')
-            .addEventListener('pointerdown',  e => { e.stopPropagation(); hide(); });
-        document.getElementById('pause-resume')
-            .addEventListener('pointerdown',  e => { e.stopPropagation(); hide(); });
-
-        document.getElementById('pause-retry')
-            .addEventListener('pointerdown',  e => {
-                e.stopPropagation();
-                hide();
-                if (this.onPauseRetry) this.onPauseRetry();
-            });
-
-        document.getElementById('pause-tutorial')
-            .addEventListener('pointerdown',  e => {
-                e.stopPropagation();
-                hide();
-                this.openHelp();
-            });
-
-        document.getElementById('pause-fullscreen')
-            .addEventListener('pointerdown',  e => {
-                e.stopPropagation();
-                if (window._toggleFullscreen) window._toggleFullscreen();
-            });
-
-        document.getElementById('pause-mainmenu')
-            .addEventListener('pointerdown',  e => {
-                e.stopPropagation();
-                hide();
-                if (this.onPauseMainMenu) this.onPauseMainMenu();
-            });
+        // bindTapSelect i stedet for individuelle pointerdown-lyttere pr.
+        // knap — #pause-panel scroller (overflow-y:auto) på lave viewports,
+        // og et rent pointerdown-tryk fyrer FØR en scroll-gestus kan skelnes
+        // fra et tap, så et forsøg på at scrolle forbi fx Retry ramte den med
+        // det samme. Samme rodårsag/fix som Mystixx-cap-vælgerens mobil-bug.
+        bindTapSelect(panel, 'button', btn => {
+            switch (btn.id) {
+                case 'pause-close':
+                case 'pause-resume':
+                    hide();
+                    break;
+                case 'pause-retry':
+                    hide();
+                    if (this.onPauseRetry) this.onPauseRetry();
+                    break;
+                case 'pause-tutorial':
+                    hide();
+                    this.openHelp();
+                    break;
+                case 'pause-fullscreen':
+                    if (window._toggleFullscreen) window._toggleFullscreen();
+                    break;
+                case 'pause-mainmenu':
+                    hide();
+                    if (this.onPauseMainMenu) this.onPauseMainMenu();
+                    break;
+            }
+        });
 
         // Klik på backdrop lukker
         overlay.addEventListener('pointerdown', e => {
@@ -1390,6 +1388,23 @@ export class UIManager {
             <div class="enchant-result-name" style="color:#7a1f28;">${bossDef.name}</div>
             <div class="enchant-result-desc">${bossDef.description}</div>
             ${penaltyText ? `<div class="boss-penalty-live">${penaltyText}</div>` : ''}`;
+        this._mountDismissableSticker(el, 5000);
+    }
+
+    // Shop lige før en boss-node — "sidste chance for at bruge ★"-advarslen.
+    // Var tidligere et permanent inline-element i selve shop-layoutet (et
+    // bredt banner presset ind i en grid der ikke havde plads til det, se
+    // ShopScreen._buildHTML) — nu samme dismissable fade-ind/ud-sticker-
+    // mekanik som boss/Trick Shot-info-stickeren. Vises automatisk ÉN gang
+    // ved ankomst til shoppen (kaldes fra enter(), ikke fra hvert render), da
+    // advarslen ikke må kunne overses bag et klik ligesom de andre.
+    showBossShopWarning(bossDef) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#7a1f28;font-size:26px;padding:14px 12px 10px;text-align:center;color:#fff;">⚠</div>
+            <div class="enchant-result-name" style="color:#7a1f28;">Last chance!</div>
+            <div class="enchant-result-desc">${bossDef.name} resets your score to 0 — spend your ★ now.</div>`;
         this._mountDismissableSticker(el, 5000);
     }
 

@@ -46,6 +46,13 @@ export class ShopScreen {
         this._render();
         this._justRerolled = false;
         this._el.addEventListener('click', e => this._onClick(e));
+
+        // Boss-nodens ★ nulstilles helt ved kampens start — sidste chance for
+        // at bruge det hele her. Dismissable overlay (samme mekanik som boss/
+        // Trick Shot-info-stickeren), ikke et permanent inline-element i
+        // layoutet — vises kun ÉN gang ved ankomst, ikke ved hvert re-render.
+        const nextNode = this._gs.currentNode;
+        if (nextNode?.boss) this._ui.showBossShopWarning(nextNode.boss);
     }
 
     exit() {
@@ -697,19 +704,11 @@ export class ShopScreen {
         const canReroll  = gs.canAfford(gs.rerollCost);
         const canDiscard = gs.ownedCaps.length > 0;
 
-        // Boss-nodens ★ nulstilles helt ved kampens start — sidste chance for
-        // at bruge det hele her, ellers går det tabt.
-        const bossWarningHTML = nextNode?.boss ? `
-            <div class="shop-boss-warning">
-                ⚠ Last chance to spend your ★ — ${nextNode.boss.name} resets your score to 0!
-            </div>` : '';
-
         return `
 <div class="shop-inner">
 
   <!-- ── Title ───────────────────────────────────────────────────────── -->
   <div class="shop-title-sticker">SHOP</div>
-  ${bossWarningHTML}
 
   <!-- ── 2-kolonne: venstre (band+packs) | højre (actions) ───────────── -->
   <div class="shop-main">

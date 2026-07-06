@@ -54,6 +54,7 @@ consumables.onUse = (def) => {
     if (def.id === 'double_relic') { gameState.amplifyStacks++; ui.showAmplifyBadge(gameState.amplifyStacks); roundMgr.refreshAmplifyBadges(); }
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
+        if (currentScreenName === 'boss-shop')                               bossShopScreen.reroll();
         const rerollableRewardScreens = new Set(['reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         if (rerollableRewardScreens.has(currentScreenName)) rewardScreen.reroll?.();
     }
@@ -212,7 +213,7 @@ function showScreen(name, context = null) {
         if (RUN_SCREENS.has(name)) ui.showRunOverlay();
         else                       ui.hideRunOverlay();
 
-        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
+        const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'boss-shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         const rewardLikeScreens = new Set(['slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         const contextName = rewardLikeScreens.has(name) ? 'reward' : name;
         if (CONSUMABLE_SCREENS.has(name)) { consumables.setContext(contextName); consumables.show(); }

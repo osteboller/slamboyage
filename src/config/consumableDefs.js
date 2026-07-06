@@ -33,9 +33,9 @@ export const CONSUMABLE_DEFS = [
         color:       '#00a0a0',
         bg:          '#d6f5f5',
         icon:        '↺',
-        description: 'Shop: re-roll items free. Reward: re-roll picks.',
+        description: 'Shop/Boss Shop: re-roll items free. Reward: re-roll picks.',
         sellPrice:   2,
-        usableIn:    ['shop', 'reward'],
+        usableIn:    ['shop', 'boss-shop', 'reward'],
     },
     {
         id:          'enchant',

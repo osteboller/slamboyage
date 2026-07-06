@@ -175,7 +175,15 @@ export class BossShopScreen {
                         <div class="shop-band-items">${slamHTML}</div>
                     </div>
                 </div>
-                <button id="boss-shop-continue-btn" class="boss-shop-continue-btn">Continue ▶</button>
+                <button id="boss-shop-continue-btn" class="boss-shop-continue-btn">Next ▶</button>
             </div>`;
+    }
+
+    // FRESHIE-consumablen ("Shop: re-roll items free") kalder denne — helt
+    // nyt udbud via samme _buildOffer() som enter() selv bruger. Rører IKKE
+    // _priceBump, som afspejler antal KØB denne visit, ikke antal rerolls.
+    reroll() {
+        this._offer = this._buildOffer();
+        this._render();
     }
 }
