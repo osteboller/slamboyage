@@ -21,7 +21,9 @@
     max-width: 780px;
     max-height: 100%;
     overflow-y: auto;
-    padding: clamp(16px, 3vh, 32px) 24px;
+    /* Ekstra bund-padding så indhold aldrig kan scrolle ind under den nu
+       fast-positionerede Continue-knap. */
+    padding: clamp(16px, 3vh, 32px) 24px clamp(64px, 10vh, 90px);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -42,104 +44,63 @@
     transform: rotate(-2deg);
 }
 
+/* Flyttet ud af den normale flex-flow og op til toppen, mellem titel-skiltet
+   og pause/burger-ikonet (#pause-btn sidder fast top:16px right:16px, 40px
+   bred) — frigør vertikal plads til bånd/priser/info-stickers nedenunder,
+   som ellers var for trængt sammen. */
 .boss-shop-balance {
+    position: fixed;
+    top: 16px;
+    right: 68px;
+    z-index: 210;
     font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(14px, 2.5vw, 20px);
+    font-size: clamp(12px, 2vw, 16px);
     font-weight: 800;
     color: #000;
     background: var(--clr-bg-panel);
     border: 3px solid #000;
     box-shadow: 3px 3px 0px #000;
-    padding: 4px 16px;
+    padding: 4px 12px;
     transform: rotate(1deg);
 }
 .boss-shop-balance span { color: #7a1f28; }
 
-/* Fast kolonneantal i stedet for auto-fit/1fr — auto-fit giver uens
-   kolonne-bredde pr. række når antal items ikke går lige op, hvilket så ud
-   som om nogle items bare var "større" end andre på smalle skærme. */
-.boss-shop-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: clamp(8px, 2vw, 18px);
+/* ── Skrå bånd — genbruger shop.css' band-klasser (.shop-band/.band-item/
+   .band-price-tag/.band-effect-sticker) så boss-shoppen deler visuelt sprog
+   med den almindelige shop. Kun temaet (mørkerødt bånd) og layout-afstande
+   er boss-specifikke. Én række med 5 caps, én med 3 slammere. */
+.boss-shop-band-row {
     width: 100%;
-}
-@media (max-width: 560px) {
-    .boss-shop-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 380px) {
-    .boss-shop-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-.boss-shop-item {
-    --rot: -1deg;
-    background: var(--clr-bg-panel);
-    border: 4px solid #000;
-    box-shadow: 6px 6px 0px #000;
-    padding: 12px 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    transform: rotate(var(--rot));
-    transition: box-shadow 0.1s, transform 0.1s;
-}
-.boss-shop-grid .boss-shop-item:nth-child(odd)  { --rot: 1deg; }
-.boss-shop-grid .boss-shop-item:nth-child(even) { --rot: -1deg; }
-.boss-shop-item:hover  { box-shadow: 3px 3px 0px #000; transform: rotate(var(--rot)) translateY(-3px); }
-.boss-shop-item:active { box-shadow: none; transform: rotate(var(--rot)) translateY(2px); }
-.boss-shop-item.cant-afford { opacity: 0.45; cursor: not-allowed; }
-.boss-shop-item.bought {
-    opacity: 0.3;
-    cursor: default;
-    pointer-events: none;
+    max-width: 640px;
+    /* Rigelig plads til caps der stikker op over båndet (top) OG til pris-
+       tags + info-stickers der hænger under det (band-price-tag -14px,
+       band-effect-sticker helt ned til -48px) — for stramt før kolliderede
+       synligt med rækken nedenunder. Begge rækker får samme margin, da
+       slammer-billeder stikker lige så meget op som cap-billeder. */
+    margin-top: clamp(22px, 4vh, 32px);
+    margin-bottom: clamp(56px, 8vh, 72px);
 }
 
-.boss-shop-cap-img {
-    width: clamp(56px, 10vw, 76px);
-    height: clamp(56px, 10vw, 76px);
-    border-radius: 50%;
-    object-fit: cover;
-    border: 3px solid #000;
+.boss-shop-band {
+    background: #2a1414;
+    border-color: #7a1f28;
 }
-.boss-shop-relic-icon {
-    width: clamp(56px, 10vw, 76px);
-    height: clamp(56px, 10vw, 76px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: clamp(28px, 5vw, 40px);
-    border: 3px solid var(--clr-purple);
-    border-radius: 50%;
-    background: rgba(185, 133, 255, 0.15);
-    color: var(--clr-purple-dark);
-}
+/* Slammer-rækken hælder den anden vej end cap-rækken for sticker-æstetikken */
+.boss-shop-band-row--slammers .boss-shop-band { transform: rotate(2deg); }
 
-.boss-shop-item-name {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(9px, 1.6vw, 11px);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    text-align: center;
-    color: #000;
-}
-
-.boss-shop-item-cost {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: clamp(10px, 1.8vw, 13px);
-    font-weight: 800;
-    color: #7a1f28;
-}
-
+/* Overtager score-stickerens faste bund-højre-plads (BossShopScreen skjuler
+   #score-display eksplicit mens denne skærm er aktiv — 0★ er meningsløst
+   her, scoren nulstilles jo allerede ved selve boss-kampens start). */
 .boss-shop-continue-btn {
-    margin-top: 8px;
-    padding: 14px 32px;
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 210;
+    padding: 10px 22px;
     background: #000;
     color: #fff;
     font-family: 'Space Grotesk', sans-serif;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     border: 4px solid #000;
     box-shadow: var(--shadow-raised);

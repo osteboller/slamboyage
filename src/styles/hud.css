@@ -253,16 +253,37 @@
     color: #000;
 }
 
+/* ─── SLAMMER-PASSIV-BADGE-STACK ──────────────────────────────────────────
+   Fælles flex-container for ALLE badges ovenover #run-info (double/amplify/
+   first-strike/last-stand + dynamisk tilføjede rarity/parity/flatbonus-
+   badges). Løser tidligere overlap-bug (hver badge havde sin egen faste
+   top/left/right, uafhængigt af hvor mange andre der samtidig var synlige).
+   Højrejusteret til #run-infos egen højrekant (i stedet for centreret) —
+   #run-info sidder allerede tæt på skærmens højre kant, så en centreret
+   stack skubbede halvdelen af badges ud af billedet. Vertikal kolonne i
+   stedet for vandret række, da der ellers ikke er bredde nok til flere
+   badges ad gangen. `flex-direction: column` (IKKE reverse) betyder senere
+   tilføjede badges (dynamiske rarity/parity/flatbonus, appendChild'et sidst)
+   havner nederst i stacken OG tegnes ØVERST i z-rækkefølgen — så en evt.
+   overlappende skygge fra badgen ovenover altid ender bag den under, aldrig
+   forkert foran. */
+#slammer-badge-stack {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    pointer-events: none;
+}
+
 @keyframes double-badge-pulse {
-    0%,100% { transform: translateX(-50%) rotate(-3deg) scale(1);    box-shadow: 3px 3px 0 #8b5a00; }
-    50%      { transform: translateX(-50%) rotate(-3deg) scale(1.1);  box-shadow: 4px 4px 0 #8b5a00; }
+    0%,100% { transform: rotate(-3deg) scale(1);    box-shadow: 3px 3px 0 #8b5a00; }
+    50%      { transform: rotate(-3deg) scale(1.1);  box-shadow: 4px 4px 0 #8b5a00; }
 }
 #double-badge {
-    position: absolute;
-    top: -28px;
-    left: 50%;
-    z-index: 1;
-    transform: translateX(-50%) rotate(-3deg);
     background: #ffcc00;
     color: #000;
     border: 3px solid #000;
@@ -273,7 +294,23 @@
     padding: 1px 8px;
     white-space: nowrap;
     animation: double-badge-pulse 1s ease-in-out infinite;
-    pointer-events: none;
+}
+
+@keyframes amplify-badge-pulse {
+    0%,100% { transform: rotate(3deg) scale(1);    box-shadow: 3px 3px 0 #0a2a66; }
+    50%      { transform: rotate(3deg) scale(1.1);  box-shadow: 4px 4px 0 #0a2a66; }
+}
+#amplify-badge {
+    background: #6688ff;
+    color: #fff;
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0 #0a2a66;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 13px;
+    padding: 1px 8px;
+    white-space: nowrap;
+    animation: amplify-badge-pulse 1s ease-in-out infinite;
 }
 
 @keyframes first-strike-pulse {
@@ -281,11 +318,11 @@
     50%      { transform: rotate(-5deg) scale(1.08); box-shadow: 4px 4px 0 #1a5c2a; }
 }
 @keyframes last-stand-pulse {
-    0%,100% { transform: rotate(5deg) scale(1);    box-shadow: 3px 3px 0 #8b1a1a; }
-    50%      { transform: rotate(5deg) scale(1.08); box-shadow: 4px 4px 0 #8b1a1a; }
+    0%,100% { transform: rotate(5deg) scale(1);    box-shadow: 3px 3px 0 #4a2d80; }
+    50%      { transform: rotate(5deg) scale(1.08); box-shadow: 4px 4px 0 #4a2d80; }
 }
-#first-strike-badge, #last-stand-badge {
-    position: absolute;
+#first-strike-badge, #last-stand-badge,
+.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -305,19 +342,46 @@
     border: 1px solid #000;
 }
 #first-strike-badge {
-    top: -46px;
-    left: -4px;
     background: #4ecb71;
     box-shadow: 3px 3px 0 #1a5c2a;
     animation: first-strike-pulse 1.2s ease-in-out infinite;
 }
+/* Last Stand — violet i stedet for rødt, så den ikke kan forveksles med
+   Rare-rarity-badgens røde farve (se .rarity-mult-badge/modals.css). */
 #last-stand-badge {
-    top: -60px;
-    right: -4px;
-    background: #e85555;
+    background: #9966ee;
     color: #fff;
-    box-shadow: 3px 3px 0 #8b1a1a;
+    box-shadow: 3px 3px 0 #4a2d80;
     animation: last-stand-pulse 1.2s ease-in-out infinite;
+}
+
+/* AMPLIFYZ armeret — ekstra ring + hurtigere puls omkring den eksisterende
+   badge, så den forstærkede værdi ikke bare ligner et tilfældigt større tal
+   uden forklaring. */
+@keyframes slammer-badge-amplified-ring {
+    0%, 100% { box-shadow: 0 0 0 2px #1144aa, 3px 3px 0 #000; }
+    50%      { box-shadow: 0 0 0 4px #1144aa, 3px 3px 0 #000; }
+}
+.slammer-badge--amplified {
+    animation: first-strike-pulse 0.6s ease-in-out infinite, slammer-badge-amplified-ring 0.6s ease-in-out infinite;
+}
+#last-stand-badge.slammer-badge--amplified {
+    animation: last-stand-pulse 0.6s ease-in-out infinite, slammer-badge-amplified-ring 0.6s ease-in-out infinite;
+}
+
+/* Transiente rarity/parity/flatbonus-badges — poppes ind, holder et øjeblik,
+   poppes ud igen, som en rigtig badge i stacken (kan bære slammer-ikonet),
+   IKKE synlige før kastet rent faktisk er afgjort (fx Voodoo Skulls Magnet
+   skal ikke vises FØR kastet, kun som bekræftelse efter). */
+@keyframes rarity-parity-badge-pop {
+    0%   { opacity: 0; transform: scale(0.5); }
+    25%  { opacity: 1; transform: scale(1.15); }
+    35%  { opacity: 1; transform: scale(1); }
+    85%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.85); }
+}
+.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge {
+    animation: rarity-parity-badge-pop 1.8s ease-in-out forwards;
 }
 
 /* ─── RUN INFO (node name + goal) ────────────────────────────────────────── */
@@ -388,6 +452,20 @@
     font-size: 11px;
     color: #f2c8c8;
     margin: 2px 0 0;
+}
+/* No Glam Fam — live straf-procent, beregnet fra ejede caps' enchants lige nu. */
+#boss-info-penalty {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    color: #ffcc66;
+    background: rgba(0,0,0,0.25);
+    border: 2px solid #ffcc66;
+    border-radius: 2px;
+    padding: 2px 8px;
+    margin: 5px 0 0;
+    display: inline-block;
+    white-space: nowrap;
 }
 
 /* Pr.-kast parity-feedback (Even Steven/Odd Todd) — sidder ØVERST PÅ selve

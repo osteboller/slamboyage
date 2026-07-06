@@ -5,6 +5,8 @@ import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js';
+import { pulseIconRotate } from '../ui/domUtils.js';
+import { formatScore } from '../ui/formatScore.js';
 
 const BAND_SIZE       = 5;
 const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 6, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
@@ -133,7 +135,7 @@ export class ShopScreen {
             const idx  = parseInt(packEl.dataset.packIdx, 10);
             const pack = this._packs[idx];
             if (pack.bought || pack.choices.length === 0) return;
-            const cost = this._price(pack.basePrice);
+            const cost = this._price(pack.basePrice, 'pack');
             if (!this._gs.canAfford(cost)) return;
             this._gs.score -= cost;
             this._ui.showScoreDeduct(cost);
@@ -146,6 +148,7 @@ export class ShopScreen {
         // Open cap detail on image click — with BUY sticker if purchasable
         const capImg = e.target.closest('.cap-enchant-wrap[data-cap-name]');
         if (capImg) {
+            pulseIconRotate(capImg);
             const def = CAP_DEFS.find(c => c.name === capImg.dataset.capName);
             if (def) {
                 const priceTag = capImg.closest('.band-item')?.querySelector('[data-band-idx]');
@@ -154,15 +157,16 @@ export class ShopScreen {
 
                 let action = null;
                 if (item && !item.bought) {
-                    const price  = this._price(item.basePrice);
-                    const canBuy = this._gs.canAfford(price);
+                    const price  = this._price(item.basePrice, 'cap');
+                    const full   = !this._gs.canAddCap();
+                    const canBuy = !full && this._gs.canAfford(price);
                     action = canBuy ? {
                         label:    'BUY',
                         price:    `${price}★`,
                         color:    '#2a9d5c',
                         callback: () => this._doBuy(bandIdx),
                     } : {
-                        label:    "CAN'T AFFORD",
+                        label:    full ? 'COLLECTION FULL' : "CAN'T AFFORD",
                         color:    '#888',
                         callback: () => {},
                     };
@@ -181,19 +185,17 @@ export class ShopScreen {
 
             // Card slot in band
             if (item.type === 'card') {
-                const cardPrice = this._price(item.basePrice);
-                if (!this._gs.canAfford(cardPrice)) return;
                 const bandItem = bandBuy.closest('.band-item');
-                const slotIdx  = this._gs.addConsumable(item.def);
-                if (slotIdx === false) {
-                    // No room — flash red and show brief label
-                    this._flashNoRoom(bandItem);
+                const result   = this._gs.buyConsumableCard(item.def, item.basePrice);
+                if (!result.ok) {
+                    // No room — flash red and show brief label (afford-guard er allerede
+                    // dækket af .cant-afford-klassen på selve knappen)
+                    if (result.reason === 'no_room') this._flashNoRoom(bandItem);
                     return;
                 }
-                this._gs.score -= cardPrice;
-                this._ui.showScoreDeduct(cardPrice);
+                this._ui.showScoreDeduct(result.price);
                 item.bought = true;
-                if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
+                if (this.onConsumableAdded) this.onConsumableAdded(result.slot);
                 if (bandItem) {
                     bandItem.classList.add('band-item--buying');
                     setTimeout(() => this._render(), 380);
@@ -203,7 +205,7 @@ export class ShopScreen {
                 return;
             }
 
-            const capPrice = this._price(item.basePrice);
+            const capPrice = this._price(item.basePrice, 'cap');
             if (this._gs.buyCap(item.def, capPrice)) {
                 this._ui.showScoreDeduct(capPrice);
                 this._ui.flashBagBtn();
@@ -225,9 +227,20 @@ export class ShopScreen {
     // ─── GENERATORS ───────────────────────────────────────────────────────────
 
     // Discount-slammer (Bargain Bin, shopDiscount) halverer alle priser her —
-    // afrundes op så intet nogensinde bliver gratis (0★).
-    _price(base) {
-        return Math.max(1, Math.ceil(base * this._gs.shopDiscountMult));
+    // afrundes op så intet nogensinde bliver gratis (0★). kind ('cap'|'pack')
+    // bruger begge gs.capPriceMultiplier lige nu — parameteren gør det eksplicit
+    // og nemt at splitte senere hvis de skal stige forskelligt (kort-priser går
+    // gennem GameState.buyConsumableCard()/_cardPrice() i stedet og rammer ikke her).
+    _price(base, kind = 'cap') {
+        const growth = kind === 'pack' ? this._gs.capPriceMultiplier : this._gs.capPriceMultiplier;
+        return Math.max(1, Math.ceil(base * this._gs.shopDiscountMult * growth));
+    }
+
+    // Kort i båndet vokser i pris pr. kort købt (CARD_PRICE_GROWTH) OVENI shop-
+    // rabatten — samme formel som GameState.buyConsumableCard() bruger ved selve
+    // købet, så den viste pris aldrig kan drifte fra hvad der rent faktisk trækkes.
+    _cardPrice(basePrice) {
+        return Math.max(1, Math.ceil(basePrice * this._gs.shopDiscountMult * this._gs.cardPriceMultiplier));
     }
 
     _genBand() {
@@ -411,19 +424,52 @@ export class ShopScreen {
             const quickPick = e.target.closest('.reward-quick-pick[data-key]');
             if (quickPick) { this._pickFromPack(quickPick.dataset.key, pack, idx); return; }
 
-            const card = e.target.closest('.reward-card[data-key]');
-            if (card) {
-                const key = card.dataset.key;
-                if (pack.type === 'cap' || pack.type === 'cap_uncommon' || pack.type === 'cap_rare') {
-                    const def = pack.choices.find(c => c.name === key);
-                    if (def) this._ui.showCapDetail(def, false, {
+            // Ikon-klik → inspektion med PICK-handling indeni, for ALLE pakke-
+            // typer (tidligere kun cap/cap_uncommon/cap_rare — resten committede
+            // med det samme ved klik hvor som helst på kortet). Samme mønster
+            // som RewardScreen (reward-and-shop-card-consistency-prompten).
+            const icon = e.target.closest('.cap-enchant-wrap, .reward-cap-img');
+            if (!icon) return;
+            pulseIconRotate(icon);
+            const card = icon.closest('.reward-card[data-key]');
+            const key  = card?.dataset.key;
+            if (key == null) return;
+
+            if (pack.type === 'cap' || pack.type === 'cap_uncommon' || pack.type === 'cap_rare') {
+                const def = pack.choices.find(c => c.name === key);
+                if (def) this._ui.showCapDetail(def, false, {
+                    label: 'PICK', color: '#000',
+                    callback: () => this._pickFromPack(key, pack, idx),
+                });
+            } else if (pack.type === 'cap_holo') {
+                const item = pack.choices[parseInt(key, 10)];
+                if (item) this._ui.showCapDetail({ def: item.def, enchant: item.enchant }, false, {
+                    label: 'PICK', color: '#000',
+                    callback: () => this._pickFromPack(key, pack, idx),
+                });
+            } else if (pack.type === 'slammer' || pack.type === 'slammer_rare') {
+                const def = pack.choices.find(s => s.name === key);
+                if (def) this._ui.showSlammerDetail(def, false, {
+                    label: 'PICK', color: '#000',
+                    callback: () => this._pickFromPack(key, pack, idx),
+                });
+            } else if (pack.type === 'mystery') {
+                const item = pack.choices[parseInt(key, 10)];
+                if (!item) return;
+                if (item.itemType === 'slammer') {
+                    this._ui.showSlammerDetail(item.def, false, {
                         label: 'PICK', color: '#000',
                         callback: () => this._pickFromPack(key, pack, idx),
                     });
-                } else {
-                    this._pickFromPack(key, pack, idx);
+                } else if (item.itemType === 'cap') {
+                    this._ui.showCapDetail({ def: item.def, enchant: item.enchant ?? null }, false, {
+                        label: 'PICK', color: '#000',
+                        callback: () => this._pickFromPack(key, pack, idx),
+                    });
                 }
+                // item.itemType === 'card' — intet ikon at inspicere (gum-pack-icon er kun et emoji)
             }
+            // pack.type === 'card' — intet ikon at inspicere
         });
     }
 
@@ -444,7 +490,7 @@ export class ShopScreen {
             <button id="pack-skip-btn">SKIP</button>
             <div class="reward-title-box">
                 <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'} — PICK 1</h2>
-                <p class="reward-sub">You paid ${this._price(pack.basePrice)}★ · choose one to keep</p>
+                <p class="reward-sub">You paid ${this._price(pack.basePrice, 'pack')}★ · choose one to keep</p>
             </div>
             <div class="reward-cards">${cardsHTML}</div>`;
 
@@ -460,10 +506,15 @@ export class ShopScreen {
     _pickFromPack(key, pack, idx) {
         if (pack.type === 'slammer' || pack.type === 'slammer_rare') {
             const def = pack.choices.find(s => s.name === key);
-            if (def) this._gs.addSlammer(def);
+            // Slammer-loft: blokér commit, lad pakke-skærmen (allerede betalt) stå
+            // urørt så spilleren kan sælge en slammer og klikke samme valg igen.
+            if (def && !this._gs.addSlammer(def)) { this._ui.showMaxSlammersMessage(); return; }
         } else if (pack.type === 'cap_holo') {
             const item = pack.choices[parseInt(key, 10)];
-            if (item) this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
+            if (item) {
+                const result = this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
+                if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
+            }
         } else if (pack.type === 'card') {
             const def = pack.choices.find(c => c.id === key);
             if (def) {
@@ -478,7 +529,7 @@ export class ShopScreen {
             const item = pack.choices[parseInt(key, 10)];
             if (!item) return;
             if (item.itemType === 'slammer') {
-                this._gs.addSlammer(item.def);
+                if (!this._gs.addSlammer(item.def)) { this._ui.showMaxSlammersMessage(); return; }
             } else if (item.itemType === 'card') {
                 const slotIdx = this._gs.addConsumable(item.def);
                 if (slotIdx === false) {
@@ -487,12 +538,16 @@ export class ShopScreen {
                 }
                 if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
             } else {
-                this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
+                const result = this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
+                if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
                 this._ui.flashBagBtn();
             }
         } else {
             const def = pack.choices.find(c => c.name === key);
-            if (def) this._gs.gainCap(def);
+            if (def) {
+                const result = this._gs.gainCap(def);
+                if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
+            }
         }
         this._packs[idx].bought = true;
         this._pendingPack = null;
@@ -636,7 +691,7 @@ export class ShopScreen {
         const gs        = this._gs;
         const nextNode  = gs.currentNode;
         const clearScore = nextNode?.clearScore ?? nextNode?.score;
-        const nextBadge  = clearScore != null ? `GOAL: ${clearScore}★` : '→';
+        const nextBadge  = clearScore != null ? `GOAL: ${formatScore(clearScore)}★` : '→';
         const nextLabel  = gs.isRunComplete ? 'NEXT LOOP' : 'NEXT ROUND';
 
         const canReroll  = gs.canAfford(gs.rerollCost);
@@ -720,12 +775,14 @@ export class ShopScreen {
                     <div class="band-price-tag band-sold-label">SOLD</div>
                 </div>`;
             }
-            const price     = this._price(item.basePrice);
-            const canBuy    = gs.canAfford(price);
+            const isCard    = item.type === 'card';
+            const price     = isCard ? this._cardPrice(item.basePrice) : this._price(item.basePrice, 'cap');
+            const full      = !isCard && !gs.canAddCap();
+            const canBuy    = !full && gs.canAfford(price);
             const animStyle = animate ? `style="animation-delay:${i * 90}ms"` : '';
             const animClass = animate ? 'band-item--entering' : '';
 
-            if (item.type === 'card') {
+            if (isCard) {
                 const d = item.def;
                 const stripe = `repeating-linear-gradient(-45deg, ${d.bg} 0px, ${d.bg} 2px, #fff 2px, #fff 4px)`;
                 return `<div class="band-item band-item--card ${animClass}" ${animStyle}>
@@ -753,7 +810,7 @@ export class ShopScreen {
                 </div>
                 <button class="band-price-tag ${canBuy ? '' : 'cant-afford'}"
                         data-band-idx="${i}" ${canBuy ? '' : 'disabled'}>
-                    ${price}★
+                    ${full ? 'FULL' : price + '★'}
                 </button>
                 ${bandEffL ? `<div class="band-effect-sticker">${bandEffL}</div>` : ''}
             </div>`;
@@ -782,7 +839,7 @@ export class ShopScreen {
                 </div>
             </div>`;
         }
-        const price     = this._price(pack.basePrice);
+        const price     = this._price(pack.basePrice, 'pack');
         const canAfford = this._gs.canAfford(price);
         const empty     = pack.choices.length === 0;
         return `<button class="shop-pack${m.cls} ${canAfford && !empty ? '' : 'cant-afford'}"
@@ -824,7 +881,7 @@ export class ShopScreen {
     _doBuy(bandIdx) {
         const item = this._band[bandIdx];
         if (!item || item.bought) return;
-        const price = this._price(item.basePrice);
+        const price = this._price(item.basePrice, 'cap');
         if (this._gs.buyCap(item.def, price)) {
             this._ui.showScoreDeduct(price);
             this._ui.flashBagBtn();

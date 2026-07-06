@@ -1,6 +1,7 @@
 import { THROWS_PER_ROUND } from '../config/constants.js';
 import { effectName } from '../game/effects/labels.js';
 import { REWARD_TYPE_ICONS } from '../config/trickShotDefs.js';
+import { formatScore } from '../ui/formatScore.js';
 
 export class MapScreen {
     constructor({ gameState, ui }) {
@@ -212,7 +213,7 @@ export class MapScreen {
                     : `<div class="map-node-name">${node.name}</div>`;
 
             const scoreHTML = isSlammerNode ? '' :
-                `<div class="map-node-score">Goal<span class="map-node-score-val">${node.clearScore}★</span></div>`;
+                `<div class="map-node-score">Goal<span class="map-node-score-val">${formatScore(node.clearScore)}★</span></div>`;
 
             // Reward-badge: viser nodens EFFEKTIVE reward-type (baseline fra
             // start, eller den opgraderede type efter et clearet Trick Shot) —

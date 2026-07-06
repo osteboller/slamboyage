@@ -51,6 +51,7 @@ consumables.onUse = (def) => {
     if (def.id === 'extra_throw') roundMgr.addThrow();
     if (def.id === 'power_up')   roundMgr.addVoltage(8);
     if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); }
+    if (def.id === 'double_relic') { gameState.amplifyStacks++; ui.showAmplifyBadge(gameState.amplifyStacks); roundMgr.refreshAmplifyBadges(); }
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
         const rerollableRewardScreens = new Set(['reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
@@ -94,7 +95,13 @@ consumables.onUse = (def) => {
                 const pool = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
                 const enchantDef = pool[Math.floor(Math.random() * pool.length)];
                 gameState.applyEnchant(entry.id, enchantDef.id);
-                if (currentScreenName === 'battle') roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
+                if (currentScreenName === 'battle') {
+                    roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
+                    // No Glam Fam-straffen afhænger af enchant-antallet — genopfrisk
+                    // boss-info-headeren så den viste procent ikke går forældet hvis
+                    // man enchanter en cap midt i selve boss-kampen.
+                    if (gameState.currentNode?.boss) ui.setBossInfo(gameState.currentNode.boss);
+                }
                 ui.showEnchantResult(enchantDef, entry);
             });
         }
@@ -146,7 +153,7 @@ const closePeekIfOpen = () => {
     if (currentScreenName !== 'map' && document.getElementById('map-screen')) mapScreen.exit();
 };
 
-ui.onPauseRetry    = () => { closePeekIfOpen(); battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
+ui.onPauseRetry    = () => { closePeekIfOpen(); battleSaveState = null; resumeScreen = null; gameState.startRun(); goToNode(gameState.currentNode); };
 ui.onPauseMainMenu = () => {
     closePeekIfOpen();
     battleSaveState = null;
@@ -183,6 +190,14 @@ transitionCover.id = 'screen-transition-cover';
 document.body.appendChild(transitionCover);
 
 // ─── SCREEN ROUTER ───────────────────────────────────────────────────────────
+// Delt af mapScreen.onNodeSelect og alle "start en frisk run"-indgange (New Run,
+// Pause-Retry, Try Again) — sender direkte til node 1-1 uden at mounte map-screen.
+function goToNode(node) {
+    returnToAfterMap = 'start';
+    if (node.type === 'slammer') showScreen('slammer-choice', node);
+    else                         showScreen('battle', node);
+}
+
 function showScreen(name, context = null) {
     const prev = currentScreen;
 
@@ -205,7 +220,7 @@ function showScreen(name, context = null) {
 
         if (name === 'start') {
             currentScreen = startScreen;
-            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
+            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); goToNode(gameState.currentNode); };
             startScreen.onContinueRun = () => {
                 if (battleSaveState) {
                     const saved = battleSaveState;
@@ -234,11 +249,7 @@ function showScreen(name, context = null) {
                 returnToAfterMap = 'start';
                 showScreen(dest);
             };
-            mapScreen.onNodeSelect = (node) => {
-                returnToAfterMap = 'start';
-                if (node.type === 'slammer') showScreen('slammer-choice', node);
-                else                         showScreen('battle', node);
-            };
+            mapScreen.onNodeSelect = goToNode;
             mapScreen.onTrickShot = (trickShotDef, parentNode) => {
                 showScreen('trickshot', { trickShotDef, parentNode });
             };
@@ -325,7 +336,7 @@ function showScreen(name, context = null) {
 
         } else if (name === 'run-end') {
             currentScreen = runEndScreen;
-            runEndScreen.onTryAgain = () => { returnToAfterMap = 'start'; gameState.startRun(); showScreen('map'); };
+            runEndScreen.onTryAgain = () => { gameState.startRun(); goToNode(gameState.currentNode); };
             runEndScreen.onMainMenu = () => showScreen('start');
             runEndScreen.enter(context);
 

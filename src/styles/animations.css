@@ -1,3 +1,15 @@
+/* ─── ICON-KLIK "JUICE" (cap/slammer-thumbnails før detail-view åbnes) ──────
+   Erstatter/supplerer den gamle rene :hover-rotation (som slet ikke fyrer på
+   touch — derfor virkede den kun med mus på pc). Trigges via JS
+   (domUtils.js: pulseIconRotate) lige når et ikon-klik detekteres, samme sted
+   på tværs af RewardScreen/ShopScreen/BossShopScreen for konsekvent feel. */
+@keyframes icon-pulse-rotate {
+    0%   { transform: rotate(0deg) scale(1);    }
+    40%  { transform: rotate(15deg) scale(1.12); }
+    100% { transform: rotate(0deg) scale(1);    }
+}
+.icon-pulse-rotate { animation: icon-pulse-rotate 0.4s ease-out; }
+
 /* ─── SCREEN TRANSITIONS ─────────────────────────────────────────────────── */
 @keyframes screen-fade-in {
     from { opacity: 0; transform: scale(0.98); }
@@ -333,6 +345,23 @@
 .trickshot-reward-bonus {
     background: #f5c842;
     color: #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+    padding: 6px 10px;
+    border-top: 3px solid #000;
+    margin-top: -1px;
+}
+
+/* Samme "påklistret mærke nederst"-mønster som ovenfor, men på boss-info-
+   stickeren (kort-tooltip) — viser No Glam Fams live straf-procent baseret på
+   ejede caps' enchants LIGE NU, i stedet for kun den statiske gimmick-tekst. */
+.boss-penalty-live {
+    background: #7a1f28;
+    color: #ffcc66;
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     font-weight: 800;

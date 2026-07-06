@@ -115,6 +115,25 @@
     animation: help-bar-oscillate 2.5s ease-in-out infinite;
 }
 
+/* ─── DETAIL BACKDROP ─────────────────────────────────────────────────────── */
+/* Delt dæmpnings-lag bag cap/slammer/relic-detail — de tre popups er gensidigt
+   udelukkende (kun én kan være åben ad gangen), så ét baggrundslag er nok.
+   Samme --overlay-modal-token som help-modal/shop-pack-overlay/collection, så
+   det visuelt matcher resten af spillets "dæmp alt andet"-mønster. Vises/
+   skjules centralt i UIManager (_setDetailBackdrop) sammen med selve popup'en
+   — også fra de knapper der lukker popup'en direkte (BUY/PICK/TAKE/Sell),
+   ikke kun fra klik-udenfor. z-index under selve popup'en (300) men over alt
+   andet, så det dækker den skærm popup'en er åbnet fra (reward/shop/boss-shop/
+   collection) uanset hvilken det er. */
+#detail-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--overlay-modal);
+    z-index: 295;
+}
+#detail-backdrop.open { display: block; }
+
 /* ─── CAP DETAIL ──────────────────────────────────────────────────────────── */
 #cap-detail {
     display: none;
@@ -129,6 +148,28 @@
     text-align: center;
     min-width: 180px;
     border-radius: 0;
+}
+/* Chest/mystery-reward: kortet selv sidder forskudt mod venstre (se
+   .reward-cards--single i reward.css), så popup'en åbner til HØJRE i stedet
+   for centreret, i det tomrum der ellers er ubrugt. Sat/fjernet pr. kald via
+   showCapDetail(..., {side:true}) — aldrig en permanent klasse, da #cap-detail
+   er globalt og bruges centreret alle andre steder (shop/collection/osv).
+   Kun >=720px — samme breakpoint som .reward-cards--single's venstre-skub i
+   reward.css. Uden denne guard blev popup'en skubbet mod højre på ALLE
+   bredder (ren vw/clamp uden nedre grænse), mens kortet under kun skubbes
+   til venstre >=720px — under den bredde endte de to derfor med at overlappe
+   grimt i stedet for enten at være pænt splittet ELLER begge centreret.
+   right-værdien er en FAST afstand fra midten (50vw - --reward-side-half),
+   samme konstant som reward.css bruger til kortets margin — det er det der
+   holder afstanden mellem kort og popup KONSTANT uanset skærmbredde, i
+   stedet for at vokse ubegrænset på brede skærme (som en ren vw/clamp-
+   skalering af hver sin kant ellers ville gøre). */
+@media (min-width: 720px) {
+    #cap-detail.cap-detail--side {
+        left: auto;
+        right: calc(50vw - var(--reward-side-half));
+        transform: translateY(-50%) rotate(-1deg);
+    }
 }
 .cap-viewer-wrap {
     position: relative;
@@ -308,16 +349,54 @@
     min-width: 180px;
     border-radius: 0;
 }
+/* Samme chest/mystery-side-positionering (og samme >=720px-guard + faste
+   afstand-fra-midten) som #cap-detail--side ovenfor. */
+@media (min-width: 720px) {
+    #slammer-detail.slammer-detail--side {
+        left: auto;
+        right: calc(50vw - var(--reward-side-half));
+        transform: translateY(-50%) rotate(1deg);
+    }
+}
+.slammer-viewer-wrap {
+    position: relative;
+    display: inline-block;
+    margin: 10px auto 0;
+}
 #slammer-viewer-container {
     width: 220px;
     height: 220px;
-    margin: 10px auto 0;
     border: 2px solid var(--border-ink);
     overflow: hidden;
     cursor: grab;
     background: #f0f0f0;
+    display: block;
 }
 #slammer-viewer-container:active { cursor: grabbing; }
+/* Generisk action-knap på slammer-detail — parallel til #cap-detail-action,
+   bruges når slammeren inspiceres FØR et valg (reward/shop), i modsætning til
+   #slammer-detail-actions' faste Equip/Sell (Collection-brug). */
+#slammer-detail-action {
+    position: absolute;
+    bottom: -14px; right: -14px;
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; font-weight: 700;
+    line-height: 1.3; text-align: center;
+    padding: 7px 16px; cursor: pointer;
+    transform: rotate(2deg);
+    transition: box-shadow 0.08s, transform 0.08s;
+    z-index: 1;
+}
+#slammer-detail-action:hover {
+    box-shadow: 5px 5px 0px #000;
+    transform: rotate(2deg) translate(-1px, -1px);
+}
+#slammer-detail-action:active {
+    box-shadow: 1px 1px 0px #000;
+    transform: rotate(2deg) translate(2px, 2px);
+}
 #slammer-detail-name {
     font-family: 'JetBrains Mono', monospace;
     font-size: 14px;

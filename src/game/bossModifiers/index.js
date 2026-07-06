@@ -11,10 +11,17 @@ function oddToddMultiplier(ctx) {
     return ctx.actualWonCount % 2 === 1 ? 1 : 0;
 }
 
+// Delt med UI'et (boss-info-sticker/kort-tooltip) så den viste procent aldrig
+// kan drifte fra hvad der rent faktisk trækkes fra scoren.
+export function getNoGlamFamPenalty(ownedCaps) {
+    const enchantedCount = ownedCaps.filter(c => c.enchant).length;
+    const penaltyPercent = Math.min(10 * enchantedCount, 80);
+    return { enchantedCount, penaltyPercent };
+}
+
 function noGlamFamMultiplier(ctx) {
-    const enchantedCount = ctx.ownedCaps.filter(c => c.enchant).length;
-    const penalty = Math.min(0.10 * enchantedCount, 0.80);
-    return 1 - penalty;
+    const { penaltyPercent } = getNoGlamFamPenalty(ctx.ownedCaps);
+    return 1 - penaltyPercent / 100;
 }
 
 const BOSS_MULTIPLIERS = {

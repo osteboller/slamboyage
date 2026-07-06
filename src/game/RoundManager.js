@@ -5,6 +5,7 @@ import { EffectResolver } from './EffectResolver.js';
 import { isFaceUp } from './capUtils.js';
 import { resolveTrickShot } from './trickshots/index.js';
 import { getBossThrowMultiplier } from './bossModifiers/index.js';
+import { passiveMultiplier, passiveFlatBonus } from './passiveUtils.js';
 
 export class RoundManager {
     constructor({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState }) {
@@ -180,6 +181,12 @@ export class RoundManager {
     // scoreBase: persistent wallet score shown as starting value in the UI
     buildStack(overrideSize = null, overrideCaps = null, scoreBase = 0) {
         this.cancelAllTimers();
+        // Fjerner evt. transiente rarity/parity/flatbonus-badges fra forrige
+        // rundes sidste kast — de er globale HUD-elementer, uafhængige af
+        // hvilken skærm der vises, så deres 1.8s pop-animation kan ellers nå
+        // at bløde ind i en helt ny (fx boss-)runde hvis spilleren navigerer
+        // hurtigere end det.
+        this._ui.clearTransientPassiveBadges();
 
         this.caps.forEach(({ mesh, body }) => {
             this._render.removeMesh(mesh);
@@ -244,20 +251,39 @@ export class RoundManager {
         this._ui.hideResults();
         this._ui.updateThrowPips(this._throwsTotal, this._throwsTotal);
 
-        const slammers = this._gs?.ownedSlammers ?? [];
+        const slammers   = this._gs?.ownedSlammers ?? [];
+        const amplifyNow = this._gs?.amplifyStacks ?? 0;
         const firstStrikeSlammer = slammers.find(s => s.passive?.type === 'firstThrow');
-        if (firstStrikeSlammer) this._ui.showFirstStrikeBadge(firstStrikeSlammer);
+        if (firstStrikeSlammer) this._ui.showFirstStrikeBadge(firstStrikeSlammer, amplifyNow);
         else                    this._ui.hideFirstStrikeBadge();
         // Last Stand only visible on the last throw — hide at start unless round is 1 throw
         const lastStandSlammer = slammers.find(s => s.passive?.type === 'lastThrow');
-        if (lastStandSlammer && this._throwsTotal === 1) this._ui.showLastStandBadge(lastStandSlammer);
+        if (lastStandSlammer && this._throwsTotal === 1) this._ui.showLastStandBadge(lastStandSlammer, amplifyNow);
         else                                              this._ui.hideLastStandBadge();
+        // Flat Bonus vises IKKE her — den er transient (poppes ind som bekræftelse
+        // lige efter et kast, se phase 3+4), ikke en persistent pre-kast-badge.
         this._ui.updatePileButtons(this.caps, [], this._geb);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
         this.delay(() => {
             if (this._phase === 'idle') this._ui.setActionPrompt('Hold to aim');
         }, 300);
+    }
+
+    // Kaldes fra main.js lige når AMPLIFYZ spilles — de pre-kast-badges (First
+    // Strike/Last Stand) blev evt. allerede vist FØR kortet blev brugt (fra
+    // buildStack), og skal derfor opdateres med det samme til den forstærkede
+    // værdi i stedet for at vente på næste stack.
+    refreshAmplifyBadges() {
+        const slammers      = this._gs?.ownedSlammers ?? [];
+        const amplify       = this._gs?.amplifyStacks ?? 0;
+        const isFirstThrow  = this._pendingThrowsDone === 0;
+        const isLastThrow   = this._throwsLeft === 1;
+        const firstStrikeSlammer = slammers.find(s => s.passive?.type === 'firstThrow');
+        if (firstStrikeSlammer && isFirstThrow) this._ui.showFirstStrikeBadge(firstStrikeSlammer, amplify);
+        const lastStandSlammer = slammers.find(s => s.passive?.type === 'lastThrow');
+        if (lastStandSlammer && isLastThrow) this._ui.showLastStandBadge(lastStandSlammer, amplify);
+        // Flat Bonus har ingen pre-kast-badge at opdatere — den er transient.
     }
 
     // Bygger en stak til et Trick Shot-forsøg: hele owned-caps-puljen, kun 1 kast.
@@ -344,7 +370,7 @@ export class RoundManager {
 
         if (this._throwsLeft === 1) {
             const lastStandSlammer = (this._gs?.ownedSlammers ?? []).find(s => s.passive?.type === 'lastThrow');
-            if (lastStandSlammer) this._ui.showLastStandBadge(lastStandSlammer);
+            if (lastStandSlammer) this._ui.showLastStandBadge(lastStandSlammer, this._gs?.amplifyStacks ?? 0);
         }
     }
 
@@ -625,26 +651,57 @@ export class RoundManager {
         });
 
         // ── Phase 3+4: per-cap score med flat bonus + global multiplier-kæde ──
-        const flatSlammerBonus = this._gs?.flatSlammerBonus ?? 0;
         const multChain       = this._gs?.multiplierChain  ?? [];
         const doubleStacks    = this._gs?.activeDouble ?? 0;
         if (doubleStacks > 0 && this._gs) { this._gs.activeDouble = 0; this._ui.hideDoubleBadge(); }
         const doubleChain     = doubleStacks > 0 ? [...multChain, 2 ** doubleStacks] : multChain;
 
+        // AMPLIFYZ — næste kast: alle slammer-passiver trigger N ekstra gange,
+        // ét pr. kort brugt (stakker som doubleStacks — 2 kort = 2 ekstra triggers,
+        // ikke bare "aktiv/ikke aktiv"). Forbruges/nulstilles HER, kun ét sted,
+        // uanset om kastet rammer noget.
+        const amplify = this._gs?.amplifyStacks ?? 0;
+        if (amplify > 0 && this._gs) { this._gs.amplifyStacks = 0; this._ui.hideAmplifyBadge(); }
+
         const isFirstThrow    = this._pendingThrowsDone === 0;
         const isLastThrow     = this._throwsLeft === 1;
         const slammers        = this._gs?.ownedSlammers ?? [];
-        const firstMult       = isFirstThrow ? slammers.filter(s => s.passive?.type === 'firstThrow').reduce((m, s) => m * s.passive.value, 1) : 1;
-        const lastMult        = isLastThrow  ? slammers.filter(s => s.passive?.type === 'lastThrow' ).reduce((m, s) => m * s.passive.value, 1) : 1;
+        const flatSlammerBonus = passiveFlatBonus(slammers, s => s.passive?.type === 'flatBonus', amplify);
+        const firstMult       = isFirstThrow ? passiveMultiplier(slammers, s => s.passive?.type === 'firstThrow', amplify) : 1;
+        const lastMult        = isLastThrow  ? passiveMultiplier(slammers, s => s.passive?.type === 'lastThrow',  amplify) : 1;
         if (isFirstThrow) this._ui.hideFirstStrikeBadge();
         if (isLastThrow)  this._ui.hideLastStandBadge();
         // Parity-slammere (Even Steven/Odd Todd) — hele kastets antal flips afgør
         // om de matcher, ligesom boss-gimmicken, men her som en ren bonus (ikke veto).
+        // flipCount > 0 er bevidst — 0 er teknisk "lige", men et rent miss skal
+        // ikke kunne trigge Even Steven (samme regel som Even Split-trickshottet,
+        // se trickshots/evenFlipCount.js).
         const flipCount       = actualWon.length;
-        const parityMult      = slammers.filter(s => s.passive?.type === 'parityMultiplier')
-            .reduce((m, s) => (flipCount % 2 === (s.passive.parity === 'even' ? 0 : 1) ? m * s.passive.value : m), 1);
+        const parityMult      = passiveMultiplier(
+            slammers,
+            s => flipCount > 0 && s.passive?.type === 'parityMultiplier' && flipCount % 2 === (s.passive.parity === 'even' ? 0 : 1),
+            amplify
+        );
         const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : []), ...(parityMult > 1 ? [parityMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
+
+        // Parity Multiplier-feedback (Even Steven/Odd Todd SLAMMERE — bonus, ikke
+        // boss-veto'et). parityMult > 1 betyder kastets flip-paritet matchede en
+        // ejet slammer denne gang — udled hvilken (even/odd) for at finde dens icon.
+        if (parityMult > 1) {
+            const parityType    = flipCount % 2 === 0 ? 'even' : 'odd';
+            const paritySlammer = slammers.find(s => s.passive?.type === 'parityMultiplier' && s.passive.parity === parityType);
+            if (paritySlammer) this._ui.showParityMultBadge(paritySlammer, parityType, parityMult);
+        }
+
+        // Flat Bonus-feedback (Power Surge/Magnet) — kun hvis kastet rent faktisk
+        // flippede noget (ellers er der intet at lægge bonussen oveni). Sender
+        // den U-forstærkede base-værdi ind (showFlatBonusBadge amplificerer selv,
+        // ligesom showFirstStrikeBadge/showLastStandBadge gør med passive.value).
+        if (flatSlammerBonus > 0 && actualWon.length > 0) {
+            const flatBonusSlammer = slammers.find(s => s.passive?.type === 'flatBonus');
+            if (flatBonusSlammer) this._ui.showFlatBonusBadge(flatBonusSlammer, this._gs?.flatSlammerBonus ?? 0, amplify);
+        }
 
         // Boss-gimmick multiplier (Even Steven/Odd Todd/No Glam Fam) — holdes UDENFOR
         // positionChain, så den ikke optræder i score-floatens visuelle multiplier-kæde
@@ -666,6 +723,9 @@ export class RoundManager {
         }
 
         const voltage    = this._voltageBonus ?? 0;
+        // Dedup af Rarity Multiplier-badges: flere caps af samme rarity i ét kast
+        // skal kun give ÉN badge, ikke én pr. cap.
+        const triggeredRarities = new Set();
         const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
             const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
             const gsEntry  = cap.entryId != null && this._gs ? this._gs.ownedCaps.find(c => c.id === cap.entryId) : null;
@@ -680,12 +740,25 @@ export class RoundManager {
             // Rarity-slammere (Common/Uncommon/Rare/Legendary-fokus) — kun caps af den
             // matchende rarity ganges, så det vises i DENNE caps egen chain, ikke i
             // den delte positionChain (som gælder alle caps i kastet).
-            const rarityMult = slammers.filter(s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === (cap.def?.rarity ?? 1))
-                .reduce((m, s) => m * s.passive.value, 1);
+            const capRarity   = cap.def?.rarity ?? 1;
+            const rarityMult = passiveMultiplier(
+                slammers,
+                s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === capRarity,
+                amplify
+            );
+            if (rarityMult > 1) triggeredRarities.add(capRarity);
             const capChain   = rarityMult > 1 ? [...positionChain, rarityMult] : positionChain;
             const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1));
             const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult);
             return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry };
+        });
+        // Rarity Multiplier-feedback: én badge pr. UNIK rarity der rent faktisk
+        // triggede denne gang (se dedup ovenfor).
+        triggeredRarities.forEach(rarity => {
+            const raritySlammer = slammers.find(s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === rarity);
+            if (!raritySlammer) return;
+            const value = passiveMultiplier(slammers, s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === rarity, amplify);
+            this._ui.showRarityMultBadge(raritySlammer, rarity, value);
         });
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
 

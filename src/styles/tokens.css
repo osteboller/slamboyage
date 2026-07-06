@@ -65,4 +65,11 @@
     /* ── Dot-grid baggrund (bruges på alle light screens) ────────────────────── */
     --bg-dot-grid: radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px);
     --bg-dot-size: 22px 22px;
+
+    /* ── Layout ──────────────────────────────────────────────────────────────── */
+    /* Halv "stage"-bredde for chest/mystery-rewardens venstre-kort/højre-popup-
+       opdeling (reward.css' .reward-cards--single + modals.css' cap/slammer-
+       detail--side). Delt ét sted så kort og popup altid forbliver et fast,
+       centreret par — se udregningen i modals.css. */
+    --reward-side-half: 320px;
 }

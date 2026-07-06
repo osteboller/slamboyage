@@ -4,6 +4,9 @@ import { effectName, effectDesc } from '../game/effects/labels.js';
 import { ENCHANT_DEFS }      from '../config/enchantDefs.js';
 import { capThumbnailHTML }  from './capThumbnail.js';
 import { REWARD_TYPE_ICONS, REWARD_TYPE_LABELS, REWARD_TYPE_DESCRIPTIONS } from '../config/trickShotDefs.js';
+import { bindTapSelect } from './domUtils.js';
+import { getNoGlamFamPenalty } from '../game/bossModifiers/index.js';
+import { formatScore } from './formatScore.js';
 
 export class UIManager {
     constructor() {
@@ -282,24 +285,29 @@ export class UIManager {
         document.getElementById('results').style.display = 'none';
     }
 
+    // _lastScoreValue holder den RÅ numeriske startværdi for tween-animationen
+    // — kan ikke længere læses tilbage fra DOM'en (parseInt("1.01k") === 1,
+    // ikke 1010, hvilket ville ødelægge selve optællingen for store tal).
     setScore(n) {
-        const el = document.getElementById('score');
-        const from = parseInt(el.textContent) || 0;
+        const el   = document.getElementById('score');
+        const from = this._lastScoreValue ?? 0;
         if (from === n) return;
+        this._lastScoreValue = n;
         if (this._scoreTweenRaf) cancelAnimationFrame(this._scoreTweenRaf);
         const duration = Math.min(450, Math.max(120, Math.abs(n - from) * 6));
         const start = performance.now();
         const step = (now) => {
             const t = Math.min((now - start) / duration, 1);
             const eased = 1 - Math.pow(1 - t, 3);
-            el.textContent = Math.round(from + (n - from) * eased);
+            el.textContent = formatScore(from + (n - from) * eased);
             if (t < 1) this._scoreTweenRaf = requestAnimationFrame(step);
-            else { el.textContent = n; this._scoreTweenRaf = null; }
+            else { el.textContent = formatScore(n); this._scoreTweenRaf = null; }
         };
         this._scoreTweenRaf = requestAnimationFrame(step);
     }
     resetScore() {
         if (this._scoreTweenRaf) { cancelAnimationFrame(this._scoreTweenRaf); this._scoreTweenRaf = null; }
+        this._lastScoreValue = 0;
         document.getElementById('score').textContent = 0;
         const ri = document.getElementById('run-info');
         if (ri) ri.classList.remove('run-info--won', 'run-info--lost');
@@ -316,11 +324,11 @@ export class UIManager {
         const step = (now) => {
             const t     = Math.min((now - start) / duration, 1);
             const eased = 1 - Math.pow(1 - t, 3);
-            goalEl.textContent = Math.round(clearScore + (target - clearScore) * eased);
+            goalEl.textContent = formatScore(clearScore + (target - clearScore) * eased);
             if (t < 1) {
                 requestAnimationFrame(step);
             } else {
-                goalEl.textContent = target;
+                goalEl.textContent = formatScore(target);
                 runInfo.classList.add(won ? 'run-info--won' : 'run-info--lost');
             }
         };
@@ -343,8 +351,8 @@ export class UIManager {
         el.addEventListener('animationend', e => { if (e.target === el) el.remove(); });
     }
 
-    showScoreDeduct(amount) { this._spawnAnchorFloat(`-${amount}`, 'score-float--deduct'); }
-    showScoreGain(amount)   { this._spawnAnchorFloat(`+${amount}`, 'bonus'); }
+    showScoreDeduct(amount) { this._spawnAnchorFloat(`-${formatScore(amount)}`, 'score-float--deduct'); }
+    showScoreGain(amount)   { this._spawnAnchorFloat(`+${formatScore(amount)}`, 'bonus'); }
 
     // Parity-boss (Even Steven/Odd Todd) pr.-kast feedback — grønt flueben når
     // kastets flip-antal matcher bossens krav (kastet tæller), rødt kryds når
@@ -387,20 +395,112 @@ export class UIManager {
         el.style.display = '';
     }
     hideDoubleBadge()      { document.getElementById('double-badge').style.display = 'none'; }
+
+    // Fjerner øjeblikkeligt (ingen exit-animation) alle transiente rarity/
+    // parity/flatbonus-badges — kaldes ved en NY runde/stack (RoundManager.
+    // buildStack()), så en badge fra forrige rundes sidste kast ikke bliver
+    // hængende ind i næste skærm/kamp bare fordi dens 1.8s pop-animation
+    // endnu ikke var færdig da spilleren nåede at navigere videre (fx gennem
+    // reward/shop og ind i en boss-kamp hurtigere end 1.8s).
+    clearTransientPassiveBadges() {
+        document.querySelectorAll('.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge')
+            .forEach(el => el.remove());
+    }
+
+    // AMPLIFYZ — persistent "armeret"-badge, stakker ligesom double-badge (spiller
+    // 2 kort → ×2, ikke bare "aktiv"). Uden denne var der ingen måde at SE at et
+    // 2. kort overhovedet blev registreret før kastet rent faktisk blev afgjort.
+    showAmplifyBadge(stacks) {
+        const el = document.getElementById('amplify-badge');
+        el.textContent = `◈ ×${stacks}`;
+        el.style.display = '';
+    }
+    hideAmplifyBadge() { document.getElementById('amplify-badge').style.display = 'none'; }
+
     // slammer = den ejede slammer der giver passiven — viser dens portræt i
     // stedet for et generisk ikon (relic-erstatning, jf. slammer-passives-draft.md).
-    showFirstStrikeBadge(slammer) {
+    // amplifyStacks = antal AMPLIFYZ-kort armeret til NÆSTE kast (0 = ingen) —
+    // viser den reelt forstærkede værdi (value^(1+stacks), matcher passiveMultiplier)
+    // + en ◈×N-markør, så stak-antallet kan ses FØR man kaster.
+    showFirstStrikeBadge(slammer, amplifyStacks = 0) {
         const el = document.getElementById('first-strike-badge');
-        if (slammer?.texFront) el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ×${slammer.passive.value}`;
+        if (slammer?.texFront) {
+            const value = amplifyStacks > 0 ? slammer.passive.value ** (1 + amplifyStacks) : slammer.passive.value;
+            el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ×${value}${amplifyStacks > 0 ? ` ◈×${amplifyStacks}` : ''}`;
+        }
+        el.classList.toggle('slammer-badge--amplified', amplifyStacks > 0);
         el.style.display = '';
     }
     hideFirstStrikeBadge() { document.getElementById('first-strike-badge').style.display = 'none'; }
-    showLastStandBadge(slammer) {
+    showLastStandBadge(slammer, amplifyStacks = 0) {
         const el = document.getElementById('last-stand-badge');
-        if (slammer?.texFront) el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ×${slammer.passive.value}`;
+        if (slammer?.texFront) {
+            const value = amplifyStacks > 0 ? slammer.passive.value ** (1 + amplifyStacks) : slammer.passive.value;
+            el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ×${value}${amplifyStacks > 0 ? ` ◈×${amplifyStacks}` : ''}`;
+        }
+        el.classList.toggle('slammer-badge--amplified', amplifyStacks > 0);
         el.style.display = '';
     }
     hideLastStandBadge()   { document.getElementById('last-stand-badge').style.display = 'none'; }
+
+    // Flat Bonus-passiv (Power Surge/Magnet) — transient, ligesom rarity/parity
+    // nedenfor: poppes ind som BEKRÆFTELSE lige når et kast lander, ikke synlig
+    // FØR kastet (den er ubetinget/altid aktiv, så en persistent pre-kast-badge
+    // ville bare være støj — se rarity-mult-badge for samme mønster). value =
+    // den AGGREGEREDE bonus på tværs af alle ejede flatBonus-slammere.
+    showFlatBonusBadge(slammer, value, amplifyStacks = 0) {
+        const stack = document.getElementById('slammer-badge-stack');
+        if (!stack || !slammer?.texFront) return;
+        const shown = amplifyStacks > 0 ? value * (1 + amplifyStacks) : value;
+        const el = document.createElement('div');
+        el.className = 'flatbonus-mult-badge';
+        el.style.background = '#ffb84d';
+        el.style.color      = '#000';
+        el.style.boxShadow  = '3px 3px 0 #8b5a00';
+        el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> +${shown}★${amplifyStacks > 0 ? ` ◈×${amplifyStacks}` : ''}`;
+        stack.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
+
+    // Rarity Multiplier-passiv (Uncommon Ground/Rare Find/Legendary Status/
+    // Common Touch) — transient badge der poppes ind i badge-stacken lige når
+    // kastet lander, farvet efter den rarity der blev boostet (samme palette
+    // som cap/slammer-detailens rarity-badge i modals.css). Kalderen (RoundManager)
+    // deduplikerer pr. kast — kaldes kun ÉN gang selvom flere caps af samme
+    // rarity flippede i samme kast.
+    showRarityMultBadge(slammer, rarity, value) {
+        const stack = document.getElementById('slammer-badge-stack');
+        if (!stack || !slammer?.texFront) return;
+        const RARITY_COLORS = { 1: ['#000', '#fff'], 2: ['#5d5f5f', '#fff'], 3: ['var(--clr-red)', '#fff'], 4: ['#f5c842', '#000'] };
+        const [bg, fg] = RARITY_COLORS[rarity] ?? RARITY_COLORS[1];
+        const el = document.createElement('div');
+        el.className = 'rarity-mult-badge';
+        el.style.background  = bg;
+        el.style.color       = fg;
+        el.style.boxShadow   = '3px 3px 0 #000';
+        el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ×${value}`;
+        stack.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
+
+    // Parity Multiplier-passiv (Even Steven/Odd Todd SLAMMERE — en ren bonus,
+    // IKKE at forveksle med de samnavngivne boss-gimmicks som veto'er score til
+    // 0 i stedet). Samme transiente stil som rarity-badgen ovenfor. Teal/magenta
+    // — bevidst IKKE grønt/rødt, så de ikke forveksles med First Strikes grønne
+    // eller Rare-rarityens røde.
+    showParityMultBadge(slammer, parity, value) {
+        const stack = document.getElementById('slammer-badge-stack');
+        if (!stack || !slammer?.texFront) return;
+        const bg = parity === 'even' ? '#00a0a0' : '#cc2266';
+        const el = document.createElement('div');
+        el.className = 'parity-mult-badge';
+        el.style.background = bg;
+        el.style.color      = '#fff';
+        el.style.boxShadow  = '3px 3px 0 #000';
+        el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ${parity === 'even' ? 'EVEN' : 'ODD'} ×${value}`;
+        stack.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
 
     showRunOverlay() {
         document.getElementById('tl-overlay').style.display    = '';
@@ -439,10 +539,28 @@ export class UIManager {
     }
 
     // ─── BOSS INFO ───────────────────────────────────────────────────────────
+    // No Glam Fam-straffen afhænger af ejede caps' enchants — beregnes live
+    // fra gameState i stedet for at bages ind i bossDef, så den aldrig kan
+    // vise et forældet tal (fx hvis en cap enchantes mens man kigger på den).
+    // Returnerer kun selve teksten (ingen wrapper) — kaldestederne har hver
+    // deres egen container med sin egen styling (sticker vs. persistent header).
+    _noGlamFamPenaltyText(bossDef) {
+        if (bossDef.gimmick !== 'no_glam_fam' || !this._gameState) return null;
+        const { enchantedCount, penaltyPercent } = getNoGlamFamPenalty(this._gameState.ownedCaps);
+        const capsLabel = enchantedCount === 1 ? 'enchanted cap' : 'enchanted caps';
+        return `Current: −${penaltyPercent}% (${enchantedCount} ${capsLabel})`;
+    }
+
     setBossInfo(bossDef) {
         document.getElementById('boss-info-name').textContent = `${bossDef.icon} ${bossDef.name}`;
         document.getElementById('boss-info-desc').textContent = bossDef.description;
         document.getElementById('boss-info').style.display = '';
+        const penaltyEl = document.getElementById('boss-info-penalty');
+        const penaltyText = this._noGlamFamPenaltyText(bossDef);
+        if (penaltyEl) {
+            penaltyEl.textContent = penaltyText ?? '';
+            penaltyEl.style.display = penaltyText ? '' : 'none';
+        }
         document.getElementById('boss-info-feedback')?.classList.remove('boss-info-feedback--show', 'boss-info-feedback--pop');
     }
     clearBossInfo() {
@@ -743,6 +861,7 @@ export class UIManager {
             detail.style.display      = 'none';
             slamDetail.style.display  = 'none';
             relicDetail.style.display = 'none';
+            this._setDetailBackdrop(false);
             this._capViewer.hide();
             this._slammerViewer.hide();
         });
@@ -982,11 +1101,23 @@ export class UIManager {
         });
     }
 
+    // ─── DETAIL BACKDROP ─────────────────────────────────────────────────────
+    // Delt dæmpnings-lag bag cap/slammer/relic-detail (modals.css) — kaldes
+    // fra alle steder der viser/skjuler en af de tre popups, inklusive deres
+    // egne action-knapper (BUY/PICK/TAKE/Sell), ikke kun klik-udenfor.
+    _setDetailBackdrop(open) {
+        document.getElementById('detail-backdrop')?.classList.toggle('open', open);
+    }
+
     // ─── CAP DETAIL POPUP ────────────────────────────────────────────────────
     // action = { label, price, color, callback } — optional sticker button on viewer
-    showCapDetail(capOrEntry, lit = false, action = null) { this._showCapDetail(capOrEntry, lit, action); }
+    // opts.side = true → popup åbner til HØJRE (chest/mystery-rewards, hvor
+    // selve kortet er forskudt mod venstre, se reward.css). Toggles ALTID
+    // (både til og fra) så klassen aldrig kan "lække" ind i andre kontekster
+    // — #cap-detail er globalt og bruges centreret alle andre steder.
+    showCapDetail(capOrEntry, lit = false, action = null, opts = {}) { this._showCapDetail(capOrEntry, lit, action, opts); }
 
-    _showCapDetail(capOrEntry, lit, action = null) {
+    _showCapDetail(capOrEntry, lit, action = null, opts = {}) {
         const def     = capOrEntry.def ?? capOrEntry;
         const enchant = capOrEntry.enchant ?? null;
 
@@ -1023,6 +1154,7 @@ export class UIManager {
         }
 
         detail.classList.toggle('cap-detail--lit', lit);
+        detail.classList.toggle('cap-detail--side', !!opts.side);
 
         if (action) {
             actionEl.innerHTML         = `${action.label}${action.price ? `<br>${action.price}` : ''}`;
@@ -1035,6 +1167,7 @@ export class UIManager {
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
                 detail.style.display = 'none';
+                this._setDetailBackdrop(false);
                 this._capViewer.hide();
                 action.callback();
             });
@@ -1060,6 +1193,7 @@ export class UIManager {
 
         this._capViewer.show(def, 'cap', enchant);
         detail.style.display = 'block';
+        this._setDetailBackdrop(true);
     }
 
     // ─── RELIC / CARD DETAIL POPUP ───────────────────────────────────────────
@@ -1085,6 +1219,7 @@ export class UIManager {
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
                 detail.style.display = 'none';
+                this._setDetailBackdrop(false);
                 action.callback();
             });
         } else {
@@ -1092,10 +1227,17 @@ export class UIManager {
         }
 
         detail.style.display = 'block';
+        this._setDetailBackdrop(true);
     }
 
     // ─── SLAMMER DETAIL POPUP ────────────────────────────────────────────────
-    _showSlammerDetail(def, showEquip = false) {
+    // action = { label, price, color, callback } — samme mønster som showCapDetail,
+    // for inspektion-før-valg i reward/shop-kontekster (adskilt fra showEquip's
+    // faste Equip/Sell-knapper, som kun bruges fra Collection).
+    // opts.side = true → samme chest/mystery-højreforskydning som showCapDetail.
+    showSlammerDetail(def, showEquip = false, action = null, opts = {}) { this._showSlammerDetail(def, showEquip, action, opts); }
+
+    _showSlammerDetail(def, showEquip = false, action = null, opts = {}) {
         const detail = document.getElementById('slammer-detail');
         const nameEl = document.getElementById('slammer-detail-name');
 
@@ -1104,6 +1246,8 @@ export class UIManager {
         this._slammerViewer.show(def, 'slammer');
         this._renderSlammerStats(def);
         detail.style.display = 'block';
+        this._setDetailBackdrop(true);
+        detail.classList.toggle('slammer-detail--side', !!opts.side);
 
         const rarityEl = document.getElementById('slammer-detail-rarity');
         if (rarityEl) {
@@ -1111,6 +1255,28 @@ export class UIManager {
             const [cls, label] = RARITY_MAP[def.rarity ?? 1] ?? ['common', 'Common'];
             rarityEl.className   = `rarity--${cls}`;
             rarityEl.textContent = label;
+        }
+
+        const actionEl = document.getElementById('slammer-detail-action');
+        if (actionEl) {
+            if (action) {
+                actionEl.innerHTML         = `${action.label}${action.price ? `<br>${action.price}` : ''}`;
+                actionEl.style.background  = action.color ?? 'var(--clr-red)';
+                actionEl.style.color       = action.textColor ?? '#fff';
+                actionEl.style.display     = '';
+                // Replace node to drop any previous listener
+                const fresh = actionEl.cloneNode(true);
+                actionEl.parentNode.replaceChild(fresh, actionEl);
+                fresh.addEventListener('click', e => {
+                    e.stopPropagation();
+                    detail.style.display = 'none';
+                    this._setDetailBackdrop(false);
+                    this._slammerViewer.hide();
+                    action.callback();
+                });
+            } else {
+                actionEl.style.display = 'none';
+            }
         }
 
         // Passiv-info — erstatning for det tidligere relic-system, se
@@ -1158,6 +1324,7 @@ export class UIManager {
                     this._gameState.sellSlammer(def.name);
                     this.setScore(this._gameState.score);
                     detail.style.display = 'none';
+                    this._setDetailBackdrop(false);
                     // Genopfrisk collection-oversigten hvis den er åben, så ejerskabet opdateres
                     if (document.getElementById('map-collection-overlay')) this.openCollection('slammers');
                 };
@@ -1217,10 +1384,12 @@ export class UIManager {
     showBossInfoSticker(bossDef) {
         const el = document.createElement('div');
         el.className = 'enchant-result-sticker';
+        const penaltyText = this._noGlamFamPenaltyText(bossDef);
         el.innerHTML = `
             <div class="enchant-result-icon" style="background:#7a1f28;font-size:32px;padding:14px 12px 10px;text-align:center;color:#fff;">${bossDef.icon}</div>
             <div class="enchant-result-name" style="color:#7a1f28;">${bossDef.name}</div>
-            <div class="enchant-result-desc">${bossDef.description}</div>`;
+            <div class="enchant-result-desc">${bossDef.description}</div>
+            ${penaltyText ? `<div class="boss-penalty-live">${penaltyText}</div>` : ''}`;
         this._mountDismissableSticker(el, 5000);
     }
 
@@ -1238,6 +1407,52 @@ export class UIManager {
             <div class="enchant-result-name">${label}</div>
             <div class="enchant-result-desc">${desc}</div>`;
         this._mountDismissableSticker(el, 4500);
+    }
+
+    // Slammer-loft ramt (MAX_OWNED_SLAMMERS) — dismissable sticker med en direkte
+    // genvej til Collection, så spilleren kan sælge en slammer og gøre plads
+    // uden at forlade det underliggende reward/pakke-flow (som ligger urørt bag
+    // denne body-level overlay og bare venter på samme klik igen).
+    showMaxSlammersMessage() {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#7a1f28;font-size:26px;padding:14px 12px 10px;text-align:center;color:#fff;">⚠</div>
+            <div class="enchant-result-name" style="color:#7a1f28;">Max Slammers reached</div>
+            <div class="enchant-result-desc">Sell one to make room.</div>
+            <button id="max-slammers-sell-btn" class="reward-quick-pick" style="display:block;margin:0 auto 14px;">▶ SELL A SLAMMER</button>`;
+        document.body.appendChild(el);
+
+        let timer;
+        const cleanup = () => { clearTimeout(timer); document.removeEventListener('pointerdown', onOutsidePointerdown); };
+        const dismiss = () => { cleanup(); el.classList.add('enchant-result-sticker--out'); };
+        const onOutsidePointerdown = e => {
+            if (e.target.closest('#max-slammers-sell-btn')) return; // knappen håndterer sit eget klik
+            this._suppressNextClick = true;
+            dismiss();
+        };
+        timer = setTimeout(dismiss, 6000);
+        setTimeout(() => document.addEventListener('pointerdown', onOutsidePointerdown), 0);
+        el.addEventListener('animationend', e => { if (e.animationName === 'enchant-result-out') el.remove(); });
+
+        el.querySelector('#max-slammers-sell-btn').addEventListener('pointerdown', e => {
+            e.stopPropagation();
+            this._suppressNextClick = true;
+            dismiss();
+            this.openCollection('slammers');
+        });
+    }
+
+    // Cap-loft ramt (MAX_OWNED_CAPS) — rent informativ, ingen handling: rewarden
+    // er allerede konverteret til ★ af GameState.compensateFullCollection().
+    showCollectionFullMessage(amount) {
+        const el = document.createElement('div');
+        el.className = 'enchant-result-sticker';
+        el.innerHTML = `
+            <div class="enchant-result-icon" style="background:#1a1a1a;font-size:26px;padding:14px 12px 10px;text-align:center;color:#fff;">🎒</div>
+            <div class="enchant-result-name">Collection full</div>
+            <div class="enchant-result-desc">Converted to +${amount}★ instead.</div>`;
+        this._mountDismissableSticker(el, 3500);
     }
 
     // Trick Shot-info-sticker fra kortet — samme mekanik som boss-info-stickeren.
@@ -1326,9 +1541,16 @@ export class UIManager {
         document.body.appendChild(el);
 
         el.querySelector('#cap-picker-close').addEventListener('click', () => el.remove());
+        // Baggrunds-luk uændret — kun selve tap-valget er ramt af scroll-vs-tap-buggen.
         el.addEventListener('pointerdown', e => {
-            const thumb = e.target.closest('.cap-picker-thumb[data-cap-id]');
-            if (!thumb) { if (e.target === el) el.remove(); return; }
+            if (!e.target.closest('.cap-picker-thumb[data-cap-id]') && e.target === el) el.remove();
+        });
+        // pointerdown alene fyrer i samme øjeblik fingeren rammer skærmen — før
+        // browseren har afgjort om det er et tap eller starten på en scroll-
+        // gestus. bindTapSelect kræver at pointerup lander på samme element
+        // UDEN nævneværdig bevægelse, så et scroll i listen ikke rammer en
+        // tilfældig cap under fingeren.
+        bindTapSelect(el, '.cap-picker-thumb[data-cap-id]', thumb => {
             const entry = entries.find(c => c.id === +thumb.dataset.capId);
             if (entry) { el.remove(); onPick(entry); }
         });

@@ -69,23 +69,66 @@
     margin: 4px 0 0;
 }
 
-/* Cards grid */
+/* Cards grid — kolonner er content-brede (samme "tykkelse" som kiste-kortet i
+   single-mode) i stedet for 1fr-stræk, så 3-korts-layouts (rewards OG pakker)
+   ikke blæser kortene op i fuld bredde på store skærme. */
 .reward-cards {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, clamp(140px, 24vw, 180px)));
+    justify-content: center;
     gap: clamp(10px, 2vw, 20px);
     width: 100%;
     max-width: min(92vw, 680px);
     align-items: start;
 }
-/* Kiste/mystery — ÉT kort, ikke 3 (reward-chests-draft.md) — centreret, ikke
-   strakt ud til fuld gridbredde. */
+/* Kiste/mystery — ÉT kort, ikke 3 (reward-chests-draft.md) — ikke strakt ud
+   til fuld gridbredde. */
 .reward-cards--single {
     grid-template-columns: 1fr;
     max-width: min(80vw, 280px);
     justify-items: center;
 }
-.reward-cards--single .reward-card:nth-child(1) { --rot: 1deg; }
+/* Trækkes mod venstre halvdel på brede nok skærme, så der er plads til at
+   capviewer/detail-view popper op til HØJRE for kortet (se
+   #cap-detail--side/#slammer-detail--side i modals.css) i stedet for at
+   overlappe midt på skærmen oven i et ellers tomt rum. Kun >=720px — på
+   mobil er der ikke plads til side-by-side alligevel, så forbliver centreret
+   (matcher modals.css' samme breakpoint-guard på selve popup'en).
+   Positionen regnes som en FAST afstand fra skærmens midte
+   (50vw - --reward-side-half), IKKE en ren vw/clamp-skalering af margenen —
+   ellers vokser afstanden til popup'en ubegrænset med skærmbredden (kortet
+   presses mod venstre kant, popup'en mod højre kant, og imellem dem opstår
+   et stadig større tomrum jo bredere skærmen er). Med en fast afstand fra
+   midten centrerer hele kort+popup-parret sig i stedet omkring skærmens
+   midte med en KONSTANT indbyrdes afstand, uanset skærmbredde. Det sidste led
+   trækker containerens egen venstre-padding fra, så margin-left rammer den
+   ønskede ABSOLUTTE position (align-self:flex-start starter jo allerede
+   inde efter paddingen). */
+@media (min-width: 720px) {
+    .reward-cards--single {
+        align-self: flex-start;
+        margin-left: calc(50vw - var(--reward-side-half) - clamp(12px, 3vw, 24px));
+    }
+}
+/* Ingen :nth-child her — chest tilføjer nu en tier-label SOM SØSKENDE FØR
+   kortet (se .reward-chest-tier-label), så kortet ikke længere er 1. barn.
+   Der er altid præcis ét .reward-card i single-mode, så ren descendant-match
+   er robust uanset hvor mange søskende der kommer før det. */
+.reward-cards--single .reward-card { --rot: 1deg; }
+
+/* Kiste-tier-indikator (SØLV/GULD) — separat, mindre mærke OVER selve kortet,
+   så den ikke længere overskriver cappens/slammerens egen rarity-badge
+   (reward-and-shop-card-consistency-prompten, Opgave 2). */
+.reward-chest-tier-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
 
 /* Point-udfald i en kiste — stort tal i stedet for et billede */
 .reward-points-display {
@@ -138,9 +181,11 @@
     margin: 8px 0;
 }
 
-/* Per-card scattered rotation via CSS custom property */
+/* Per-card scattered rotation + lodret forskydning via CSS custom properties —
+   kortene skal stå let forskudt/skævt (sticker-æstetik), ikke snorlige. */
 .reward-card {
     --rot: 0deg;
+    --ty: 0px;
     position: relative;
     background: var(--clr-bg-panel);
     border: 4px solid #000;
@@ -151,16 +196,16 @@
     align-items: center;
     gap: clamp(5px, 1vh, 8px);
     cursor: pointer;
-    transform: rotate(var(--rot));
+    transform: rotate(var(--rot)) translateY(var(--ty));
     transition: box-shadow 0.1s, transform 0.1s;
     text-align: left;
 }
-.reward-card:hover  { box-shadow: 4px 4px 0px #000; transform: rotate(var(--rot)) translateY(-4px); }
-.reward-card:active { box-shadow: none;              transform: rotate(var(--rot)) translateY(4px);  }
+.reward-card:hover  { box-shadow: 4px 4px 0px #000; transform: rotate(var(--rot)) translateY(calc(var(--ty) - 4px)); }
+.reward-card:active { box-shadow: none;              transform: rotate(var(--rot)) translateY(calc(var(--ty) + 4px)); }
 
-.reward-cards .reward-card:nth-child(1) { --rot:  2deg; }
-.reward-cards .reward-card:nth-child(2) { --rot: -1deg; z-index: 1; }
-.reward-cards .reward-card:nth-child(3) { --rot:  3deg; }
+.reward-cards .reward-card:nth-child(1) { --rot:  2deg; --ty:  8px; }
+.reward-cards .reward-card:nth-child(2) { --rot: -1deg; --ty: -5px; z-index: 1; }
+.reward-cards .reward-card:nth-child(3) { --rot:  3deg; --ty: 12px; }
 
 /* Rarity badge */
 .reward-rarity {
@@ -188,7 +233,12 @@
 .reward-rarity--rare      { background: var(--clr-red);  color: #fff; }
 .reward-rarity--legendary { background: #f5c842;          color: #000; }
 
-/* Cap image — larger, spin on card hover */
+/* Cap image — larger, spin on card hover.
+   INGEN pointer-events:none her — ikonet er selve klik-målet for "inspektion
+   før valg" (ikon = detail-viewer, PICK-knap = commit). pointer-events:none
+   gjorde at klik faldt igennem til det døde kort på alle kort hvor billedet
+   er en BAR <img> (slammere, kiste-slammere) — caps virkede kun fordi
+   capThumbnailHTML's .cap-enchant-wrap-wrapper fangede klikket i stedet. */
 .reward-cap-img {
     width: clamp(64px, 13vw, 100px);
     height: clamp(64px, 13vw, 100px);
@@ -196,7 +246,7 @@
     object-fit: cover;
     border: 4px solid #000;
     align-self: center;
-    pointer-events: none;
+    cursor: pointer;
     flex-shrink: 0;
 }
 .reward-card .cap-enchant-wrap { transition: transform 0.5s; align-self: center; }

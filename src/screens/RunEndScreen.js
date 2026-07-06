@@ -1,4 +1,5 @@
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
+import { formatScore } from '../ui/formatScore.js';
 
 export class RunEndScreen {
     constructor({ gameState }) {
@@ -53,7 +54,7 @@ export class RunEndScreen {
 
                 <div class="run-end-stats">
                     <div class="run-end-stat">
-                        <span class="run-end-stat-val">${totalScore}</span>
+                        <span class="run-end-stat-val">${formatScore(totalScore)}</span>
                         <span class="run-end-stat-key">★ score</span>
                     </div>
                     <div class="run-end-stat-sep">·</div>

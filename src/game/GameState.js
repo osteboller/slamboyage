@@ -1,4 +1,4 @@
-import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
+import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNED_CAPS, CAP_PRICE_GROWTH_PER_LOOP } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
@@ -18,9 +18,11 @@ export class GameState {
         this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
         this._rerollCostBase  = 1;
         this._discardCostBase = 2;
+        this._cardPriceMult   = 1;
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
+        this.amplifyStacks  = 0; // AMPLIFYZ — stakker ligesom activeDouble: 0=none, 1=×1 ekstra trigger, 2=×2 ekstra …
         this.shards         = 0; // run-scoped valuta — kun til boss-shoppen
     }
 
@@ -68,12 +70,17 @@ export class GameState {
         this.runNodes       = this._generateNodes(1);
         this._rerollCostBase  = 1;
         this._discardCostBase = 2;
+        this._cardPriceMult   = 1;
         this.shopOffer      = null;
         const mystixx   = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
         const twinsies  = CONSUMABLE_DEFS.find(c => c.id === 'clone');
-        const skippy    = CONSUMABLE_DEFS.find(c => c.id === 'skip_trickshot');
-        this.consumables    = [mystixx ?? null, twinsies ?? null, skippy ?? null];
+        // Skippy (trick shot-skip) er allerede valideret fra en tidligere test-
+        // runde — bytter den midlertidigt ud med Amplifyz, som mangler sin første
+        // test. Byt tilbage når Amplifyz er bekræftet virkende.
+        const amplifyz  = CONSUMABLE_DEFS.find(c => c.id === 'double_relic');
+        this.consumables    = [mystixx ?? null, twinsies ?? null, amplifyz ?? null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
+        this.amplifyStacks  = 0;
     }
 
     // Call when all nodes cleared — bumps loop, resets progress, scales thresholds
@@ -82,8 +89,10 @@ export class GameState {
         this.nodeIndex   = 0;
         this.runNodes    = this._generateNodes(this._loop);
         this._rerollCostBase  = 1;
-        this._discardCostBase = 2;
+        // _discardCostBase nulstilles IKKE her — discard-prisen skal blive ved med
+        // at eskalere gennem hele runnen, kun startRun() nulstiller den.
         this.shopOffer   = null;
+        this.amplifyStacks  = 0;
     }
 
     // Called after a node battle with the player's full accumulated score.
@@ -140,11 +149,18 @@ export class GameState {
 
     hasSlammer(name)  { return this.ownedSlammers.some(s => s.name === name); }
 
+    canAddSlammer() { return this.ownedSlammers.length < MAX_OWNED_SLAMMERS; }
+
+    // Returnerer false (uden at mutere ownedSlammers) hvis loftet er nået — kalderen
+    // skal vise ui.showMaxSlammersMessage() og lade tilbuddet stå urørt til retry
+    // (fx efter spilleren har solgt en slammer via Collection).
     addSlammer(slammerDef) {
+        if (!this.canAddSlammer()) return false;
         const entry = { ...slammerDef, passive: slammerDef.passive ? { ...slammerDef.passive } : null };
         if (entry.passive?.type === 'throwSaver') entry.passive.currentValue = 1.0;
         this.ownedSlammers.push(entry);
         if (entry.passive?.type === 'stackSize') this.stackSizeLimit += entry.passive.value;
+        return true;
     }
 
     sellSlammer(name) {
@@ -190,20 +206,63 @@ export class GameState {
     // regnes frisk og ikke driver skævt hvis slammeren hentes midt i et shop-besøg.
     get rerollCost()  { return Math.max(1, Math.ceil(this._rerollCostBase  * this.shopDiscountMult)); }
     get discardCost() { return Math.max(1, Math.ceil(this._discardCostBase * this.shopDiscountMult)); }
+    // Kort-pris-inflationen (CARD_PRICE_GROWTH) er run-persistent ligesom reroll/discard.
+    get cardPriceMultiplier() { return this._cardPriceMult; }
+    // Cap-/pakke-priser vokser pr. loop (CAP_PRICE_GROWTH_PER_LOOP) — se ShopScreen._price().
+    get capPriceMultiplier() { return 1 + (this._loop - 1) * CAP_PRICE_GROWTH_PER_LOOP; }
 
+    hasConsumableRoom() { return this.consumables.some(s => s === null); }
+
+    canAddCap() { return this.ownedCaps.length < MAX_OWNED_CAPS; }
+
+    // Fallback når collection er fuld ved commit — konverterer den forspildte cap til ★
+    // i stedet for at forsvinde stille. Kald i stedet for at pushe når canAddCap() === false.
+    compensateFullCollection(capDef) {
+        const fallback = Math.ceil(capDef?.sellPrice ?? 4);
+        this.score += fallback;
+        return fallback; // så UI kan vise "Collection full — +N★ i stedet"
+    }
+
+    // Gratis reward-lag (reward/kiste/mystery/pakke-pick) — blokerer ALDRIG flowet:
+    // konverterer til ★ via compensateFullCollection() hvis collection er fuld.
+    // Returnerer { ok, entry } eller { ok: false, compensated }.
     gainCap(capDef) {
-        this.ownedCaps.push(this._mkCapEntry(capDef));
+        if (!this.canAddCap()) return { ok: false, compensated: this.compensateFullCollection(capDef) };
+        const entry = this._mkCapEntry(capDef);
+        this.ownedCaps.push(entry);
+        return { ok: true, entry };
     }
 
     gainEnchantedCap(capDef, enchant = null) {
-        this.ownedCaps.push(this._mkCapEntry(capDef, enchant));
+        if (!this.canAddCap()) return { ok: false, compensated: this.compensateFullCollection(capDef) };
+        const entry = this._mkCapEntry(capDef, enchant);
+        this.ownedCaps.push(entry);
+        return { ok: true, entry };
     }
 
+    // Betalt køb i shoppen — undtaget fra ★-kompensationen (shop-UI'et skal i
+    // stedet aktivt disable/vise "FULL", så spilleren aldrig betaler ★ for en
+    // cap der bare konverteres tilbage). Afviser derfor stille, ligesom canAfford.
     buyCap(capDef, price) {
         if (!this.canAfford(price)) return false;
+        if (!this.canAddCap()) return false;
         this.score -= price;
         this.gainCap(capDef);
         return true;
+    }
+
+    // Køber et consumable-kort fra shop-båndet — prisen vokser ×CARD_PRICE_GROWTH
+    // for hvert kort købt, resten af runnen (kun startRun() nulstiller den).
+    // basePrice = u-rabatteret pris (fx PACK_PRICES.card), samme råt-felt-mønster
+    // som rerollCost/discardCost.
+    buyConsumableCard(def, basePrice) {
+        const price = Math.max(1, Math.ceil(basePrice * this.shopDiscountMult * this._cardPriceMult));
+        if (!this.canAfford(price)) return { ok: false, reason: 'afford' };
+        const slot = this.addConsumable(def);
+        if (slot === false) return { ok: false, reason: 'no_room' };
+        this.score -= price;
+        this._cardPriceMult *= CARD_PRICE_GROWTH;
+        return { ok: true, slot, price };
     }
 
     // Reroll top band — cost doubles each use per loop

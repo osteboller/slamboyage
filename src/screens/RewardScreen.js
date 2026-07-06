@@ -4,6 +4,8 @@ import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { effectName } from '../game/effects/labels.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js';
+import { pulseIconRotate } from '../ui/domUtils.js';
+import { formatScore } from '../ui/formatScore.js';
 
 const SKIP_BONUS = 5;
 
@@ -51,10 +53,12 @@ export class RewardScreen {
                 this._confirm(quickPick.dataset.key);
                 return;
             }
-            // Klik på kort → åbn detail viewer med PICK-sticker
-            const card = e.target.closest('.reward-card[data-key]');
-            if (card) {
-                const key = card.dataset.key;
+            // Klik på selve IKONET (ikke hele kortet) → åbn detail viewer med PICK-sticker
+            const icon = this._iconClick(e);
+            if (icon) {
+                const card = icon.closest('.reward-card[data-key]');
+                const key  = card?.dataset.key;
+                if (!key) return;
                 if (this._mode === 'cap') {
                     const def = this._choices.find(c => c.name === key);
                     if (def) this._ui.showCapDetail(def, false, {
@@ -63,7 +67,12 @@ export class RewardScreen {
                         callback: () => this._confirm(key),
                     });
                 } else {
-                    this._confirm(key);
+                    const def = this._choices.find(s => s.name === key);
+                    if (def) this._ui.showSlammerDetail(def, false, {
+                        label:    'PICK',
+                        color:    '#000',
+                        callback: () => this._confirm(key),
+                    });
                 }
                 return;
             }
@@ -97,9 +106,19 @@ export class RewardScreen {
 
         this._el.addEventListener('click', e => {
             const quickPick = e.target.closest('.reward-quick-pick[data-key]');
-            if (quickPick) { this._confirmEnchant(parseInt(quickPick.dataset.key)); return; }
-            const card = e.target.closest('.reward-card[data-key]');
-            if (card) { this._confirmEnchant(parseInt(card.dataset.key)); return; }
+            if (quickPick) { this._confirmEnchant(parseInt(quickPick.dataset.key, 10)); return; }
+            const icon = this._iconClick(e);
+            if (icon) {
+                const card   = icon.closest('.reward-card[data-key]');
+                const idx    = card ? parseInt(card.dataset.key, 10) : NaN;
+                const choice = this._choices[idx];
+                if (choice) this._ui.showCapDetail(choice.entry, false, {
+                    label:    'PICK',
+                    color:    choice.enchantDef.color,
+                    callback: () => this._confirmEnchant(idx),
+                });
+                return;
+            }
             if (e.target.closest('#reward-skip-btn')) this._doSkip();
         });
     }
@@ -135,10 +154,11 @@ export class RewardScreen {
         this._el.addEventListener('click', e => {
             const quickPick = e.target.closest('.reward-quick-pick[data-key]');
             if (quickPick) { this._confirm(quickPick.dataset.key); return; }
-            const card = e.target.closest('.reward-card[data-key]');
-            if (card) {
-                const key = card.dataset.key;
-                const def = this._choices.find(c => c.name === key);
+            const icon = this._iconClick(e);
+            if (icon) {
+                const card = icon.closest('.reward-card[data-key]');
+                const key  = card?.dataset.key;
+                const def  = key ? this._choices.find(c => c.name === key) : null;
                 if (def) this._ui.showCapDetail(def, false, {
                     label:    'PICK',
                     color:    '#000',
@@ -167,8 +187,16 @@ export class RewardScreen {
         this._render(this._choices);
 
         this._el.addEventListener('click', e => {
-            if (e.target.closest('.reward-quick-pick[data-key]') || e.target.closest('.reward-card[data-key]')) {
-                this._confirmChest();
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) { this._confirmChest(); return; }
+            const icon = this._iconClick(e);
+            if (icon) {
+                const item = this._chestItem;
+                if (item?.kind === 'cap') {
+                    this._ui.showCapDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() }, { side: true });
+                } else if (item?.kind === 'slammer') {
+                    this._ui.showSlammerDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() }, { side: true });
+                }
                 return;
             }
             if (e.target.closest('#reward-skip-btn')) this._doSkip();
@@ -191,8 +219,27 @@ export class RewardScreen {
         this._render(this._choices);
 
         this._el.addEventListener('click', e => {
-            if (e.target.closest('.reward-quick-pick[data-key]') || e.target.closest('.reward-card[data-key]')) {
-                this._confirmMystery();
+            const quickPick = e.target.closest('.reward-quick-pick[data-key]');
+            if (quickPick) { this._confirmMystery(); return; }
+            const icon = this._iconClick(e);
+            if (icon) {
+                const a = this._mysteryAction;
+                if (a?.kind === 'new_cap') {
+                    this._ui.showCapDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                } else if (a?.kind === 'new_slammer') {
+                    this._ui.showSlammerDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                } else if (a?.kind === 'swap_cap') {
+                    // Bytte-forhåndsvisning — begge ikoner (før/efter) skal kunne
+                    // inspiceres, ellers aner spilleren ikke hvad han bytter TIL.
+                    const isOld   = this._isOldSwapIcon(icon);
+                    const def     = isOld ? a.entry.def : a.newDef;
+                    const enchant = isOld ? (a.entry.enchant ?? null) : null;
+                    this._ui.showCapDetail({ def, enchant }, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                } else if (a?.kind === 'swap_slammer') {
+                    const isOld = this._isOldSwapIcon(icon);
+                    const def   = isOld ? a.entry : a.newDef;
+                    this._ui.showSlammerDetail(def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                }
                 return;
             }
             if (e.target.closest('#reward-skip-btn')) this._doSkip();
@@ -202,6 +249,28 @@ export class RewardScreen {
     exit() {
         this._el?.remove();
         this._el = null;
+    }
+
+    // Delt selector for "klik på selve ikonet" på tværs af alle reward-kort-
+    // typer — capThumbnailHTML's wrapper for caps, en bar <img> for slammere,
+    // .transform-result-img for mysterys før→efter-bytte-billeder. Ikon-klik =
+    // inspektion, PICK/TAKE-knappen = commit, resten af kortet reagerer ikke
+    // på klik (reward-and-shop-card-consistency-prompten, Opgave 3). Fyrer
+    // også den lille rotations-"juice" (samme for alle 5 modes gratis, siden
+    // de alle går gennem denne ene helper) — klik/tap-baseret i stedet for
+    // den gamle rene :hover-effekt, som slet ikke virkede på touch.
+    _iconClick(e) {
+        const icon = e.target.closest('.cap-enchant-wrap, .reward-cap-img, .transform-result-img');
+        if (icon) pulseIconRotate(icon);
+        return icon;
+    }
+
+    // Afgør om et klik i en swap_cap/swap_slammer-før→efter-visning ramte
+    // "før" (old) eller "efter" (new) billedet — el kan enten VÆRE <img>-taget
+    // selv (bar slammer-img) eller en .cap-enchant-wrap med <img> som barn.
+    _isOldSwapIcon(el) {
+        const img = el.matches('img') ? el : el.querySelector('img');
+        return img?.classList.contains('transform-result-img--old') ?? false;
     }
 
     reroll() {
@@ -238,10 +307,17 @@ export class RewardScreen {
     _confirm(key) {
         if (this._mode === 'slammer') {
             const def = this._choices.find(s => s.name === key);
-            if (def) this._gs.addSlammer(def);
+            // Loft ramt: blokér commit og lad skærmen stå urørt, så spilleren kan
+            // sælge en slammer via stickerens Collection-genvej og prøve igen.
+            if (def && !this._gs.addSlammer(def)) { this._ui.showMaxSlammersMessage(); return; }
         } else {
             const def = this._choices.find(c => c.name === key);
-            if (def) this._gs.gainCap(def);
+            // Cap-loft blokerer IKKE flowet — konverteres til ★ i stedet, jf.
+            // hardcaps-draften ("gratis reward-lag, ★-kompensationen er fin UX").
+            if (def) {
+                const result = this._gs.gainCap(def);
+                if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
+            }
         }
         if (this.onContinue) this.onContinue();
     }
@@ -257,9 +333,12 @@ export class RewardScreen {
     _confirmChest() {
         const item = this._chestItem;
         if (item) {
-            if      (item.kind === 'cap')     this._gs.gainCap(item.def);
-            else if (item.kind === 'slammer') this._gs.addSlammer(item.def);
-            else if (item.kind === 'card') {
+            if (item.kind === 'cap') {
+                const result = this._gs.gainCap(item.def);
+                if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
+            } else if (item.kind === 'slammer') {
+                if (!this._gs.addSlammer(item.def)) { this._ui.showMaxSlammersMessage(); return; }
+            } else if (item.kind === 'card') {
                 const slot = this._gs.addConsumable(item.def);
                 // Intet ledigt slot — sælg automatisk i stedet for at tabe rewarden helt
                 if (slot === false) this._gs.score += item.def.sellPrice ?? 0;
@@ -304,9 +383,10 @@ export class RewardScreen {
             const slot = this._gs.addConsumable(a.def);
             if (slot === false) this._gs.score += a.def.sellPrice ?? 0;
         } else if (a.kind === 'new_slammer') {
-            this._gs.addSlammer(a.def);
+            if (!this._gs.addSlammer(a.def)) { this._ui.showMaxSlammersMessage(); return; }
         } else if (a.kind === 'new_cap') {
-            this._gs.gainCap(a.def);
+            const result = this._gs.gainCap(a.def);
+            if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
         }
         if (this.onContinue) this.onContinue();
     }
@@ -518,17 +598,42 @@ export class RewardScreen {
         return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#000' : '#fff';
     }
 
+    // Delt gum-pack-kort for et consumable-kort — brugt af BÅDE chest- og
+    // mystery-visningen, så der kun er ét sted der definerer hvordan et kort
+    // ser ud som reward (reward-and-shop-card-consistency-prompten, Opgave 1+2).
+    _consumableCardHTML(def, key) {
+        const stripe = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 2px, #fff 2px, #fff 4px)`;
+        const tCol   = this._headerTextColor(def.color);
+        return `<div class="reward-card reward-card--gumcard" data-key="${key}">
+            <div class="gum-pack-top" style="background:${stripe};">
+                <div class="gum-pack-header" style="background:${def.color}; color:${tCol};">${def.name}</div>
+                <div class="gum-pack-icon">${def.icon}</div>
+            </div>
+            <div class="gum-pack-bottom">
+                <div class="gum-pack-flavor">${def.flavor}</div>
+                <div class="gum-pack-desc">${def.description}</div>
+            </div>
+            <div class="gum-pack-footer" style="background:${stripe};">
+                <button class="reward-quick-pick" data-key="${key}">▶ TAKE</button>
+            </div>
+        </div>`;
+    }
+
     // Sølv/guld-kiste — ÉT kort, ikke 3 (reward-chests-draft.md). Udseendet
     // afhænger af hvad kisten reelt indeholder (cap/slammer/kort/point).
+    // Kiste-tier (sølv/guld) vises nu som en separat lille indikator OVER
+    // kortet, i stedet for at overskrive cappens/slammerens EGEN rarity-badge
+    // (tidligere bug — badgens farve var allerede rigtig rarity, men teksten
+    // sagde "SILVER/GOLD CHEST" i stedet for fx "RARE").
     _chestCard(item) {
-        const tierLabel = this._chestTier === 'gold' ? 'GOLD CHEST' : 'SILVER CHEST';
-        const tierCls   = this._chestTier === 'gold' ? 'legendary' : 'common';
+        const tierLabel = this._chestTier === 'gold' ? '✪ GOLD CHEST' : '◎ SILVER CHEST';
+        const tierIndicatorHTML = `<div class="reward-chest-tier-label">${tierLabel}</div>`;
 
         if (item.kind === 'cap') {
             const r    = this._rarityInfo(item.def.rarity ?? 1);
             const effL = item.def.effect ? effectName(item.def.effect) : '';
-            return `<div class="reward-card" data-key="chest">
-                <div class="reward-rarity reward-rarity--${r.cls}">${tierLabel}</div>
+            return tierIndicatorHTML + `<div class="reward-card" data-key="chest">
+                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 ${capThumbnailHTML(item.def, { imgClass: 'reward-cap-img' })}
                 <div class="reward-cap-name">${item.def.name}</div>
                 <div class="reward-cap-series">${item.def.series.replaceAll('_', ' ')}</div>
@@ -538,8 +643,9 @@ export class RewardScreen {
         }
         if (item.kind === 'slammer') {
             const s = item.def;
-            return `<div class="reward-card reward-card--relic" data-key="chest">
-                <div class="reward-rarity reward-rarity--${tierCls}">${tierLabel}</div>
+            const r = this._rarityInfo(s.rarity ?? 1);
+            return tierIndicatorHTML + `<div class="reward-card reward-card--relic" data-key="chest">
+                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
                 <div class="reward-relic-desc">${s.passive ? `${s.passive.icon} ${s.passive.name} — ${s.passive.description}` : 'No passive'}</div>
@@ -547,74 +653,53 @@ export class RewardScreen {
             </div>`;
         }
         if (item.kind === 'card') {
-            const c      = item.def;
-            const stripe = `repeating-linear-gradient(-45deg, ${c.bg} 0px, ${c.bg} 2px, #fff 2px, #fff 4px)`;
-            const tCol   = this._headerTextColor(c.color);
-            return `<div class="reward-card reward-card--gumcard" data-key="chest">
-                <div class="gum-pack-top" style="background:${stripe};">
-                    <div class="gum-pack-header" style="background:${c.color}; color:${tCol};">${c.name}</div>
-                    <div class="gum-pack-icon">${c.icon}</div>
-                </div>
-                <div class="gum-pack-bottom">
-                    <div class="gum-pack-flavor">${c.flavor}</div>
-                    <div class="gum-pack-desc">${c.description}</div>
-                </div>
-                <div class="gum-pack-footer" style="background:${stripe};">
-                    <button class="reward-quick-pick" data-key="chest">▶ TAKE</button>
-                </div>
-            </div>`;
+            return tierIndicatorHTML + this._consumableCardHTML(item.def, 'chest');
         }
-        // points
-        return `<div class="reward-card" data-key="chest">
-            <div class="reward-rarity reward-rarity--${tierCls}">${tierLabel}</div>
-            <div class="reward-points-display">★${item.amount}</div>
+        // points — ingen rarity-koncept, tier-indikatoren ovenfor er nok
+        return tierIndicatorHTML + `<div class="reward-card" data-key="chest">
+            <div class="reward-points-display">★${formatScore(item.amount)}</div>
             <div class="reward-cap-name">Bonus Score</div>
             <button class="reward-quick-pick" data-key="chest">▶ TAKE</button>
         </div>`;
     }
 
     // Mystery — ét kort. Man ser allerede det faktiske udfald her (det er jo
-    // afsløret, ikke skjult mere), så kortet viser en visning der passer til
-    // HVAD det er — ikke et generisk "?" (det hører kun til på kortet, før man
-    // ved hvad det bliver).
+    // afsløret, ikke skjult mere), så kortet genbruger de SAMME kort-skabeloner
+    // som normale reward-cards (cap/slammer/card) i stedet for en generisk
+    // "MYSTERY"-label der skjuler allerede-kendt info.
     _mysteryCard(action) {
-        const wrap = bodyHTML => `<div class="reward-card reward-card--relic" data-key="mystery">
-            <div class="reward-rarity reward-rarity--rare">MYSTERY</div>
+        if (action.kind === 'new_cap')     return this._capCards([action.def]);
+        if (action.kind === 'new_slammer') return this._slammerCards([action.def]);
+        if (action.kind === 'card')        return this._consumableCardHTML(action.def, 'mystery');
+
+        // swap_cap/swap_slammer/transform_tier — behold før→efter-visningen,
+        // men INGEN "MYSTERY"-toplabel (intet er skjult i disse kort).
+        let bodyHTML;
+        if (action.kind === 'swap_cap') {
+            bodyHTML = `<div class="reward-swap-row">
+                ${capThumbnailHTML({ def: action.entry.def, enchant: action.entry.enchant }, { imgClass: 'transform-result-img transform-result-img--old' })}
+                <span class="reward-swap-arrow">→</span>
+                ${capThumbnailHTML({ def: action.newDef }, { imgClass: 'transform-result-img' })}
+            </div>`;
+        } else if (action.kind === 'swap_slammer') {
+            bodyHTML = `<div class="reward-swap-row">
+                <img src="${action.entry.texFront}" class="transform-result-img transform-result-img--old" alt="${action.entry.name}">
+                <span class="reward-swap-arrow">→</span>
+                <img src="${action.newDef.texFront}" class="transform-result-img" alt="${action.newDef.name}">
+            </div>`;
+        } else {
+            // transform_tier
+            bodyHTML = `<div class="reward-swap-row">
+                <span class="reward-rarity-pill reward-rarity-pill--common">COMMON</span>
+                <span class="reward-swap-arrow">→</span>
+                <span class="reward-rarity-pill reward-rarity-pill--uncommon">UNCOMMON</span>
+            </div>`;
+        }
+        return `<div class="reward-card reward-card--relic" data-key="mystery">
             ${bodyHTML}
             <div class="reward-cap-name">${action.title}</div>
             <div class="reward-relic-desc">${action.desc}</div>
             <button class="reward-quick-pick" data-key="mystery">▶ TAKE</button>
         </div>`;
-
-        if (action.kind === 'swap_cap') {
-            return wrap(`<div class="reward-swap-row">
-                ${capThumbnailHTML({ def: action.entry.def, enchant: action.entry.enchant }, { imgClass: 'transform-result-img transform-result-img--old' })}
-                <span class="reward-swap-arrow">→</span>
-                ${capThumbnailHTML({ def: action.newDef }, { imgClass: 'transform-result-img' })}
-            </div>`);
-        }
-        if (action.kind === 'swap_slammer') {
-            return wrap(`<div class="reward-swap-row">
-                <img src="${action.entry.texFront}" class="transform-result-img transform-result-img--old" alt="${action.entry.name}">
-                <span class="reward-swap-arrow">→</span>
-                <img src="${action.newDef.texFront}" class="transform-result-img" alt="${action.newDef.name}">
-            </div>`);
-        }
-        if (action.kind === 'transform_tier') {
-            return wrap(`<div class="reward-swap-row">
-                <span class="reward-rarity-pill reward-rarity-pill--common">COMMON</span>
-                <span class="reward-swap-arrow">→</span>
-                <span class="reward-rarity-pill reward-rarity-pill--uncommon">UNCOMMON</span>
-            </div>`);
-        }
-        if (action.kind === 'card') {
-            const c = action.def;
-            return wrap(`<div class="reward-mystery-card-icon" style="background:${c.color};">${c.icon}</div>`);
-        }
-        if (action.kind === 'new_slammer') {
-            return wrap(`<img class="reward-cap-img" src="${action.def.texFront}" alt="${action.def.name}">`);
-        }
-        // new_cap
-        return wrap(capThumbnailHTML(action.def, { imgClass: 'reward-cap-img' }));
     }
 }

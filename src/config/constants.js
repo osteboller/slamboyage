@@ -17,6 +17,17 @@ export const POWER_SPEED_MAX = 100;
 export const SHOT_DELAY = 1000;
 export const THROWS_PER_ROUND = 3;
 
+// Kort-pris i shop-båndet ×1.5 for hvert kort købt, resten af runnen (nulstilles kun i startRun()).
+export const CARD_PRICE_GROWTH = 1.5;
+
+// Hard caps på collection — se docs/særskilte md'er for 6. juli/6juli_AGENT_HARDCAPS_AND_PRICE_SCALING.md
+export const MAX_OWNED_SLAMMERS = 10;
+export const MAX_OWNED_CAPS     = 50;
+
+// Cap-/pakke-priser i shoppen vokser +35% pr. loop (kort-priser har sin egen
+// CARD_PRICE_GROWTH ovenfor og er upåvirket af denne).
+export const CAP_PRICE_GROWTH_PER_LOOP = 0.35;
+
 export const CAM_BASE  = { x: 0, y: 16, z: 22 }; // zoomed ud (post-blast) — original vinkel
 export const CAM_CLOSE = { x: 0, y: 12, z: 8  }; // zoomed ind (idle/aiming) — mere ovenfra
 
