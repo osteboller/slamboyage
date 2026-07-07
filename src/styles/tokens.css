@@ -72,4 +72,10 @@
        detail--side). Delt ét sted så kort og popup altid forbliver et fast,
        centreret par — se udregningen i modals.css. */
     --reward-side-half: 320px;
+
+    /* Reserveret bundplads så reward/pack-kortgitre aldrig render deres
+       PICK/TAKE-knap under det permanente #score-display (bottom:16px; right:16px;
+       z-index:220 i hud.css — bevidst altid øverst). Matcher badgens omtrentlige
+       fulde højde (font-size 42px + padding + border + margin), plus lidt luft. */
+    --hud-corner-reserve: 88px;
 }

@@ -149,28 +149,6 @@
     min-width: 180px;
     border-radius: 0;
 }
-/* Chest/mystery-reward: kortet selv sidder forskudt mod venstre (se
-   .reward-cards--single i reward.css), så popup'en åbner til HØJRE i stedet
-   for centreret, i det tomrum der ellers er ubrugt. Sat/fjernet pr. kald via
-   showCapDetail(..., {side:true}) — aldrig en permanent klasse, da #cap-detail
-   er globalt og bruges centreret alle andre steder (shop/collection/osv).
-   Kun >=720px — samme breakpoint som .reward-cards--single's venstre-skub i
-   reward.css. Uden denne guard blev popup'en skubbet mod højre på ALLE
-   bredder (ren vw/clamp uden nedre grænse), mens kortet under kun skubbes
-   til venstre >=720px — under den bredde endte de to derfor med at overlappe
-   grimt i stedet for enten at være pænt splittet ELLER begge centreret.
-   right-værdien er en FAST afstand fra midten (50vw - --reward-side-half),
-   samme konstant som reward.css bruger til kortets margin — det er det der
-   holder afstanden mellem kort og popup KONSTANT uanset skærmbredde, i
-   stedet for at vokse ubegrænset på brede skærme (som en ren vw/clamp-
-   skalering af hver sin kant ellers ville gøre). */
-@media (min-width: 720px) {
-    #cap-detail.cap-detail--side {
-        left: auto;
-        right: calc(50vw - var(--reward-side-half));
-        transform: translateY(-50%) rotate(-1deg);
-    }
-}
 .cap-viewer-wrap {
     position: relative;
     display: inline-block;
@@ -207,27 +185,71 @@
     box-shadow: 1px 1px 0px #000;
     transform: rotate(2deg) translate(2px, 2px);
 }
+/* Navn + serie-pille — SAMME linje, navn dominerende, serie dæmpet støtte */
+.cap-detail-name-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
 #cap-detail-name {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 17px;
+    font-weight: 800;
     color: var(--text-primary);
 }
-#cap-detail-sub {
-    font-size: 11px;
+/* border-radius:0 — matcher spillets øvrige hård-kant/sticker-æstetik (rarity-
+   badge, ability-box, alle knapper) i stedet for en blødere afrundet "chip". */
+.cap-detail-series-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--surface-subtle);
+    border: 1px solid var(--border-subtle);
+    padding: 1px 7px;
+    border-radius: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
     color: var(--text-secondary);
-    margin-top: 3px;
-    font-family: 'Space Grotesk', sans-serif;
 }
-#cap-detail-desc {
+
+/* Delt ability/enchant-boks (abilityBox.js) */
+.ability-box {
+    margin-top: 8px;
+    background: var(--clr-bg-panel);
+    border: 2px solid var(--border-ink);
+    border-left-width: 6px;
+    border-left-style: solid;
+    padding: 6px 9px;
+    text-align: left;
+}
+.ability-box-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+}
+.ability-box-desc {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 10px;
-    color: var(--text-secondary);
-    opacity: 0.75;
-    margin-top: 4px;
-    font-family: 'Space Grotesk', sans-serif;
-    line-height: 1.3;
+    color: var(--text-primary);
+    line-height: 1.35;
+    margin-top: 2px;
 }
-#cap-detail-desc:empty { display: none; }
+
+/* Korte viewports — modvirk scale(0.72)-nedskaleringen af selve popup'en (se
+   @media (max-height:520px) nedenfor) ved at kompensere med en STØRRE base-
+   størrelse, så det VISUELT rendrede resultat efter skalering forbliver
+   læsbart (10px × 0.72 ≈ 7.2px er for lille — 13px × 0.72 ≈ 9.4px, tæt på
+   normal størrelse). */
+@media (max-height: 520px) {
+    .ability-box-desc { font-size: 13px; }
+    .ability-box-name { font-size: 11px; }
+}
+
 .cap-detail-extra-base {
     display: inline-block;
     font-family: 'JetBrains Mono', monospace;
@@ -349,15 +371,6 @@
     min-width: 180px;
     border-radius: 0;
 }
-/* Samme chest/mystery-side-positionering (og samme >=720px-guard + faste
-   afstand-fra-midten) som #cap-detail--side ovenfor. */
-@media (min-width: 720px) {
-    #slammer-detail.slammer-detail--side {
-        left: auto;
-        right: calc(50vw - var(--reward-side-half));
-        transform: translateY(-50%) rotate(1deg);
-    }
-}
 .slammer-viewer-wrap {
     position: relative;
     display: inline-block;
@@ -375,7 +388,9 @@
 #slammer-viewer-container:active { cursor: grabbing; }
 /* Generisk action-knap på slammer-detail — parallel til #cap-detail-action,
    bruges når slammeren inspiceres FØR et valg (reward/shop), i modsætning til
-   #slammer-detail-actions' faste Equip/Sell (Collection-brug). */
+   #slammer-equip-btn/#slammer-sell-btn's faste hjørne-knapper (Collection-
+   brug) — de tre deler samme hjørne-mønster men vises aldrig samtidig
+   (action= vs. showEquip=true er gensidigt udelukkende). */
 #slammer-detail-action {
     position: absolute;
     bottom: -14px; right: -14px;
@@ -405,57 +420,50 @@
 }
 #slammer-detail-stats {
     margin: 10px auto 0;
-    width: 160px;
 }
-#slammer-detail-passive {
-    margin: 8px auto 0;
-    width: 160px;
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: 10px;
-    color: var(--text-secondary);
-    line-height: 1.3;
-}
-#slammer-detail-actions {
-    display: flex;
-    gap: 6px;
-    margin-top: 12px;
-}
-#slammer-equip-btn {
-    flex: 1;
-    padding: 8px 0;
-    background: #000;
-    color: #fff;
-    border: 3px solid #000;
-    box-shadow: var(--shadow-sticker);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-    transition: box-shadow 0.08s, transform 0.08s;
-}
-#slammer-equip-btn:active {
-    box-shadow: var(--shadow-pressed);
-    transform: translate(2px, 2px);
-}
+/* Genbruger .ability-box/.ability-box-name/.ability-box-desc fra cap-detail-
+   redesignet (modals.css) uændret — se den opgave for definitionen. */
+#slammer-detail-passive-slot { margin: 8px auto 0; }
+
+/* Sell — spejlvendt venstre-hjørne-variant af #slammer-detail-action. Samme
+   visuelle sprog (sticker-boks på vieweren), modsat hjørne, så Equip (højre) og
+   Sell (venstre) aldrig kan kollidere selvom begge er synlige samtidig. */
 #slammer-sell-btn {
-    flex: 1;
-    padding: 8px 0;
+    position: absolute;
+    bottom: -14px; left: -14px;
+    border: 3px solid #000;
+    box-shadow: 3px 3px 0px #000;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 700;
+    padding: 7px 14px; cursor: pointer;
+    transform: rotate(-2deg);
+    transition: box-shadow 0.08s, transform 0.08s;
     background: var(--clr-red);
     color: #fff;
+    z-index: 1;
+}
+#slammer-sell-btn:hover  { box-shadow: 5px 5px 0px #000; transform: rotate(-2deg) translate(1px, -1px); }
+#slammer-sell-btn:active { box-shadow: 1px 1px 0px #000; transform: rotate(-2deg) translate(2px, 2px); }
+
+/* Equip — deler hjørne med #slammer-detail-action (generisk PICK/BUY), men de
+   to er aldrig synlige samtidig (action= vs. showEquip=true er gensidigt
+   udelukkende i _showSlammerDetail, verificeret på tværs af alle kaldesteder). */
+#slammer-equip-btn {
+    position: absolute;
+    bottom: -14px; right: -14px;
     border: 3px solid #000;
-    box-shadow: var(--shadow-sticker);
+    box-shadow: 3px 3px 0px #000;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    cursor: pointer;
+    font-size: 12px; font-weight: 700;
+    padding: 7px 14px; cursor: pointer;
+    transform: rotate(2deg);
     transition: box-shadow 0.08s, transform 0.08s;
+    background: #000;
+    color: #fff;
+    z-index: 1;
 }
-#slammer-sell-btn:active {
-    box-shadow: var(--shadow-pressed);
-    transform: translate(2px, 2px);
-}
+#slammer-equip-btn:hover  { box-shadow: 5px 5px 0px #000; transform: rotate(2deg) translate(-1px, -1px); }
+#slammer-equip-btn:active { box-shadow: 1px 1px 0px #000; transform: rotate(2deg) translate(2px, 2px); }
 
 /* Korte viewports (mobil landskab-tilstand) — #cap-detail/#slammer-detail er
    dead-centreret uden højde-loft, så på et kort viewport går toppen (rarity-

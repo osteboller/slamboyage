@@ -597,7 +597,7 @@ export class ShopScreen {
                     <div class="reward-rarity reward-rarity--rare">SLAMMER</div>
                     <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                     <div class="reward-cap-name">${s.name}</div>
-                    <div class="reward-relic-desc">${s.passive ? `${s.passive.icon} ${s.passive.name} — ${s.passive.description}` : 'No passive'}</div>
+                    ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
                     <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
                 </div>`;
             }
@@ -660,7 +660,7 @@ export class ShopScreen {
             <div class="reward-card reward-card--relic" data-key="${s.name}">
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
-                <div class="reward-relic-desc">${s.passive ? `${s.passive.icon} ${s.passive.name} — ${s.passive.description}` : 'No passive'}</div>
+                ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
                 <button class="reward-quick-pick" data-key="${s.name}">▶ PICK</button>
             </div>`).join('');
     }

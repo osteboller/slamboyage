@@ -193,9 +193,9 @@ export class RewardScreen {
             if (icon) {
                 const item = this._chestItem;
                 if (item?.kind === 'cap') {
-                    this._ui.showCapDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() }, { side: true });
+                    this._ui.showCapDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() });
                 } else if (item?.kind === 'slammer') {
-                    this._ui.showSlammerDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() }, { side: true });
+                    this._ui.showSlammerDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() });
                 }
                 return;
             }
@@ -225,20 +225,20 @@ export class RewardScreen {
             if (icon) {
                 const a = this._mysteryAction;
                 if (a?.kind === 'new_cap') {
-                    this._ui.showCapDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                    this._ui.showCapDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
                 } else if (a?.kind === 'new_slammer') {
-                    this._ui.showSlammerDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                    this._ui.showSlammerDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
                 } else if (a?.kind === 'swap_cap') {
                     // Bytte-forhåndsvisning — begge ikoner (før/efter) skal kunne
                     // inspiceres, ellers aner spilleren ikke hvad han bytter TIL.
                     const isOld   = this._isOldSwapIcon(icon);
                     const def     = isOld ? a.entry.def : a.newDef;
                     const enchant = isOld ? (a.entry.enchant ?? null) : null;
-                    this._ui.showCapDetail({ def, enchant }, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                    this._ui.showCapDetail({ def, enchant }, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
                 } else if (a?.kind === 'swap_slammer') {
                     const isOld = this._isOldSwapIcon(icon);
                     const def   = isOld ? a.entry : a.newDef;
-                    this._ui.showSlammerDetail(def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() }, { side: true });
+                    this._ui.showSlammerDetail(def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
                 }
                 return;
             }
@@ -584,7 +584,7 @@ export class RewardScreen {
             <div class="reward-card reward-card--relic" data-key="${s.name}">
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
-                <div class="reward-relic-desc">${s.passive ? `${s.passive.icon} ${s.passive.name} — ${s.passive.description}` : 'No passive'}</div>
+                ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
                 <button class="reward-quick-pick" data-key="${s.name}">▶ PICK</button>
             </div>`
         ).join('');
@@ -648,7 +648,7 @@ export class RewardScreen {
                 <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
-                <div class="reward-relic-desc">${s.passive ? `${s.passive.icon} ${s.passive.name} — ${s.passive.description}` : 'No passive'}</div>
+                ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
                 <button class="reward-quick-pick" data-key="chest">▶ TAKE</button>
             </div>`;
         }

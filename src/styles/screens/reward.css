@@ -11,7 +11,16 @@
     justify-content: center;
     gap: clamp(12px, 2vh, 20px);
     z-index: 200;
-    padding: clamp(16px, 3vh, 24px) clamp(12px, 3vw, 24px);
+    /* Bunden reserverer altid mindst --hud-corner-reserve, uanset viewport-
+       højde, så et kortgitters PICK/TAKE-knap aldrig render under det
+       permanente #score-display (bottom:16px; z-index:220, altid øverst).
+       Ramte specifikt Card-pack (gum-pack-ikonet har bevidst ingen
+       sekundær ikon-klik-detail-vej som cap/slammer-packs har). Da
+       #reward-screen er en centreret flex-column, skubber den ekstra
+       bundplads bare indholdet en anelse opad på korte/mobile viewports —
+       uændret på desktop, hvor der i forvejen er rigelig margin. */
+    padding: clamp(16px, 3vh, 24px) clamp(12px, 3vw, 24px)
+             max(clamp(16px, 3vh, 24px), var(--hud-corner-reserve));
 }
 
 /* Skip — absolute top-right, red sticker */
@@ -288,6 +297,9 @@
     font-weight: 700;
     align-self: flex-start;
 }
+/* Passiv-variant — samme facon som ability-badgen, teal i stedet for guld, så
+   ability (cap) og passiv (slammer) aldrig kan forveksles visuelt. */
+.reward-effect--passive { background: #2e8fa3; color: #fff; }
 
 /* Quick pick sticker */
 .reward-quick-pick {

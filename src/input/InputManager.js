@@ -73,5 +73,19 @@ export class InputManager {
         });
 
         domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // iOS Safari kan vise en tekst-selektions-lup ved langt tryk, selv med
+        // preventDefault() på pointerdown — Safaris lup styres af det underliggende
+        // touch-event, ikke af pointer-eventet. Dette supplerende lytter-par
+        // undertrykker den pålideligt, uden at duplikere sigte-logik (den kører
+        // stadig udelukkende via pointer-events ovenfor).
+        // e.cancelable-tjek: browseren kan have committet til en scroll-gestus FØR
+        // denne handler når at køre (fx et hurtigt reelt drag) — et preventDefault()-
+        // kald er da alligevel en no-op, men Chrome logger et [Intervention]-varsel
+        // for HVERT forsøg, hvilket kan blive hundredvis af linjer over ét langt
+        // aim-drag. Tjekket fjerner spam'et uden at ændre selve adfærden (et blokeret
+        // kald var lige så virkningsløst før tjekket, bare stille).
+        domElement.addEventListener('touchstart', e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
+        domElement.addEventListener('touchmove',  e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
     }
 }

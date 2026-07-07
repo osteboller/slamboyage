@@ -89,6 +89,7 @@ export class StartScreen {
                     <button data-dev-series="scary_skullz">SKULLZ</button>
                     <button data-dev-series="cosmic_caps">COSMIC</button>
                     <button data-dev-series="dawgz">DAWGZ</button>
+                    <button data-dev-series="zupers">ZUPERS</button>
                 </div>
             </div>`;
     }

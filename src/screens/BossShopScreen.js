@@ -144,13 +144,16 @@ export class BossShopScreen {
         const infoLabel = item.kind === 'cap'
             ? (item.def.effect ? effectName(item.def.effect) : '')
             : (item.def.passive ? `${item.def.passive.icon} ${item.def.passive.name}` : '');
+        // Passiv (slammer) skal visuelt skelnes fra ability (cap) — teal i
+        // stedet for guld, samme princip som reward-effect--passive/col-badge.passive.
+        const infoClass = item.kind === 'cap' ? 'band-effect-sticker' : 'band-effect-sticker band-effect-sticker--passive';
         return `<div class="band-item" data-idx="${idx}">
             <div class="band-slot-box">${thumbHTML}</div>
             <button class="band-price-tag ${canBuy ? '' : 'cant-afford'}"
                     data-idx="${idx}" ${canBuy ? '' : 'disabled'}>
                 ${full ? 'FULL' : `${price}🔶`}
             </button>
-            ${infoLabel ? `<div class="band-effect-sticker">${infoLabel}</div>` : ''}
+            ${infoLabel ? `<div class="${infoClass}">${infoLabel}</div>` : ''}
         </div>`;
     }
 

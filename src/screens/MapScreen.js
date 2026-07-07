@@ -2,6 +2,7 @@ import { THROWS_PER_ROUND } from '../config/constants.js';
 import { effectName } from '../game/effects/labels.js';
 import { REWARD_TYPE_ICONS } from '../config/trickShotDefs.js';
 import { formatScore } from '../ui/formatScore.js';
+import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 
 export class MapScreen {
     constructor({ gameState, ui }) {
@@ -128,9 +129,13 @@ export class MapScreen {
         // Caps
         const capsHTML = gs.ownedCaps.map(({ def, enchant }) => {
             const effectLabel = def.effect ? effectName(def.effect) : null;
+            // Enchant har INGEN fast farve — individuel pr. enchant (ENCHANT_DEFS.color),
+            // samme princip som cap-detail-enchant-badge. Viser også det rigtige
+            // display-navn i stedet for den rå enchant-id-streng.
+            const enchantDef  = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
             const badges = [
                 effectLabel ? `<span class="col-badge effect">${effectLabel}</span>`  : '',
-                enchant     ? `<span class="col-badge enchant">${enchant}</span>`     : '',
+                enchantDef  ? `<span class="col-badge enchant" style="background:${enchantDef.color};color:#fff">${enchantDef.name}</span>` : '',
             ].join('');
             return `<div class="col-cap">
                 <img class="col-cap-img" src="${def.texFront}" alt="${def.name}">
@@ -139,13 +144,14 @@ export class MapScreen {
             </div>`;
         }).join('');
 
-        // Slammers — ejede slammere, med deres passive (relic-erstatning)
+        // Slammers — ejede slammere, med deres passive (relic-erstatning).
+        // Egen passive-klasse (teal), IKKE ability-guld — de to må aldrig deles.
         const slammersHTML = gs.ownedSlammers.length > 0
             ? gs.ownedSlammers.map(s => `
                 <div class="col-cap">
                     <img class="col-cap-img" src="${s.texFront}" alt="${s.name}">
                     <div class="col-cap-name">${s.name}</div>
-                    ${s.passive ? `<span class="col-badge effect">${s.passive.icon} ${s.passive.name}</span>` : ''}
+                    ${s.passive ? `<span class="col-badge passive">${s.passive.icon} ${s.passive.name}</span>` : ''}
                 </div>`).join('')
             : `<div class="col-relics-empty">
                 <span class="col-relics-icon">⬡</span>

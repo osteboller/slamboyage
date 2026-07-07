@@ -193,4 +193,19 @@ export const CAP_DEFS = [
     { rarity: 3, series: 'dawgz', color: 0x99aabb, name: 'Malmutti',     mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/dawgz/dawgz_10_malmutti.png',     texBack: 'assets/caps/dawgz/dawgz_b.png' },
     { rarity: 3, series: 'dawgz', color: 0xdddddd, name: 'Dalmer',       mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/dawgz/dawgz_11_dalmay.png',       texBack: 'assets/caps/dawgz/dawgz_b.png' },
     { rarity: 4, series: 'dawgz', color: 0xcc8822, name: 'King Corgi',   mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/dawgz/dawgz_12_king_corgi.png',   texBack: 'assets/caps/dawgz/dawgz_b.png' },
+
+    // Zupers  (5 common · 4 uncommon · 2 rare · 1 legendary) — deler ÉN fælles
+    // texBack (zupers_b.png) på tværs af alle 12, ligesom Dawgz.
+    { rarity: 1, series: 'zupers', color: 0xaa2233, name: 'Crimson Scarab',        mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zupers/zupers_01_crimson_scarab.png',        texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 1, series: 'zupers', color: 0x2255cc, name: 'The Blue Hornet',       mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zupers/zupers_02_the_blue_hornet.png',       texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 1, series: 'zupers', color: 0x223377, name: 'Captain Liberty',       mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zupers/zupers_03_captain_liberty.png',       texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 1, series: 'zupers', color: 0x66bbdd, name: 'Aero Girl',             mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zupers/zupers_04_aero_girl.png',             texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 1, series: 'zupers', color: 0x4477aa, name: 'Sky Raider',            mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/zupers/zupers_05_sky_raider.png',            texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 2, series: 'zupers', color: 0x2a1a44, name: 'Madame Midnight',       mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/zupers/zupers_06_madame_midnight.png',       texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 2, series: 'zupers', color: 0xaa5522, name: 'Sub-Terra King',        mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/zupers/zupers_07_sub-terra_king.png',        texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 2, series: 'zupers', color: 0x8844cc, name: 'Doctor Nebula',         mass: 1.0, bounce: 0.3, effect: 'rally',      texFront: 'assets/caps/zupers/zupers_08doctor_nebula.png',          texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 2, series: 'zupers', color: 0xaa3322, name: 'The Iron Patriot',      mass: 1.0, bounce: 0.3, effect: 'flat',       texFront: 'assets/caps/zupers/zupers_09_the_iron_patriot.png',      texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 3, series: 'zupers', color: 0x333344, name: 'The Whispering Shadow', mass: 1.0, bounce: 0.3, effect: 'streak',     texFront: 'assets/caps/zupers/zupers_10_the_whispering_shadow.png', texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 3, series: 'zupers', color: 0xaa8844, name: 'Clockwork Monk',        mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zupers/zupers_11_clockwork_monk.png',        texBack: 'assets/caps/zupers/zupers_b.png' },
+    { rarity: 4, series: 'zupers', color: 0xccaa33, name: 'Gilded Gargoyle',       mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/zupers/zupers_12_gilded_gargoyle.png',       texBack: 'assets/caps/zupers/zupers_b.png' },
 ];

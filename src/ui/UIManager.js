@@ -7,6 +7,8 @@ import { REWARD_TYPE_ICONS, REWARD_TYPE_LABELS, REWARD_TYPE_DESCRIPTIONS } from 
 import { bindTapSelect } from './domUtils.js';
 import { getNoGlamFamPenalty } from '../game/bossModifiers/index.js';
 import { formatScore } from './formatScore.js';
+import { getSeriesDef } from '../config/seriesDefs.js';
+import { abilityBoxHTML } from './abilityBox.js';
 
 export class UIManager {
     constructor() {
@@ -950,9 +952,13 @@ export class UIManager {
 
         const capsHTML = gs.ownedCaps.map(({ id, def, enchant }) => {
             const effectLabel = def.effect ? effectName(def.effect) : null;
+            // Enchant har INGEN fast farve — individuel pr. enchant (ENCHANT_DEFS.color),
+            // samme princip som cap-detail-enchant-badge. Viser også det rigtige
+            // display-navn i stedet for den rå enchant-id-streng.
+            const enchantDef  = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
             const badges = [
                 effectLabel ? `<span class="col-badge effect">${effectLabel}</span>` : '',
-                enchant     ? `<span class="col-badge enchant">${enchant}</span>`    : '',
+                enchantDef  ? `<span class="col-badge enchant" style="background:${enchantDef.color};color:#fff">${enchantDef.name}</span>` : '',
             ].join('');
             return `<div class="col-cap" data-cap-id="${id}">
                 ${capThumbnailHTML({ id, def, enchant }, { imgClass: 'col-cap-img' })}
@@ -961,10 +967,11 @@ export class UIManager {
             </div>`;
         }).join('') || '<p style="padding:20px;color:#888;font-family:monospace">No caps yet.</p>';
 
-        // Slammere: kun ejede — samme princip som Caps-fanen.
+        // Slammere: kun ejede — samme princip som Caps-fanen. Egen passive-
+        // klasse (teal), IKKE ability-guld — de to må aldrig deles.
         const slammersHTML = gs.ownedSlammers.map(s => {
             const passiveBadge = s.passive
-                ? `<span class="col-badge effect">${s.passive.icon} ${s.passive.name}</span>` : '';
+                ? `<span class="col-badge passive">${s.passive.icon} ${s.passive.name}</span>` : '';
             return `<div class="col-cap" data-slammer-name="${s.name}">
                 <img class="col-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="col-cap-name">${s.name}</div>
@@ -1121,27 +1128,55 @@ export class UIManager {
 
         const detail    = document.getElementById('cap-detail');
         const nameEl    = document.getElementById('cap-detail-name');
-        const subEl     = document.getElementById('cap-detail-sub');
-        const descEl    = document.getElementById('cap-detail-desc');
         const actionEl  = document.getElementById('cap-detail-action');
 
-        nameEl.textContent = def.name;
-        const seriesLabel  = def.series?.replace(/_/g, ' ') ?? '';
-        const effectLabel  = def.effect ? effectName(def.effect) : '';
-        if (descEl) descEl.textContent = def.effect ? effectDesc(def.effect) : '';
-
+        // Samme fix som pile-overlayet: brug cappens/entryens EGEN id, ikke
+        // gsEntry2?.id — ellers matcher ghosts (uden GameState-post) aldrig.
         const gsEntry2     = capOrEntry.entryId != null
             ? this._gameState?.ownedCaps.find(c => c.id === capOrEntry.entryId)
             : (capOrEntry.storedBonus != null ? capOrEntry : null);
         const storedBonus2 = gsEntry2?.storedBonus ?? 0;
-        // Samme fix som pile-overlayet: brug cappens/entryens EGEN id, ikke
-        // gsEntry2?.id — ellers matcher ghosts (uden GameState-post) aldrig.
         const lookupId2    = capOrEntry.entryId ?? capOrEntry.id ?? null;
         const extraBase2   = storedBonus2 + (this._getExtraBase?.(lookupId2) ?? 0);
 
-        subEl.innerHTML = [seriesLabel, effectLabel].filter(Boolean)
-            .map(t => `<span>${t}</span>`).join(' · ')
+        // +N base-badgen hører til NAVNET (bonus til cappens værdi, ikke til
+        // dens ability) og står derfor i navne-rækken, som ALTID renderes —
+        // ability-boksen renderes kun når def.effect findes, så en simpel
+        // common uden ability ville ellers ikke have noget sted at vise en
+        // stored bonus fra crew/rally/voltage.
+        nameEl.innerHTML = def.name
             + (extraBase2 > 0 ? ` <span class="cap-detail-extra-base">+${extraBase2} base</span>` : '');
+
+        const seriesDef = getSeriesDef(def.series);
+        const pillEl = document.getElementById('cap-detail-series-pill');
+        pillEl.innerHTML          = `${seriesDef.icon} ${seriesDef.label}`;
+        pillEl.style.background   = `${seriesDef.color}22`; // let tonet baggrund (13% alpha)
+        pillEl.style.color        = seriesDef.color;
+        pillEl.style.borderColor  = `${seriesDef.color}55`;
+
+        // Fast guld — ability-kategori-farve, samme som col-badge.effect/.reward-effect.
+        const ABILITY_COLOR = '#f5c842';
+
+        const abilitySlot = document.getElementById('cap-detail-ability-slot');
+        abilitySlot.innerHTML = def.effect
+            ? abilityBoxHTML({
+                  color:       ABILITY_COLOR,
+                  name:        effectName(def.effect),
+                  description: effectDesc(def.effect),
+              })
+            : '';
+
+        const enchantSlot = document.getElementById('cap-detail-enchant-slot');
+        const enchantDefForBox = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
+        enchantSlot.innerHTML = enchantDefForBox
+            ? abilityBoxHTML({
+                  color:       enchantDefForBox.color,
+                  description: enchantDefForBox.description,
+                  // bevidst INTET name-felt her — enchant-navnet er allerede
+                  // synligt som ikon-badge på selve 3D-mønten (cap-detail-
+                  // enchant-badge nedenfor).
+              })
+            : '';
 
         const rarityEl = document.getElementById('cap-detail-rarity');
         if (rarityEl) {
@@ -1278,15 +1313,20 @@ export class UIManager {
         }
 
         // Passiv-info — erstatning for det tidligere relic-system, se
-        // docs/slammer-passives-draft.md.
-        const passiveEl = document.getElementById('slammer-detail-passive');
-        if (passiveEl) {
-            if (def.passive) {
-                passiveEl.textContent = `${def.passive.icon} ${def.passive.name} — ${def.passive.description}`;
-                passiveEl.style.display = '';
-            } else {
-                passiveEl.style.display = 'none';
-            }
+        // docs/slammer-passives-draft.md. Genbruger abilityBoxHTML() fra cap-
+        // detail-redesignet, MEN beholder navnet i boksen (i modsætning til
+        // enchant-boksen) — der findes intet ikon-overlay på selve slammer-
+        // mønten der allerede viser hvilken passiv det er.
+        const PASSIVE_COLOR = '#2e8fa3';
+        const passiveSlot = document.getElementById('slammer-detail-passive-slot');
+        if (passiveSlot) {
+            passiveSlot.innerHTML = def.passive
+                ? abilityBoxHTML({
+                      color:       PASSIVE_COLOR,
+                      name:        `${def.passive.icon} ${def.passive.name}`,
+                      description: def.passive.description,
+                  })
+                : '';
         }
 
         const equipBtn = document.getElementById('slammer-equip-btn');

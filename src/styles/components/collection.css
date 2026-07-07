@@ -139,7 +139,10 @@
     border-radius: 0;
 }
 .col-badge.effect  { background: #f5c842; color: #000; }
-.col-badge.enchant { background: #b985ff; color: #000; }
+/* Passiv-variant (slammer) — teal, adskilt fra ability-guld. */
+.col-badge.passive { background: #2e8fa3; color: #fff; }
+/* Enchant — INGEN fast farve her, individuel pr. enchant, sat inline fra JS
+   (samme princip som cap-detail-enchant-badge). */
 
 /* ── Relics grid ────────────────────────────────────────────────────────── */
 .col-relic-grid {

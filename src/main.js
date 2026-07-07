@@ -191,8 +191,10 @@ transitionCover.id = 'screen-transition-cover';
 document.body.appendChild(transitionCover);
 
 // ─── SCREEN ROUTER ───────────────────────────────────────────────────────────
-// Delt af mapScreen.onNodeSelect og alle "start en frisk run"-indgange (New Run,
-// Pause-Retry, Try Again) — sender direkte til node 1-1 uden at mounte map-screen.
+// Delt af mapScreen.onNodeSelect og de to "start en frisk run MIDT i noget"-
+// indgange (Pause-Retry, Try Again) — sender direkte til node 1-1 uden at mounte
+// map-screen. New Run bruger den BEVIDST IKKE (se startScreen.onNewRun) — den
+// skal lande i map-screen, så der er tid til dev-knapperne før første kast.
 function goToNode(node) {
     returnToAfterMap = 'start';
     if (node.type === 'slammer') showScreen('slammer-choice', node);
@@ -221,7 +223,11 @@ function showScreen(name, context = null) {
 
         if (name === 'start') {
             currentScreen = startScreen;
-            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); goToNode(gameState.currentNode); };
+            // New Run går IKKE via goToNode (i modsætning til Pause-Retry/Try Again) —
+            // lander i map-screen med Next som eneste vej ind i 1-1, så der er tid til
+            // at bruge dev-knapperne (fx tilføje caps til collection) FØR første kast.
+            // Bevidst forskel fra de to andre "start frisk run"-indgange.
+            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
             startScreen.onContinueRun = () => {
                 if (battleSaveState) {
                     const saved = battleSaveState;

@@ -68,6 +68,14 @@ export class CapViewer {
         const id = ++this._loadId;
         this._visible = true;
 
+        // Cap-detail-redesignet (7. juli) strammede cap-kameraets framing for
+        // bedre fyld af viewer-rammen (~72%→~85%) — kun caps, IKKE slammere
+        // (separat, senere opgave). Sat pr. show()-kald i stedet for i
+        // konstruktøren, da CapViewer er en DELT klasse — både _capViewer og
+        // _slammerViewer i UIManager er instanser af den samme klasse, så en
+        // konstruktør-ændring ville utilsigtet have ramt begge.
+        this._camera.position.z = type === 'slammer' ? 4 : 3.3;
+
         // Stop old loop and clear canvas immediately — prevents old cap flashing
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
         this._clearMesh();

@@ -30,6 +30,17 @@ body {
     -webkit-touch-callout: none;
 }
 
+/* Skulle arve fra #canvas-container ovenfor, men WebKit har kendte kvirks
+   hvor <canvas> ikke opfører sig 100% som andre child-elementer — samme
+   iOS-lup-rodårsag som InputManager.js's touchstart/touchmove-preventDefault,
+   set fra CSS-siden i stedet. */
+#canvas-container canvas {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
 /* Rotate overlay — vises i portrait-mode på touch-enheder */
 #rotate-overlay {
     display: none;
