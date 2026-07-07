@@ -249,9 +249,12 @@
     <!-- Cap detail popup -->
     <div id="cap-detail">
         <div id="cap-detail-rarity"></div>
-        <div id="cap-detail-name"></div>
-        <div id="cap-detail-sub"></div>
-        <div id="cap-detail-desc"></div>
+        <div class="cap-detail-name-row">
+            <span id="cap-detail-name"></span>
+            <span id="cap-detail-series-pill" class="cap-detail-series-pill"></span>
+        </div>
+        <div id="cap-detail-ability-slot"></div>
+        <div id="cap-detail-enchant-slot"></div>
         <div class="cap-viewer-wrap">
             <div id="cap-viewer-container"></div>
             <button id="cap-detail-action" style="display:none"></button>
@@ -270,16 +273,14 @@
     <div id="slammer-detail">
         <div id="slammer-detail-rarity"></div>
         <div id="slammer-detail-name"></div>
+        <div id="slammer-detail-passive-slot"></div>
         <div class="slammer-viewer-wrap">
             <div id="slammer-viewer-container"></div>
             <button id="slammer-detail-action" style="display:none"></button>
-        </div>
-        <div id="slammer-detail-stats"></div>
-        <div id="slammer-detail-passive" style="display:none"></div>
-        <div id="slammer-detail-actions">
             <button id="slammer-equip-btn" style="display:none"></button>
             <button id="slammer-sell-btn" style="display:none"></button>
         </div>
+        <div id="slammer-detail-stats"></div>
     </div>
 
     <div id="results">
