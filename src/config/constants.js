@@ -208,4 +208,19 @@ export const CAP_DEFS = [
     { rarity: 3, series: 'zupers', color: 0x333344, name: 'The Whispering Shadow', mass: 1.0, bounce: 0.3, effect: 'streak',     texFront: 'assets/caps/zupers/zupers_10_the_whispering_shadow.png', texBack: 'assets/caps/zupers/zupers_b.png' },
     { rarity: 3, series: 'zupers', color: 0xaa8844, name: 'Clockwork Monk',        mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zupers/zupers_11_clockwork_monk.png',        texBack: 'assets/caps/zupers/zupers_b.png' },
     { rarity: 4, series: 'zupers', color: 0xccaa33, name: 'Gilded Gargoyle',       mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/zupers/zupers_12_gilded_gargoyle.png',       texBack: 'assets/caps/zupers/zupers_b.png' },
+
+    // Zrees — 90'er tv-serie-parodier  (5 common · 4 uncommon · 2 rare · 1 legendary)
+    // — deler ÉN fælles texBack (zrees_b.png) på tværs af alle 12, ligesom Dawgz/Zupers.
+    { rarity: 1, series: 'zrees', color: 0xee2299, name: 'Neon Justice',       mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_01_neon_justice.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0xddaa33, name: 'Guiding Lights',     mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_02_guiding_lights.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0xcc3322, name: 'Quarterback Sis',    mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_03_quarterback_sis.png',     texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0x556633, name: 'Basement Tapes',     mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_04_basement_tapes_1.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0x223366, name: 'Midnight Journal',   mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/zrees/zrees_05_midnight_journal.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 2, series: 'zrees', color: 0x555555, name: 'Off the Record',     mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/zrees/zrees_06_off_the_record.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 2, series: 'zrees', color: 0x3355aa, name: 'Orbit9',            mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/zrees/zrees_07_orbit9.png',              texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 2, series: 'zrees', color: 0x8833cc, name: 'Spellbound',        mass: 1.0, bounce: 0.3, effect: 'rally',      texFront: 'assets/caps/zrees/zrees_08_spellbound.png',          texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 2, series: 'zrees', color: 0xcc77aa, name: 'Crescent Heights II', mass: 1.0, bounce: 0.3, effect: 'streak',    texFront: 'assets/caps/zrees/zrees_09_crescent_heights2.png',   texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 3, series: 'zrees', color: 0x991122, name: 'Bloodlines',        mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zrees/zrees_10_bloodlines.png',          texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 3, series: 'zrees', color: 0xccaa22, name: "Class of '96",      mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/zrees/zrees_11_class_of_96.png',         texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 4, series: 'zrees', color: 0xaa7722, name: 'Relic Hunter',      mass: 1.0, bounce: 0.3, effect: 'absorb',     texFront: 'assets/caps/zrees/zrees_12_relic_hunter.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
 ];

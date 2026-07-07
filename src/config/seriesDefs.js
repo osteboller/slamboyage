@@ -9,6 +9,7 @@ export const SERIES_DEFS = {
     scary_skullz:  { label: 'SKULLZ',   color: '#4a4a4a', icon: '☠' },
     legacy_discs:  { label: 'LEGACY',   color: '#8a7248', icon: '💿' }, // IKKE ★ — kolliderer visuelt/semantisk med score-stjernen
     zupers:        { label: 'ZUPERS',   color: '#b23a3a', icon: '🦸' },
+    zrees:         { label: 'ZREES',    color: '#cc4488', icon: '📼' },
 };
 
 // Fallback for evt. ukendt/fremtidig serie-id, så vi aldrig crasher på manglende data.

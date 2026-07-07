@@ -1,5 +1,6 @@
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { CAP_DEFS }    from '../config/constants.js';
+import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 
 export class StartScreen {
     constructor({ gameState, ui }) {
@@ -43,6 +44,14 @@ export class StartScreen {
                 this._gameState.ownedCaps = [];
                 caps.forEach(def => this._gameState.gainCap(def));
             }
+            // Tilføjer via samme addConsumable() som resten af spillet bruger —
+            // fyldt op (3 slots) betyder simpelthen at klikket ikke gør noget,
+            // addConsumable() guarder allerede selv mod det.
+            const cardBtn = e.target.closest('[data-dev-card]');
+            if (cardBtn) {
+                const def = CONSUMABLE_DEFS.find(c => c.id === cardBtn.dataset.devCard);
+                if (def) this._gameState.addConsumable(def);
+            }
             if (e.target.closest('#dev-skip-to-boss-btn')) {
                 this._gameState.startRun();
                 this._gameState.nodeIndex = this._gameState.runNodes.length - 1; // sidste node = boss
@@ -83,13 +92,36 @@ export class StartScreen {
                 <button id="dev-add-score-btn">DEV +100★</button>
                 <button id="dev-enchant-caps-btn">DEV ENCHANT CAPS</button>
                 <button id="dev-skip-to-boss-btn">DEV SKIP TO BOSS</button>
-                <div id="dev-series-btns">
-                    <button data-dev-series="pewl_ballz">PEWLS</button>
-                    <button data-dev-series="raptor_strike">RAPTORS</button>
-                    <button data-dev-series="scary_skullz">SKULLZ</button>
-                    <button data-dev-series="cosmic_caps">COSMIC</button>
-                    <button data-dev-series="dawgz">DAWGZ</button>
-                    <button data-dev-series="zupers">ZUPERS</button>
+                <div id="dev-series-btns" class="dev-mini-btn-group">
+                    <div class="dev-btn-row">
+                        <button class="dev-mini-btn" data-dev-series="pewl_ballz">PEWLS</button>
+                        <button class="dev-mini-btn" data-dev-series="raptor_strike">RAPTORS</button>
+                        <button class="dev-mini-btn" data-dev-series="scary_skullz">SKULLZ</button>
+                        <button class="dev-mini-btn" data-dev-series="cosmic_caps">COSMIC</button>
+                    </div>
+                    <div class="dev-btn-row">
+                        <button class="dev-mini-btn" data-dev-series="dawgz">DAWGZ</button>
+                        <button class="dev-mini-btn" data-dev-series="zupers">ZUPERS</button>
+                        <button class="dev-mini-btn" data-dev-series="zrees">ZREES</button>
+                    </div>
+                </div>
+                <div id="dev-card-btns" class="dev-mini-btn-group">
+                    <div class="dev-btn-row">
+                        <button class="dev-mini-btn" data-dev-card="extra_throw">CHOMP</button>
+                        <button class="dev-mini-btn" data-dev-card="double_next">DUBBL</button>
+                        <button class="dev-mini-btn" data-dev-card="refresh">FRESH</button>
+                        <button class="dev-mini-btn" data-dev-card="enchant">MYSTI</button>
+                    </div>
+                    <div class="dev-btn-row">
+                        <button class="dev-mini-btn" data-dev-card="white_card">BLANC</button>
+                        <button class="dev-mini-btn" data-dev-card="clone">TWINS</button>
+                        <button class="dev-mini-btn" data-dev-card="transform">MUTTZ</button>
+                        <button class="dev-mini-btn" data-dev-card="power_up">VOLT</button>
+                    </div>
+                    <div class="dev-btn-row">
+                        <button class="dev-mini-btn" data-dev-card="double_relic">AMPLI</button>
+                        <button class="dev-mini-btn" data-dev-card="skip_trickshot">SKIPP</button>
+                    </div>
                 </div>
             </div>`;
     }

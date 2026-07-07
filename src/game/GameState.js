@@ -1,6 +1,5 @@
 import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNED_CAPS, CAP_PRICE_GROWTH_PER_LOOP } from '../config/constants.js';
 import { BASE_NODES } from '../config/mapData.js';
-import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
 import { BOSS_DEFS } from '../config/bossDefs.js';
 
@@ -51,16 +50,16 @@ export class GameState {
         this.score          = 0;
         this.shards         = 0;
         this.stackSizeLimit = 10;
-        // Test-hånd: demonstrerer crew, rally, halflife og gilded+streak
-        const byName = name => CAP_DEFS.find(d => d.name === name);
+        // Starthånd: 5 tilfældige caps (3 common, 1 uncommon, 1 rare) — rigtigt
+        // run-udgangspunkt, ikke en fast test-hånd. Dev-knapperne på main menu
+        // dækker nu ad-hoc test-behov (tilføj specifikke caps/serier før første kast).
+        const randomOfRarity = (rarity, n) =>
+            CAP_DEFS.filter(d => (d.rarity ?? 1) === rarity).sort(() => Math.random() - 0.5).slice(0, n);
         this.ownedCaps = [
-            this._mkCapEntry(byName('Raptor Fusion'),    'halflife'),
-            this._mkCapEntry(byName('Martian Graffiti'), null),
-            this._mkCapEntry(byName('Ollien'),           null),
-            this._mkCapEntry(byName('Phone Homie'),      null),
-            this._mkCapEntry(byName("Surfin' Alien"),    null),
-            this._mkCapEntry(byName('Space Rockera'),    'gilded'),
-        ].filter(e => e.def);
+            ...randomOfRarity(1, 3),
+            ...randomOfRarity(2, 1),
+            ...randomOfRarity(3, 1),
+        ].map(def => this._mkCapEntry(def));
         // Starter-slammer: altid Regal Pug — den er bevidst passiv-løs, hvilket
         // passer perfekt som en "neutral" starter. Fremtidig idé: karaktervalg
         // med egne startere — se docs/slammer-passives-draft.md.
@@ -72,13 +71,10 @@ export class GameState {
         this._discardCostBase = 2;
         this._cardPriceMult   = 1;
         this.shopOffer      = null;
-        const mystixx   = CONSUMABLE_DEFS.find(c => c.id === 'enchant');
-        const twinsies  = CONSUMABLE_DEFS.find(c => c.id === 'clone');
-        // Skippy (trick shot-skip) er allerede valideret fra en tidligere test-
-        // runde — bytter den midlertidigt ud med Amplifyz, som mangler sin første
-        // test. Byt tilbage når Amplifyz er bekræftet virkende.
-        const amplifyz  = CONSUMABLE_DEFS.find(c => c.id === 'double_relic');
-        this.consumables    = [mystixx ?? null, twinsies ?? null, amplifyz ?? null];
+        // Starter uden kort — main menuens dev-kort-knapper dækker nu ad-hoc
+        // test-behov for specifikke consumables, ligesom dev-serie-knapperne
+        // gør for caps.
+        this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
         this.amplifyStacks  = 0;
     }
