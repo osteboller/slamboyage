@@ -284,6 +284,10 @@
     opacity: 1;
     transform: scale(1);
 }
+/* Reset-variant (streak brudt) — rødtonet i stedet for gyldent/sort, så den
+   tydeligt læses som "mistet", ikke endnu en gevinst. */
+.relic-gain-sticker--reset .relic-gain-throws { color: var(--clr-red, #cc2222); }
+.relic-gain-sticker--reset .relic-gain-new    { color: var(--clr-red, #cc2222); }
 
 
 /* ─── ENCHANT RESULT STICKER ─────────────────────────────────────────────── */

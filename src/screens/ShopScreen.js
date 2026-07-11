@@ -8,6 +8,7 @@ import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js'
 import { pulseIconRotate } from '../ui/domUtils.js';
 import { formatScore } from '../ui/formatScore.js';
 import { seriesPillHTML } from '../config/seriesDefs.js';
+import { watchRewardTitleSpacing } from '../ui/rewardTitleSpacing.js';
 
 const BAND_SIZE       = 5;
 const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 6, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
@@ -27,6 +28,7 @@ export class ShopScreen {
         this._packs           = [];
         this._pendingPack     = null;
         this._justRerolled    = false; // triggers staggered band animation
+        this._titleUnwatch    = null;
         this.onContinue       = null;
         this.onConsumableAdded = null; // (slotIdx) => void — called after card pick
     }
@@ -61,6 +63,8 @@ export class ShopScreen {
     }
 
     exit() {
+        this._titleUnwatch?.();
+        this._titleUnwatch = null;
         this._packEl?.remove();
         this._packEl = null;
         this._el?.remove();
@@ -442,11 +446,14 @@ export class ShopScreen {
         this._packEl.id = 'reward-screen';
         document.body.appendChild(this._packEl);
         this._renderPackScreen(pack, idx);
+        this._titleUnwatch = watchRewardTitleSpacing(this._packEl);
 
         this._packEl.addEventListener('click', e => {
             if (e.target.closest('#pack-skip-btn')) {
                 this._packs[idx].bought = true;
                 this._pendingPack = null;
+                this._titleUnwatch?.();
+                this._titleUnwatch = null;
                 this._packEl?.remove();
                 this._packEl = null;
                 this._render();
@@ -596,6 +603,8 @@ export class ShopScreen {
         this._packs[idx].bought = true;
         this._pendingPack = null;
         this._ui.flashBagBtn();
+        this._titleUnwatch?.();
+        this._titleUnwatch = null;
         this._packEl?.remove();
         this._packEl = null;
         this._render();

@@ -182,7 +182,11 @@ export class RoundManager {
 
     // overrideSize / overrideCaps: bruges af BattleScreen i run-mode
     // scoreBase: persistent wallet score shown as starting value in the UI
-    buildStack(overrideSize = null, overrideCaps = null, scoreBase = 0) {
+    // isTrickShot: sat af buildTrickShotStack() — springer "runde-start"-bonusser
+    // (Square/Balance) over. Uden dette kunne man cheese dem uendeligt ved at
+    // fejle og "Try Again" et Trick Shot igen og igen — hvert forsøg kalder
+    // buildStack() på ny, men er ikke reelt en ny runde/node.
+    buildStack(overrideSize = null, overrideCaps = null, scoreBase = 0, isTrickShot = false) {
         this.cancelAllTimers();
         // Fjerner evt. transiente rarity/parity/flatbonus-badges fra forrige
         // rundes sidste kast — de er globale HUD-elementer, uafhængige af
@@ -269,7 +273,8 @@ export class RoundManager {
         // lige efter et kast, se phase 3+4), ikke en persistent pre-kast-badge.
 
         // SQUARE (Spellbound) — rundens start: hvis spilleren ingen kort har, giv ét gratis.
-        if (this._gs && this._gs.consumables.every(c => c === null) &&
+        // IKKE ved Trick Shot-forsøg (se isTrickShot-kommentaren ovenfor).
+        if (!isTrickShot && this._gs && this._gs.consumables.every(c => c === null) &&
             slammers.some(s => s.passive?.type === 'squareCard')) {
             const slot = this._gs.grantRandomConsumable();
             if (slot !== false && this.onFreeCardGranted) this.onFreeCardGranted(slot);
@@ -277,15 +282,24 @@ export class RoundManager {
 
         // BALANCE (Neon Justice) — streak af på-hinanden-følgende runder hvor
         // collection'en præcis fylder max stack-antal. Tjekkes kun ved en NY
-        // node/runde (buildStack), ikke ved applyRestack() mellem kast.
-        if (this._gs) {
+        // node/runde (buildStack), ikke ved applyRestack() mellem kast, og IKKE
+        // ved Trick Shot-forsøg (samme cheese-risiko som Square — gentagne
+        // "Try Again"-forsøg er ikke reelt nye runder).
+        if (!isTrickShot && this._gs) {
             const atMaxStack = this._gs.ownedCaps.length === this._gs.stackSizeLimit;
             slammers.forEach(s => {
                 if (s.passive?.type !== 'balance') return;
                 const oldValue = s.passive.currentValue ?? 1.0;
                 s.passive.currentValue = atMaxStack ? oldValue + s.passive.value : 1.0;
                 s.passive.description  = `Each consecutive round your collection exactly fills max stack size: +${s.passive.value} permanently · Current: ×${s.passive.currentValue.toFixed(1)}`;
-                if (atMaxStack) this._ui.showRelicGain(s.passive.icon, oldValue, s.passive.currentValue, 1, 'round at max stack');
+                if (atMaxStack) {
+                    this._ui.showRelicGain(s.passive.icon, oldValue, s.passive.currentValue, 1, 'round at max stack');
+                } else if (oldValue > 1.0) {
+                    // Streaken blev brudt — vis samme slags sticker som ved en
+                    // gevinst, bare tydeligt markeret som et reset, så spilleren
+                    // faktisk kan se HVORFOR multiplikatoren pludselig er væk.
+                    this._ui.showRelicReset(s.passive.icon, oldValue);
+                }
             });
         }
 
@@ -319,7 +333,8 @@ export class RoundManager {
         const ownedCaps = this._gs?.ownedCaps ?? [];
         // scoreBase = nuværende wallet-score (efter cost-fradrag) — der scores intet
         // under et forsøg, så buildStack's interne setScore skal ramme det rigtige tal.
-        this.buildStack(null, ownedCaps, this._gs?.score ?? 0);
+        // isTrickShot=true — se buildStack()'s egen kommentar for hvorfor.
+        this.buildStack(null, ownedCaps, this._gs?.score ?? 0, true);
         this._activeTrickShot = trickShotDef;
         this._throwsTotal     = 1;
         this._throwsLeft      = 1;
@@ -790,7 +805,10 @@ export class RoundManager {
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
         // Overdrive (Quarterback Sis) — halverer ALT, holdt udenfor positionChain
         // (ligesom bossMult) så den ikke optræder som en "×N > 1"-chip i UI'et.
-        const overdriveMult   = passiveMultiplier(slammers, s => s.passive?.type === 'overdrive', amplify);
+        // Bevidst UDEN amplify: det er en debuff, ikke en bonus — AMPLIFYZ skal
+        // ikke gøre en værdi < 1 endnu stærkere (base^(1+stacks) ville gøre 0.5 til
+        // 0.25 i stedet for at lade den stå urørt).
+        const overdriveMult   = passiveMultiplier(slammers, s => s.passive?.type === 'overdrive');
 
         // Parity Multiplier-feedback (Even Steven/Odd Todd SLAMMERE — bonus, ikke
         // boss-veto'et). parityMult > 1 betyder kastets flip-paritet matchede en

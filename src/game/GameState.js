@@ -174,21 +174,23 @@ export class GameState {
         return this.addConsumable(def);
     }
 
-    // Sharden (Sub-Terra King) — konverterer ubrugte Shards til permanent
-    // multiplier, kaldt når boss-shoppen forlades (se main.js). No-op hvis
-    // spilleren ikke ejer Sub-Terra King — shards persisterer så uændret som før.
+    // Shards er KUN til boss-shoppen — nulstilles altid ved exit, uanset om
+    // Sub-Terra King (Sharden) er ejet eller ej (de persisterede tidligere
+    // fejlagtigt for alle uden Sharden — rettet). Sharden konverterer de
+    // ubrugte Shards til permanent multiplier FØR nulstillingen, hvis ejet.
     // Returnerer { icon, oldValue, newValue, unspent } så main.js kan vise en
     // showRelicGain-sticker (samme mønster som Iron Discipline/Balance) — eller
-    // null hvis der ikke var noget at konvertere.
+    // null hvis der ikke var noget at konvertere (uanset om det var pga. 0
+    // Shards eller manglende Sharden).
     convertUnusedShards() {
-        const shardenSlammer = this.ownedSlammers.find(s => s.passive?.type === 'sharden');
-        if (!shardenSlammer || this.shards <= 0) return null;
         const unspent = this.shards;
+        this.shards = 0;
+        const shardenSlammer = this.ownedSlammers.find(s => s.passive?.type === 'sharden');
+        if (!shardenSlammer || unspent <= 0) return null;
         const p = shardenSlammer.passive;
         const oldValue = p.currentValue ?? 1.0;
         p.currentValue = oldValue + unspent * p.value;
         p.description  = `Each unused Shard adds ×${p.value} permanently · Current: ×${p.currentValue.toFixed(1)}`;
-        this.shards = 0;
         return { icon: p.icon, oldValue, newValue: p.currentValue, unspent };
     }
 

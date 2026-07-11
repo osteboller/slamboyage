@@ -7,6 +7,7 @@ import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js'
 import { pulseIconRotate } from '../ui/domUtils.js';
 import { formatScore } from '../ui/formatScore.js';
 import { seriesPillHTML } from '../config/seriesDefs.js';
+import { watchRewardTitleSpacing } from '../ui/rewardTitleSpacing.js';
 
 const SKIP_BONUS = 5;
 
@@ -23,6 +24,7 @@ export class RewardScreen {
         this._chestTier  = 'silver';
         this._chestItem     = null;
         this._mysteryAction = null;
+        this._titleUnwatch  = null;
         this.onContinue  = null;
     }
 
@@ -258,6 +260,8 @@ export class RewardScreen {
     }
 
     exit() {
+        this._titleUnwatch?.();
+        this._titleUnwatch = null;
         this._el?.remove();
         this._el = null;
     }
@@ -553,6 +557,12 @@ export class RewardScreen {
             card.style.animationDelay = `${delay}ms`;
             setTimeout(() => card.classList.remove('reward-card--entering'), delay + 420);
         });
+
+        // innerHTML ovenfor genskaber .reward-title-box hver gang _render()
+        // kaldes — gammel resize-listener peger på et nu-fjernet element, ryd
+        // op i den før vi måler den nye.
+        this._titleUnwatch?.();
+        this._titleUnwatch = watchRewardTitleSpacing(this._el);
     }
 
     _rarityInfo(rarity) {

@@ -406,6 +406,28 @@ export class UIManager {
         el.addEventListener('animationend', e => { if (e.target === el) el.remove(); });
     }
 
+    // Modstykke til showRelicGain — bruges når en streak-baseret permanent
+    // multiplier (fx Balance) brydes og falder tilbage til ×1.0, så spilleren
+    // kan SE hvorfor den pludselig er væk i stedet for bare at opdage det
+    // ved et tilfælde. Samme sticker, rødtonet i stedet for gyldent.
+    showRelicReset(icon, oldValue) {
+        const el = document.createElement('div');
+        el.className = 'relic-gain-sticker relic-gain-sticker--reset';
+        el.innerHTML = `
+            <div class="relic-gain-top">
+                <span class="relic-gain-icon">${icon}</span>
+                <span class="relic-gain-throws">↺ reset</span>
+            </div>
+            <div class="relic-gain-row">
+                <span class="relic-gain-old">×${oldValue.toFixed(1)}</span>
+                <span class="relic-gain-arrow">→</span>
+                <span class="relic-gain-new">×1.0</span>
+            </div>`;
+        document.body.appendChild(el);
+        setTimeout(() => el.classList.add('relic-gain-sticker--reveal'), 400);
+        el.addEventListener('animationend', e => { if (e.target === el) el.remove(); });
+    }
+
     showDoubleBadge(mult) {
         const el = document.getElementById('double-badge');
         el.textContent = `×${mult}`;
@@ -660,6 +682,18 @@ export class UIManager {
 
     // ─── SLAMMER SELECTION ───────────────────────────────────────────────────
     getSlammerDef() { return SLAMMER_DEFS[this._slammerIdx]; }
+
+    // Kaldes ved hver "start et frisk run"-indgang — _slammerIdx er UI-lokal
+    // valgt-til-at-kaste-med-state, helt separat fra GameState.ownedSlammers
+    // (passiv-samlingen). Uden dette blev den forrige runs valg (eller default
+    // index 0 = Raptor Slammer) siddende, i stedet for at følge Regal Pug,
+    // den passiv-løse starter startRun() altid sætter i ownedSlammers.
+    resetSlammerToStarter() {
+        const idx = SLAMMER_DEFS.findIndex(s => s.name === 'Regal Pug');
+        if (idx !== -1) this._slammerIdx = idx;
+        const slamNameEl = document.getElementById('slam-name');
+        if (slamNameEl) slamNameEl.textContent = SLAMMER_DEFS[this._slammerIdx].name;
+    }
 
     // ─── SLAMMER PANEL ───────────────────────────────────────────────────────
     toggleSlammerPanel() {

@@ -448,7 +448,10 @@ button.band-price-tag.cant-afford {
 
 .shop-remove-btn {
     flex: 1;
-    background: var(--clr-bg-panel);
+    /* Flad lyserød — animeret shimmer (som Next Round) blev afprøvet men var
+       for voldsomt for en knap man kigger på hele tiden. Statisk farve er
+       nok til at signalere "destruktiv handling" uden at trække opmærksomhed. */
+    background: #ffb3b3;
     border: 4px solid #000;
     box-shadow: var(--shadow-sticker);
     border-radius: 0;

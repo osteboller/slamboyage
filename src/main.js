@@ -157,7 +157,7 @@ const closePeekIfOpen = () => {
     if (currentScreenName !== 'map' && document.getElementById('map-screen')) mapScreen.exit();
 };
 
-ui.onPauseRetry    = () => { closePeekIfOpen(); battleSaveState = null; resumeScreen = null; gameState.startRun(); goToNode(gameState.currentNode); };
+ui.onPauseRetry    = () => { closePeekIfOpen(); battleSaveState = null; resumeScreen = null; gameState.startRun(); ui.resetSlammerToStarter(); goToNode(gameState.currentNode); };
 ui.onPauseMainMenu = () => {
     closePeekIfOpen();
     battleSaveState = null;
@@ -230,7 +230,7 @@ function showScreen(name, context = null) {
             // lander i map-screen med Next som eneste vej ind i 1-1, så der er tid til
             // at bruge dev-knapperne (fx tilføje caps til collection) FØR første kast.
             // Bevidst forskel fra de to andre "start frisk run"-indgange.
-            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); returnToAfterMap = 'start'; showScreen('map'); };
+            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); ui.resetSlammerToStarter(); returnToAfterMap = 'start'; showScreen('map'); };
             startScreen.onContinueRun = () => {
                 if (battleSaveState) {
                     const saved = battleSaveState;
@@ -352,7 +352,7 @@ function showScreen(name, context = null) {
 
         } else if (name === 'run-end') {
             currentScreen = runEndScreen;
-            runEndScreen.onTryAgain = () => { gameState.startRun(); goToNode(gameState.currentNode); };
+            runEndScreen.onTryAgain = () => { gameState.startRun(); ui.resetSlammerToStarter(); goToNode(gameState.currentNode); };
             runEndScreen.onMainMenu = () => showScreen('start');
             runEndScreen.enter(context);
 

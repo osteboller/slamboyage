@@ -54,6 +54,7 @@ export class StartScreen {
             }
             if (e.target.closest('#dev-skip-to-boss-btn')) {
                 this._gameState.startRun();
+                this._ui.resetSlammerToStarter();
                 this._gameState.nodeIndex = this._gameState.runNodes.length - 1; // sidste node = boss
                 this._gameState.score     = 999; // nok til at teste "sidste chance"-shop-advarslen med
                 if (this.onDevSkipToBoss) this.onDevSkipToBoss();
