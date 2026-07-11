@@ -15,9 +15,15 @@ const EMPTY_RESULT = Object.freeze({
     fx:             null,
     effectMeta:     null, // { type, ... } — drives visual effect ring in UI
     spawnCaps:      [],   // cap defs to inject into the next throw's stack
-    auraBonus:      0,    // bonus to grant to other matching caps this throw
+    auraBonus:      0,    // flat bonus to grant to other matching caps this throw
+    auraMultiplier: 1,    // multiplier to grant to other matching caps this throw (fx martyrEffect)
     auraFilter:     null, // 'nearby' | 'series' | 'series_or_nearby'
     flipNearby:     0,    // number of nearby face-down caps to surge-flip
+    destroySelf:    false, // permanently removes this cap from ownedCaps after scoring
+                           // (see RoundManager scoredCaps loop). Ironclad-enchanted caps
+                           // are protected — ironcladEnchant() forces this back to false
+                           // via the normal enchant-override pipeline, no special-case
+                           // check needed elsewhere.
 });
 
 export class EffectResolver {

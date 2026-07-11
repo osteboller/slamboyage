@@ -102,6 +102,38 @@ export const SLAMMER_DEFS = [
     { name: 'Pewl 666',       type: 'pewl',   texFront: 'assets/slammers/pewlz_slammer_666.png',      texBack: 'assets/slammers/pewlz_slammer_666_b.png',      rimColor: 0x5a1a1a, mass: 4.4, power: 0.61, precision: 0.70, rating: { power: 4, precision: 1, weight: 4 },
         rarity: 3, sellPrice: 7,
         passive: { id: 'odd_todd_slam', name: 'Odd Todd', icon: '⚂', type: 'parityMultiplier', parity: 'odd', value: 2, description: 'Throws with an ODD number of flips score ×2' } },
+    // Zuper/Zrees slammers — hver har sin egen unikke passive-type, ingen deler
+    // type med hinanden eller med de 16 ovenfor (spillerens eksplicitte krav).
+    { name: 'Crimson Scarab',    type: 'zuper', texFront: 'assets/slammers/slammer_zuper_crimson_scarab.png',    texBack: 'assets/slammers/slamm_zuper_b.png', rimColor: 0xaa2222, mass: 3.0, power: 0.52, precision: 1.15, rating: { power: 3, precision: 4, weight: 2 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'scarab_hoard', name: 'Scarab Hoard', icon: '🔶', type: 'shardGain', value: 2, description: '+2 Shard whenever a boss is cleared' } },
+    { name: 'Sub-Terra King',    type: 'zuper', texFront: 'assets/slammers/slammer_zuper_sub-terra_king.png',   texBack: 'assets/slammers/slamm_zuper_b.png', rimColor: 0x5a3a1a, mass: 4.8, power: 0.60, precision: 0.75, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'shard_king', name: 'Shard King', icon: '♦', type: 'sharden', value: 0.2, description: 'Each unused Shard adds ×0.2 permanently · Current: ×1.0' } },
+    { name: 'Gilded Gargoyle',   type: 'zuper', texFront: 'assets/slammers/slammer_zuper_gilded_gargoyle.png',  texBack: 'assets/slammers/slamm_zuper_b.png', rimColor: 0xd4af37, mass: 3.6, power: 0.55, precision: 1.10, rating: { power: 3, precision: 4, weight: 3 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'gargoyle_ward', name: "Gargoyle's Ward", icon: '✦', type: 'holoMultiplier', value: 2, description: 'Enchanted caps score ×2' } },
+    { name: 'Whispering Shadow', type: 'zuper', texFront: 'assets/slammers/slammer_zuper_whispering_shadow.png', texBack: 'assets/slammers/slamm_zuper_b.png', rimColor: 0x2a2a3a, mass: 2.4, power: 0.46, precision: 1.35, rating: { power: 2, precision: 5, weight: 2 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'vanishing_act', name: 'Vanishing Act', icon: '🃏', type: 'illusionist', value: 1, description: 'Flip every cap in the stack in one round → get a free random card' } },
+    { name: 'Spellbound',        type: 'zrees', texFront: 'assets/slammers/slammer_zrees_spellbound.png',       texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x6633aa, mass: 3.0, power: 0.50, precision: 1.10, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'first_spell', name: 'First Spell', icon: '🔮', type: 'squareCard', value: 1, description: 'Start of round: if you hold no cards, get a free random one' } },
+    { name: 'Bloodlines',        type: 'zrees', texFront: 'assets/slammers/slammer_zrees_bloodlines.png',       texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x8a1010, mass: 3.8, power: 0.56, precision: 0.95, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'last_of_the_line', name: 'Last of the Line', icon: '①', type: 'hero', value: 4, description: 'Flip exactly 1 cap in a throw → ×4' } },
+    { name: 'Crescent Heights',  type: 'zrees', texFront: 'assets/slammers/slammer_zrees_crescent_high.png',    texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x445577, mass: 3.2, power: 0.51, precision: 1.05, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 1, sellPrice: 2,
+        passive: { id: 'lunar_cycle', name: 'Lunar Cycle', icon: '☾', type: 'analogTimer', value: 6, interval: 6, description: 'Every 6th throw this run scores ×6' } },
+    { name: "Class of '96",      type: 'zrees', texFront: 'assets/slammers/slammer_zrees_96.png',               texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0xdd8800, mass: 3.4, power: 0.53, precision: 1.00, rating: { power: 3, precision: 3, weight: 3 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'nostalgia_pulse', name: 'Nostalgia Pulse', icon: '⏱', type: 'digitalTimer', value: 8, interval: 4, description: 'Every 4th throw this run: +8★ to every cap flipped that throw' } },
+    { name: 'Quarterback Sis',   type: 'zrees', texFront: 'assets/slammers/slammer_zrees_quarterback_sis.png',  texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x1155aa, mass: 4.4, power: 0.63, precision: 0.85, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 3, sellPrice: 7,
+        passive: { id: 'overdrive', name: 'Overdrive', icon: '⚡', type: 'overdrive', value: 0.5, throwBonus: 3, description: '+3 throws per round, but all scoring is halved' } },
+    { name: 'Neon Justice',      type: 'zrees', texFront: 'assets/slammers/slammer_zrees_neon_justice.png',     texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x33ffcc, mass: 2.8, power: 0.48, precision: 1.25, rating: { power: 2, precision: 4, weight: 2 },
+        rarity: 2, sellPrice: 4,
+        passive: { id: 'scales_of_justice', name: 'Scales of Justice', icon: '⚖', type: 'balance', value: 0.1, description: 'Each consecutive round your collection exactly fills max stack size: +0.1 permanently · Current: ×1.0' } },
 ];
 
 // ─── SETTLE / DÆMPNING ───────────────────────────────────────────────────────
@@ -211,16 +243,23 @@ export const CAP_DEFS = [
 
     // Zrees — 90'er tv-serie-parodier  (5 common · 4 uncommon · 2 rare · 1 legendary)
     // — deler ÉN fælles texBack (zrees_b.png) på tværs af alle 12, ligesom Dawgz/Zupers.
+    // Jackpot/Martyr (destroy-ability-draft.md) — endelig placering efter test:
+    // Quarterback Sis → jackpot, Relic Hunter → martyr. Det skubbede Relic Hunters
+    // gamle absorb til Bloodlines, Bloodlines' gamle surge til Midnight Journal, og
+    // Midnight Journals gamle solo (Lone Wolf) til Guiding Lights — én rotation af
+    // eksisterende, allerede arted caps, ingen taber sit artwork. Basement Tapes
+    // (den oprindelige jackpot-vært) er effekt-løs igen, ligesom Neon Justice.
+    // Rarity er BEVIDST urørt for nu (kun effekt-tildelingen flyttet rundt).
     { rarity: 1, series: 'zrees', color: 0xee2299, name: 'Neon Justice',       mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_01_neon_justice.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 1, series: 'zrees', color: 0xddaa33, name: 'Guiding Lights',     mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_02_guiding_lights.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 1, series: 'zrees', color: 0xcc3322, name: 'Quarterback Sis',    mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_03_quarterback_sis.png',     texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0xddaa33, name: 'Guiding Lights',     mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/zrees/zrees_02_guiding_lights.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0xcc3322, name: 'Quarterback Sis',    mass: 1.0, bounce: 0.3, effect: 'jackpot',    texFront: 'assets/caps/zrees/zrees_03_quarterback_sis.png',     texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 1, series: 'zrees', color: 0x556633, name: 'Basement Tapes',     mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_04_basement_tapes_1.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 1, series: 'zrees', color: 0x223366, name: 'Midnight Journal',   mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/zrees/zrees_05_midnight_journal.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0x223366, name: 'Midnight Journal',   mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zrees/zrees_05_midnight_journal.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0x555555, name: 'Off the Record',     mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/zrees/zrees_06_off_the_record.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0x3355aa, name: 'Orbit9',            mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/zrees/zrees_07_orbit9.png',              texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0x8833cc, name: 'Spellbound',        mass: 1.0, bounce: 0.3, effect: 'rally',      texFront: 'assets/caps/zrees/zrees_08_spellbound.png',          texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0xcc77aa, name: 'Crescent Heights II', mass: 1.0, bounce: 0.3, effect: 'streak',    texFront: 'assets/caps/zrees/zrees_09_crescent_heights2.png',   texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 3, series: 'zrees', color: 0x991122, name: 'Bloodlines',        mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zrees/zrees_10_bloodlines.png',          texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 3, series: 'zrees', color: 0x991122, name: 'Bloodlines',        mass: 1.0, bounce: 0.3, effect: 'absorb',     texFront: 'assets/caps/zrees/zrees_10_bloodlines.png',          texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 3, series: 'zrees', color: 0xccaa22, name: "Class of '96",      mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/zrees/zrees_11_class_of_96.png',         texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 4, series: 'zrees', color: 0xaa7722, name: 'Relic Hunter',      mass: 1.0, bounce: 0.3, effect: 'absorb',     texFront: 'assets/caps/zrees/zrees_12_relic_hunter.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 4, series: 'zrees', color: 0xaa7722, name: 'Relic Hunter',      mass: 1.0, bounce: 0.3, effect: 'martyr',     texFront: 'assets/caps/zrees/zrees_12_relic_hunter.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
 ];

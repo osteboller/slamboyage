@@ -47,6 +47,9 @@ export class RoundManager {
         // Callback: fired when the last score float's final number is shown — score display is now settled
         this.onScoreSettled = null;
 
+        // Callback: fired when Square/Illusionist grants a free consumable — signature: (slotIndex) => {}
+        this.onFreeCardGranted = null;
+
         // Trick Shot state — set by buildTrickShotStack(), cleared by buildStack()
         this._activeTrickShot = null;
         // Callback: fired when a Trick Shot's single throw has settled — signature: (success) => {}
@@ -234,6 +237,7 @@ export class RoundManager {
         this._halflifeEarned    = new Map(); // entryId → bonus earned this session
         this._voltageBonus      = 0;
         this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
+        this._roundCapMultipliers = new Map(); // entryId → accumulated round multiplier (fx martyr/Relic Hunter)
         this._activeTrickShot   = null; // any normal buildStack() call exits Trick Shot mode
         this._nextGhostId       = -1; // unikke negative ids til Twinsies-ghosts denne runde
         this._activeBoss        = null; // sættes eksplicit af BattleScreen EFTER dette kald
@@ -262,6 +266,28 @@ export class RoundManager {
         else                                              this._ui.hideLastStandBadge();
         // Flat Bonus vises IKKE her — den er transient (poppes ind som bekræftelse
         // lige efter et kast, se phase 3+4), ikke en persistent pre-kast-badge.
+
+        // SQUARE (Spellbound) — rundens start: hvis spilleren ingen kort har, giv ét gratis.
+        if (this._gs && this._gs.consumables.every(c => c === null) &&
+            slammers.some(s => s.passive?.type === 'squareCard')) {
+            const slot = this._gs.grantRandomConsumable();
+            if (slot !== false && this.onFreeCardGranted) this.onFreeCardGranted(slot);
+        }
+
+        // BALANCE (Neon Justice) — streak af på-hinanden-følgende runder hvor
+        // collection'en præcis fylder max stack-antal. Tjekkes kun ved en NY
+        // node/runde (buildStack), ikke ved applyRestack() mellem kast.
+        if (this._gs) {
+            const atMaxStack = this._gs.ownedCaps.length === this._gs.stackSizeLimit;
+            slammers.forEach(s => {
+                if (s.passive?.type !== 'balance') return;
+                const oldValue = s.passive.currentValue ?? 1.0;
+                s.passive.currentValue = atMaxStack ? oldValue + s.passive.value : 1.0;
+                s.passive.description  = `Each consecutive round your collection exactly fills max stack size: +${s.passive.value} permanently · Current: ×${s.passive.currentValue.toFixed(1)}`;
+                if (atMaxStack) this._ui.showRelicGain(s.passive.icon, oldValue, s.passive.currentValue, 1, 'round at max stack');
+            });
+        }
+
         this._ui.updatePileButtons(this.caps, [], this._geb);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
@@ -498,6 +524,10 @@ export class RoundManager {
     }
 
     _resolveAndScore(wonNow, faceDown, miss) {
+        // Analog/Digital Timer tæller kast på tværs af HELE runnet — bump her,
+        // én gang pr. faktisk kast, uanset hit/miss/Trick Shot.
+        if (this._gs) this._gs.bumpRunThrowCount();
+
         // ── Detect caps flipped by magnet animation ────────────────────────────
         const magnetWon = faceDown.filter(c => isFaceUp(c.body));
         const stillDown = faceDown.filter(c => !isFaceUp(c.body));
@@ -618,14 +648,15 @@ export class RoundManager {
             return;
         }
 
-        // ── Phase 2b: crew/rally tilføjer rundevis bonus til _roundCapBonuses ──
-        // Bonus persisterer resten af runden og vises i pile-overlay badges.
+        // ── Phase 2b: crew/rally/martyr tilføjer rundevis bonus/multiplier til
+        // _roundCapBonuses/_roundCapMultipliers. Persisterer resten af runden og
+        // vises i pile-overlay badges.
         const auraFeedback = new Map(); // donor cap → { type, targets } — kun til visuel feedback
-        actualWon.forEach(({ cap: donor, auraBonus, auraFilter }) => {
-            if (!auraBonus || !auraFilter) return;
+        actualWon.forEach(({ cap: donor, auraBonus, auraMultiplier, auraFilter }) => {
+            if ((!auraBonus && (auraMultiplier ?? 1) === 1) || !auraFilter) return;
             const pd = donor.body.position;
             const targets = [];
-            // crew: alle caps i runden; rally: same-throw won + face-down (positionsbaseret)
+            // crew: alle caps i runden; rally/martyr: same-throw won + face-down (positionsbaseret)
             const candidateCaps = auraFilter === 'series'
                 ? [...actualWon.map(r => r.cap), ...updatedFaceDown, ...this._wonCapsAll]
                 : [...actualWon.map(r => r.cap), ...updatedFaceDown];
@@ -639,13 +670,27 @@ export class RoundManager {
                                  : auraFilter === 'series'  ? sameSeries
                                  : nearby || sameSeries;
                 if (matches) {
-                    this._roundCapBonuses.set(target.entryId,
-                        (this._roundCapBonuses.get(target.entryId) ?? 0) + auraBonus);
+                    if (auraBonus) {
+                        this._roundCapBonuses.set(target.entryId,
+                            (this._roundCapBonuses.get(target.entryId) ?? 0) + auraBonus);
+                    }
+                    if ((auraMultiplier ?? 1) !== 1) {
+                        this._roundCapMultipliers.set(target.entryId,
+                            (this._roundCapMultipliers.get(target.entryId) ?? 1) * auraMultiplier);
+                    }
                     targets.push({ x: pt.x, y: pt.y, z: pt.z });
                 }
             });
-            if (targets.length > 0) {
-                const feedType = auraFilter === 'nearby' ? 'rally' : 'crew';
+            const isMartyr = donor.def?.effect === 'martyr';
+            // Martyr (Relic Hunter) viser sin radius-ring ALTID, selv ved 0 ramte —
+            // det er den eneste måde at se/bekræfte om et cap rent faktisk lå
+            // inden for NEARBY_RADIUS eller ej. Rally/crew beholder deres
+            // eksisterende "kun ved mindst ét ramt"-adfærd uændret.
+            if (targets.length > 0 || isMartyr) {
+                // Martyr får sin egen ring-farve i stedet for at blive slugt af
+                // rally's — samme auraFilter:'nearby', men et helt andet
+                // effekt-id, og spilleren skal kunne se forskel på dem.
+                const feedType = isMartyr ? 'martyr' : auraFilter === 'nearby' ? 'rally' : 'crew';
                 auraFeedback.set(donor, { type: feedType, targets, count: targets.length });
             }
         });
@@ -666,7 +711,13 @@ export class RoundManager {
         const isFirstThrow    = this._pendingThrowsDone === 0;
         const isLastThrow     = this._throwsLeft === 1;
         const slammers        = this._gs?.ownedSlammers ?? [];
-        const flatSlammerBonus = passiveFlatBonus(slammers, s => s.passive?.type === 'flatBonus', amplify);
+        // Digital Timer (Class of '96) lægges oveni den normale flatBonus — samme
+        // felt, den er blot kun aktiv hvert N. kast på tværs af hele runnet.
+        const runThrowCount   = this._gs?.runThrowCount ?? 0;
+        const digitalSlammer  = slammers.find(s => s.passive?.type === 'digitalTimer');
+        const digitalHit      = !!digitalSlammer && runThrowCount > 0 && runThrowCount % digitalSlammer.passive.interval === 0;
+        const flatSlammerBonus = passiveFlatBonus(slammers, s => s.passive?.type === 'flatBonus', amplify)
+            + (digitalHit ? passiveFlatBonus(slammers, s => s.passive?.type === 'digitalTimer', amplify) : 0);
         const firstMult       = isFirstThrow ? passiveMultiplier(slammers, s => s.passive?.type === 'firstThrow', amplify) : 1;
         const lastMult        = isLastThrow  ? passiveMultiplier(slammers, s => s.passive?.type === 'lastThrow',  amplify) : 1;
         if (isFirstThrow) this._ui.hideFirstStrikeBadge();
@@ -682,8 +733,19 @@ export class RoundManager {
             s => flipCount > 0 && s.passive?.type === 'parityMultiplier' && flipCount % 2 === (s.passive.parity === 'even' ? 0 : 1),
             amplify
         );
-        const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : []), ...(parityMult > 1 ? [parityMult] : [])];
+        // Hero (Bloodlines) — præcis 1 cap flippet i DETTE kast (genbruger flipCount,
+        // samme "flipCount > 0"-regel som parity, så et rent miss aldrig trigger den).
+        const heroMult         = flipCount === 1
+            ? passiveMultiplier(slammers, s => s.passive?.type === 'hero', amplify) : 1;
+        // Analog Timer (Crescent Heights) — hvert N. kast på tværs af hele runnet.
+        const analogSlammer   = slammers.find(s => s.passive?.type === 'analogTimer');
+        const analogHit       = !!analogSlammer && runThrowCount > 0 && runThrowCount % analogSlammer.passive.interval === 0;
+        const analogMult      = analogHit ? passiveMultiplier(slammers, s => s.passive?.type === 'analogTimer', amplify) : 1;
+        const positionChain   = [...doubleChain, ...(firstMult > 1 ? [firstMult] : []), ...(lastMult > 1 ? [lastMult] : []), ...(parityMult > 1 ? [parityMult] : []), ...(heroMult > 1 ? [heroMult] : []), ...(analogMult > 1 ? [analogMult] : [])];
         const globalMult      = positionChain.reduce((m, v) => m * v, 1);
+        // Overdrive (Quarterback Sis) — halverer ALT, holdt udenfor positionChain
+        // (ligesom bossMult) så den ikke optræder som en "×N > 1"-chip i UI'et.
+        const overdriveMult   = passiveMultiplier(slammers, s => s.passive?.type === 'overdrive', amplify);
 
         // Parity Multiplier-feedback (Even Steven/Odd Todd SLAMMERE — bonus, ikke
         // boss-veto'et). parityMult > 1 betyder kastets flip-paritet matchede en
@@ -692,6 +754,21 @@ export class RoundManager {
             const parityType    = flipCount % 2 === 0 ? 'even' : 'odd';
             const paritySlammer = slammers.find(s => s.passive?.type === 'parityMultiplier' && s.passive.parity === parityType);
             if (paritySlammer) this._ui.showParityMultBadge(paritySlammer, parityType, parityMult);
+        }
+
+        // Hero-feedback (Bloodlines) — samme transiente stack-badge-mønster.
+        if (heroMult > 1) {
+            const heroSlammer = slammers.find(s => s.passive?.type === 'hero');
+            if (heroSlammer) this._ui.showPassiveTriggerBadge(heroSlammer, `SOLO ×${heroMult}`, '#2a9d5c');
+        }
+        // Analog Timer-feedback (Crescent Heights).
+        if (analogHit && analogMult > 1) {
+            this._ui.showPassiveTriggerBadge(analogSlammer, `×${analogMult}`, '#445577');
+        }
+        // Digital Timer-feedback (Class of '96) — viser den U-forstærkede base-værdi,
+        // samme mønster som Flat Bonus-badgen ovenfor.
+        if (digitalHit) {
+            this._ui.showPassiveTriggerBadge(digitalSlammer, `+${digitalSlammer.passive.value}★`, '#dd8800');
         }
 
         // Flat Bonus-feedback (Power Surge/Magnet) — kun hvis kastet rent faktisk
@@ -712,7 +789,7 @@ export class RoundManager {
                 ownedCaps:      this._gs?.ownedCaps ?? [],
             })
             : 1;
-        const finalGlobalMult = globalMult * bossMult;
+        const finalGlobalMult = globalMult * bossMult * overdriveMult;
 
         // Parity-boss feedback (Even Steven/Odd Todd) — et grønt flueben/rødt kryds
         // pr. kast så spilleren straks kan se OM og HVORFOR kastet scorer 0, i
@@ -724,9 +801,11 @@ export class RoundManager {
 
         const voltage    = this._voltageBonus ?? 0;
         // Dedup af Rarity Multiplier-badges: flere caps af samme rarity i ét kast
-        // skal kun give ÉN badge, ikke én pr. cap.
+        // skal kun give ÉN badge, ikke én pr. cap. Magic (holoMultiplier) genbruger
+        // samme dedup-idé — kun ÉN badge pr. kast, uanset hvor mange enchantede caps.
         const triggeredRarities = new Set();
-        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta }) => {
+        let   holoTriggerValue  = 0;
+        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta, destroySelf }) => {
             const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
             const gsEntry  = cap.entryId != null && this._gs ? this._gs.ownedCaps.find(c => c.id === cap.entryId) : null;
             const carry    = gsEntry?.enchant === 'halflife' ? (gsEntry?.storedBonus ?? 0) : 0;
@@ -747,10 +826,17 @@ export class RoundManager {
                 amplify
             );
             if (rarityMult > 1) triggeredRarities.add(capRarity);
-            const capChain   = rarityMult > 1 ? [...positionChain, rarityMult] : positionChain;
-            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1));
-            const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult);
-            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry };
+            // Magic (Gilded Gargoyle) — kun caps der faktisk ER enchantede lige nu.
+            const holoMult = gsEntry?.enchant != null
+                ? passiveMultiplier(slammers, s => s.passive?.type === 'holoMultiplier', amplify) : 1;
+            if (holoMult > 1) holoTriggerValue = holoMult;
+            // Rundevis aura-multiplier (fx martyr/Relic Hunter) — akkumuleret i
+            // _roundCapMultipliers ovenfor i Phase 2b, samme mønster som roundBonus.
+            const roundMult  = this._roundCapMultipliers.get(cap.entryId) ?? 1;
+            const capChain   = [...positionChain, ...(rarityMult > 1 ? [rarityMult] : []), ...(holoMult > 1 ? [holoMult] : []), ...(roundMult !== 1 ? [roundMult] : [])];
+            const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1) * roundMult);
+            const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult * holoMult);
+            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry, destroySelf: !!destroySelf };
         });
         // Rarity Multiplier-feedback: én badge pr. UNIK rarity der rent faktisk
         // triggede denne gang (se dedup ovenfor).
@@ -760,6 +846,11 @@ export class RoundManager {
             const value = passiveMultiplier(slammers, s => s.passive?.type === 'rarityMultiplier' && s.passive.rarity === rarity, amplify);
             this._ui.showRarityMultBadge(raritySlammer, rarity, value);
         });
+        // Magic-feedback (Gilded Gargoyle) — én badge pr. kast, ikke pr. enchantet cap.
+        if (holoTriggerValue > 1) {
+            const holoSlammer = slammers.find(s => s.passive?.type === 'holoMultiplier');
+            if (holoSlammer) this._ui.showPassiveTriggerBadge(holoSlammer, `×${holoTriggerValue}`, '#d4af37', '#000');
+        }
         const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
 
         this._wonCapsAll.push(...actualWon.map(({ cap }) => cap));
@@ -784,7 +875,7 @@ export class RoundManager {
         const scoreDelays = scoredCaps.map(({ cap }, i) => Math.max(i * popDelay, surgeLandDelay.get(cap) ?? 0));
         const lastIdx      = scoreDelays.reduce((best, d, i) => d > scoreDelays[best] ? i : best, 0);
 
-        scoredCaps.forEach(({ cap, capScore, effectMeta, chain, carry }, i) => {
+        scoredCaps.forEach(({ cap, capScore, effectMeta, chain, carry, destroySelf }, i) => {
             const isLast = i === lastIdx;
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
@@ -794,6 +885,19 @@ export class RoundManager {
                 this._ui.showScoreFloat(x, y, capScore, chain, () => {
                     this._popCapMesh(cap.mesh);
                     this._ui.popCollectIcon(cap.def);
+                    // Ability-udløst permanent fjernelse (jackpot/martyr, se
+                    // destroy-ability-draft.md). Ironclad-caps når aldrig hertil med
+                    // destroySelf=true — ironcladEnchant() nulstiller flaget allerede
+                    // i selve effekt-resolveringen (EffectResolver._applyEnchant), så
+                    // der er bevidst INGEN separat ironclad-check her. Filter er trygt
+                    // som no-op for ghosts (negativt entryId, findes aldrig i ownedCaps).
+                    // Feedback er in-battle-view (ring + lille ikon-indikator, samme
+                    // mønster som alle andre effekter), IKKE en sticker-overlay — den
+                    // sidste virkede for forstyrrende for noget der sker midt i et kast.
+                    if (destroySelf && this._gs) {
+                        this._gs.ownedCaps = this._gs.ownedCaps.filter(c => c.id !== cap.entryId);
+                        this._spawnEffectFeedback(cap.body.position, x, y, { type: 'destroy' });
+                    }
                     if (isLast) {
                         this._ui.setScore(finalScore);
                         if (scoreGained > 0) this._ui.showScoreGain(scoreGained);
@@ -873,8 +977,16 @@ export class RoundManager {
                 });
             }
 
+            // ILLUSIONIST (Whispering Shadow) — hele stakken blev flippet denne runde.
+            if (this._gs && updatedFaceDown.length === 0 &&
+                (this._gs.ownedSlammers ?? []).some(s => s.passive?.type === 'illusionist')) {
+                const slot = this._gs.grantRandomConsumable();
+                if (slot !== false && this.onFreeCardGranted) this.onFreeCardGranted(slot);
+            }
+
             this._voltageBonus    = 0;
             this._roundCapBonuses = new Map();
+            this._roundCapMultipliers = new Map();
             this._ui.updatePileButtons(updatedFaceDown, this._wonCapsAll, this._geb);
 
             this._phase = 'done';
@@ -918,6 +1030,12 @@ export class RoundManager {
         } else if (meta.type === 'crew') {
             (meta.targets ?? []).forEach(pos =>
                 this._render.spawnEffectRing(pos, 0.7, 0xaaffaa, 400, 250));
+        } else if (meta.type === 'martyr') {
+            // Egen farve (magenta/lilla) — samme NEARBY_RADIUS-ring som rally,
+            // men skal ikke se ud som rally, det er en anden effekt (martyr).
+            this._render.spawnEffectRing(worldPos, NEARBY_RADIUS, 0xcc44ff, 700, 400);
+            (meta.targets ?? []).forEach(pos =>
+                this._render.spawnEffectRing(pos, 0.7, 0xcc44ff, 400, 250));
         } else if (meta.type === 'absorb') {
             if ((meta.bonus ?? 0) > 0) {
                 this._render.spawnEffectRing(worldPos, 14, 0xffdd44, 900, 600);
@@ -930,6 +1048,11 @@ export class RoundManager {
             if (meta.success && meta.targetPos) {
                 this._render.spawnEffectRing(meta.targetPos, 1.4, 0xff6622, 300, 200);
             }
+        } else if (meta.type === 'destroy') {
+            // Ability-udløst permanent fjernelse (jackpot/martyr) — hurtig, mørk
+            // "poof"-ring i selve battle-viewet i stedet for en sticker-overlay.
+            this._render.spawnEffectRing(worldPos, 2.5, 0x1a1a1a, 350, 300);
+            this._render.spawnEffectRing(worldPos, 1.2, 0xff4444, 250, 250);
         }
         this._ui.showEffectIndicator(screenX, screenY, meta);
     }

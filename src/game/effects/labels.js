@@ -12,6 +12,8 @@ export const EFFECT_LABELS = {
     'cue_slam':   { name: 'Cue Ball',   desc: 'blasts a random Pewl cap when flipped' },
     'surge':      { name: 'Surge',      desc: 'flips the nearest face-down cap and triggers its effect' },
     'absorb':     { name: 'Absorb',     desc: 'gains all extra base value from every other cap this round (max +1000★)' },
+    'jackpot':    { name: 'Jackpot',    desc: '+50★ flat, then permanently destroyed' },
+    'martyr':     { name: 'Martyr',     desc: '2.5× to nearby caps, then permanently destroyed' },
 };
 
 // Kort ability-navn — brugt i collection/reward/shop-kort, hvor der ikke er plads til en hel sætning.

@@ -127,11 +127,16 @@ export class RewardScreen {
     // stedet for ★ — den normale ★-reward-økonomi er jo lukket ved en boss.
     // context: { bossShards, parentNode }
     enterBoss(context = null) {
-        this._node       = context?.parentNode ?? null;
-        this._mode       = 'boss';
-        this._bossShards = context?.bossShards ?? 0;
+        this._node      = context?.parentNode ?? null;
+        this._mode      = 'boss';
+        const threshold = context?.bossShards ?? 0;
+        // Shard Gain (Crimson Scarab) lægges ind i _bossShards SELV (ikke kun ved
+        // tildelingen nedenfor), så den viste "+N🔶"-tekst (se _render()) matcher
+        // det faktiske antal Shards spilleren modtager — kun hvis bossen rent
+        // faktisk blev cleared (threshold > 0, no-op ved skip/tab).
+        this._bossShards = threshold > 0 ? threshold + this._gs.bossShardBonus : 0;
 
-        // Threshold-Shards er garanteret uanset cap-valg — tildel dem med det samme
+        // Threshold-Shards er garanteret uanset cap-valg — tildel dem med det samme.
         if (this._bossShards > 0) this._gs.addShards(this._bossShards);
 
         this._el    = document.createElement('div');
@@ -300,7 +305,7 @@ export class RewardScreen {
 
     // Boss-skip giver Shards, ikke ★ — den normale reward-økonomi gælder ikke her
     _doBossSkip() {
-        this._gs.addShards(1);
+        this._gs.addShards(1 + this._gs.bossShardBonus);
         if (this.onContinue) this.onContinue();
     }
 
@@ -511,7 +516,9 @@ export class RewardScreen {
             : this._mode === 'mystery' ? this._mysteryCard(choices[0])
             : this._capCards(choices);
 
-        const skipLabel = this._mode === 'boss' ? '+1🔶' : `+${SKIP_BONUS}★`;
+        // Shard Gain (Crimson Scarab) lægges ind her også, så knappens tal matcher
+        // det _doBossSkip() rent faktisk tildeler.
+        const skipLabel = this._mode === 'boss' ? `+${1 + this._gs.bossShardBonus}🔶` : `+${SKIP_BONUS}★`;
 
         this._el.innerHTML = `
             <button id="reward-skip-btn">

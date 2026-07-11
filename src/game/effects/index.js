@@ -9,6 +9,8 @@ import { rallyEffect }     from './rallyEffect.js';
 import { crewEffect }      from './crewEffect.js';
 import { surgeEffect }     from './surgeEffect.js';
 import { absorbEffect }    from './absorbEffect.js';
+import { jackpotEffect }   from './jackpotEffect.js';
+import { martyrEffect }    from './martyrEffect.js';
 
 // Registry: effect ID → handler function
 // Adding a new effect = one line here + one file in this folder
@@ -26,4 +28,6 @@ export const EFFECTS = {
     'cue_slam':   () => ({}), // placeholder — physics handled in RoundManager Phase A (not yet implemented)
     'surge':      surgeEffect,
     'absorb':     absorbEffect,
+    'jackpot':    jackpotEffect,
+    'martyr':     martyrEffect,
 };

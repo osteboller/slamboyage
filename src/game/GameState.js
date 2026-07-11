@@ -2,6 +2,7 @@ import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNE
 import { BASE_NODES } from '../config/mapData.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
 import { BOSS_DEFS } from '../config/bossDefs.js';
+import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 
 const _commonCaps = CAP_DEFS.filter(c => c.rarity === 1);
 
@@ -16,13 +17,14 @@ export class GameState {
         this._loop          = 1;
         this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
         this._rerollCostBase  = 1;
-        this._discardCostBase = 2;
+        this._destroyCostBase = 2;
         this._cardPriceMult   = 1;
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
         this.amplifyStacks  = 0; // AMPLIFYZ — stakker ligesom activeDouble: 0=none, 1=×1 ekstra trigger, 2=×2 ekstra …
         this.shards         = 0; // run-scoped valuta — kun til boss-shoppen
+        this._runThrowCount = 0; // tæller kast på tværs af HELE runnet (ikke nulstillet pr. runde) — bruges af Analog/Digital Timer
     }
 
     _mkCapEntry(def, enchant = null) {
@@ -68,7 +70,7 @@ export class GameState {
         if (starterSlammer) this.addSlammer(starterSlammer);
         this.runNodes       = this._generateNodes(1);
         this._rerollCostBase  = 1;
-        this._discardCostBase = 2;
+        this._destroyCostBase = 2;
         this._cardPriceMult   = 1;
         this.shopOffer      = null;
         // Starter uden kort — main menuens dev-kort-knapper dækker nu ad-hoc
@@ -77,6 +79,7 @@ export class GameState {
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
         this.amplifyStacks  = 0;
+        this._runThrowCount = 0;
     }
 
     // Call when all nodes cleared — bumps loop, resets progress, scales thresholds
@@ -85,7 +88,7 @@ export class GameState {
         this.nodeIndex   = 0;
         this.runNodes    = this._generateNodes(this._loop);
         this._rerollCostBase  = 1;
-        // _discardCostBase nulstilles IKKE her — discard-prisen skal blive ved med
+        // _destroyCostBase nulstilles IKKE her — destroy-prisen skal blive ved med
         // at eskalere gennem hele runnen, kun startRun() nulstiller den.
         this.shopOffer   = null;
         this.amplifyStacks  = 0;
@@ -121,10 +124,12 @@ export class GameState {
         const global = this.ownedSlammers
             .filter(s => s.passive?.type === 'globalMultiplier')
             .map(s => s.passive.value);
-        const saver = this.ownedSlammers
-            .filter(s => s.passive?.type === 'throwSaver' && (s.passive.currentValue ?? 1.0) > 1.0)
+        // throwSaver/sharden/balance deler samme mønster: en mutable currentValue der
+        // vokser permanent ved en betingelse, startende ved 1.0 (no-op indtil den vokser).
+        const persistent = this.ownedSlammers
+            .filter(s => ['throwSaver', 'sharden', 'balance'].includes(s.passive?.type) && (s.passive.currentValue ?? 1.0) > 1.0)
             .map(s => s.passive.currentValue);
-        return [...global, ...saver];
+        return [...global, ...persistent];
     }
 
     get globalMultiplier() {
@@ -138,9 +143,53 @@ export class GameState {
     }
 
     get throwBonus() {
+        return this.ownedSlammers.reduce((sum, s) => {
+            if (s.passive?.type === 'extraThrow') return sum + s.passive.value;
+            if (s.passive?.type === 'overdrive')  return sum + (s.passive.throwBonus ?? 0);
+            return sum;
+        }, 0);
+    }
+
+    // Shard Gain (Crimson Scarab) — ekstra Shards oveni threshold-belønningen,
+    // tilføjet ved boss-clear (se RewardScreen.js enterBoss()/_doBossSkip()).
+    get bossShardBonus() {
         return this.ownedSlammers
-            .filter(s => s.passive?.type === 'extraThrow')
+            .filter(s => s.passive?.type === 'shardGain')
             .reduce((sum, s) => sum + s.passive.value, 0);
+    }
+
+    get runThrowCount() { return this._runThrowCount; }
+
+    // Tæller kast på tværs af HELE runnet (ikke nulstillet pr. runde/node) —
+    // bruges af Analog/Digital Timer til at afgøre "hvert N. kast".
+    bumpRunThrowCount() {
+        this._runThrowCount = (this._runThrowCount ?? 0) + 1;
+        return this._runThrowCount;
+    }
+
+    // Square/Illusionist deler samme "giv et gratis tilfældigt kort"-handling.
+    // Returnerer slot-index (til UI-flash) eller false hvis der ikke var plads.
+    grantRandomConsumable() {
+        const def = CONSUMABLE_DEFS[Math.floor(Math.random() * CONSUMABLE_DEFS.length)];
+        return this.addConsumable(def);
+    }
+
+    // Sharden (Sub-Terra King) — konverterer ubrugte Shards til permanent
+    // multiplier, kaldt når boss-shoppen forlades (se main.js). No-op hvis
+    // spilleren ikke ejer Sub-Terra King — shards persisterer så uændret som før.
+    // Returnerer { icon, oldValue, newValue, unspent } så main.js kan vise en
+    // showRelicGain-sticker (samme mønster som Iron Discipline/Balance) — eller
+    // null hvis der ikke var noget at konvertere.
+    convertUnusedShards() {
+        const shardenSlammer = this.ownedSlammers.find(s => s.passive?.type === 'sharden');
+        if (!shardenSlammer || this.shards <= 0) return null;
+        const unspent = this.shards;
+        const p = shardenSlammer.passive;
+        const oldValue = p.currentValue ?? 1.0;
+        p.currentValue = oldValue + unspent * p.value;
+        p.description  = `Each unused Shard adds ×${p.value} permanently · Current: ×${p.currentValue.toFixed(1)}`;
+        this.shards = 0;
+        return { icon: p.icon, oldValue, newValue: p.currentValue, unspent };
     }
 
     hasSlammer(name)  { return this.ownedSlammers.some(s => s.name === name); }
@@ -153,7 +202,7 @@ export class GameState {
     addSlammer(slammerDef) {
         if (!this.canAddSlammer()) return false;
         const entry = { ...slammerDef, passive: slammerDef.passive ? { ...slammerDef.passive } : null };
-        if (entry.passive?.type === 'throwSaver') entry.passive.currentValue = 1.0;
+        if (['throwSaver', 'sharden', 'balance'].includes(entry.passive?.type)) entry.passive.currentValue = 1.0;
         this.ownedSlammers.push(entry);
         if (entry.passive?.type === 'stackSize') this.stackSizeLimit += entry.passive.value;
         return true;
@@ -193,16 +242,16 @@ export class GameState {
     canAfford(price)      { return this.score >= price; }
     hasCapDef(capDef)     { return this.ownedCaps.some(c => c.def.name === capDef.name); }
 
-    // Discount-slammer (Bargain Bin) — halverer alle shop-priser (band, packs, reroll, discard).
+    // Discount-slammer (Bargain Bin) — halverer alle shop-priser (band, packs, reroll, destroy).
     get shopDiscountMult() {
         return this.ownedSlammers.some(s => s.passive?.type === 'shopDiscount') ? 0.5 : 1;
     }
     // Underliggende "råt" beløb ganges med rabatten ved aflæsning — selve
-    // fordoblingen (useReroll/useDiscard) sker på råt-feltet, så rabatten altid
+    // fordoblingen (useReroll/useDestroy) sker på råt-feltet, så rabatten altid
     // regnes frisk og ikke driver skævt hvis slammeren hentes midt i et shop-besøg.
     get rerollCost()  { return Math.max(1, Math.ceil(this._rerollCostBase  * this.shopDiscountMult)); }
-    get discardCost() { return Math.max(1, Math.ceil(this._discardCostBase * this.shopDiscountMult)); }
-    // Kort-pris-inflationen (CARD_PRICE_GROWTH) er run-persistent ligesom reroll/discard.
+    get destroyCost() { return Math.max(1, Math.ceil(this._destroyCostBase * this.shopDiscountMult)); }
+    // Kort-pris-inflationen (CARD_PRICE_GROWTH) er run-persistent ligesom reroll/destroy.
     get cardPriceMultiplier() { return this._cardPriceMult; }
     // Cap-/pakke-priser vokser pr. loop (CAP_PRICE_GROWTH_PER_LOOP) — se ShopScreen._price().
     get capPriceMultiplier() { return 1 + (this._loop - 1) * CAP_PRICE_GROWTH_PER_LOOP; }
@@ -250,7 +299,7 @@ export class GameState {
     // Køber et consumable-kort fra shop-båndet — prisen vokser ×CARD_PRICE_GROWTH
     // for hvert kort købt, resten af runnen (kun startRun() nulstiller den).
     // basePrice = u-rabatteret pris (fx PACK_PRICES.card), samme råt-felt-mønster
-    // som rerollCost/discardCost.
+    // som rerollCost/destroyCost.
     buyConsumableCard(def, basePrice) {
         const price = Math.max(1, Math.ceil(basePrice * this.shopDiscountMult * this._cardPriceMult));
         if (!this.canAfford(price)) return { ok: false, reason: 'afford' };
@@ -267,10 +316,14 @@ export class GameState {
         this._rerollCostBase *= 2;
     }
 
-    // Discard a cap — costs the player ★, doubles each use per loop
-    useDiscard(capId) {
-        this.score            -= this.discardCost;
-        this._discardCostBase *= 2;
+    // Destroy a cap — player-initiated, permanent, costs ★, doubles each use per
+    // loop. Same permanent-removal semantics as ability-triggered destroySelf
+    // (EffectResolver/RoundManager), but this one is NEVER blocked by Ironclad —
+    // that enchant only protects against ability/effect-triggered removal in
+    // battle, not the player's own deliberate shop choice.
+    useDestroy(capId) {
+        this.score            -= this.destroyCost;
+        this._destroyCostBase *= 2;
         this.ownedCaps    = this.ownedCaps.filter(c => c.id !== capId);
     }
 

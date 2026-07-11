@@ -322,7 +322,7 @@
     50%      { transform: rotate(5deg) scale(1.08); box-shadow: 4px 4px 0 #4a2d80; }
 }
 #first-strike-badge, #last-stand-badge,
-.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge {
+.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge, .passive-trigger-badge {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -380,7 +380,7 @@
     85%  { opacity: 1; transform: scale(1); }
     100% { opacity: 0; transform: scale(0.85); }
 }
-.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge {
+.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge, .passive-trigger-badge {
     animation: rarity-parity-badge-pop 1.8s ease-in-out forwards;
 }
 

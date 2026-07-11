@@ -103,6 +103,7 @@ export class StartScreen {
                         <button class="dev-mini-btn" data-dev-series="dawgz">DAWGZ</button>
                         <button class="dev-mini-btn" data-dev-series="zupers">ZUPERS</button>
                         <button class="dev-mini-btn" data-dev-series="zrees">ZREES</button>
+                        <button class="dev-mini-btn" data-dev-series="legacy_discs">LEGAZ</button>
                     </div>
                 </div>
                 <div id="dev-card-btns" class="dev-mini-btn-group">

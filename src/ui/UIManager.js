@@ -168,6 +168,10 @@ export class UIManager {
             el.classList.add('effect-indicator--crew');
             el.textContent = meta.count > 0 ? `👾+${meta.count}` : '👾';
             setTimeout(() => el.remove(), 1100);
+        } else if (meta.type === 'martyr') {
+            el.classList.add('effect-indicator--martyr');
+            el.textContent = meta.count > 0 ? `💫×${meta.count}` : '💫';
+            setTimeout(() => el.remove(), 1100);
         } else if (meta.type === 'surge') {
             el.classList.add(meta.success ? 'effect-indicator--surge' : 'effect-indicator--fail');
             el.textContent = meta.success ? '⚡↩' : '⚡✕';
@@ -176,6 +180,10 @@ export class UIManager {
             el.classList.add('effect-indicator--clone');
             el.textContent = '👻';
             setTimeout(() => el.remove(), 1100);
+        } else if (meta.type === 'destroy') {
+            el.classList.add('effect-indicator--destroy');
+            el.textContent = '💥';
+            setTimeout(() => el.remove(), 1000);
         }
     }
 
@@ -373,13 +381,16 @@ export class UIManager {
         el.classList.add('boss-info-feedback--pop');
     }
 
-    showRelicGain(icon, oldValue, newValue, unusedThrows) {
+    // label = hvad "count" tæller (default 'unused', matcher Iron Discipline's
+    // "+N unused" kast-tekst) — Sharden/Balance sender deres eget label ind
+    // ('unused Shard(s)'/'round at max stack'), da "unused" alene ikke giver mening der.
+    showRelicGain(icon, oldValue, newValue, count, label = 'unused') {
         const el = document.createElement('div');
         el.className = 'relic-gain-sticker';
         el.innerHTML = `
             <div class="relic-gain-top">
                 <span class="relic-gain-icon">${icon}</span>
-                <span class="relic-gain-throws">+${unusedThrows} unused</span>
+                <span class="relic-gain-throws">+${count} ${label}</span>
             </div>
             <div class="relic-gain-row">
                 <span class="relic-gain-old">×${oldValue.toFixed(1)}</span>
@@ -405,7 +416,7 @@ export class UIManager {
     // endnu ikke var færdig da spilleren nåede at navigere videre (fx gennem
     // reward/shop og ind i en boss-kamp hurtigere end 1.8s).
     clearTransientPassiveBadges() {
-        document.querySelectorAll('.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge')
+        document.querySelectorAll('.rarity-mult-badge, .parity-mult-badge, .flatbonus-mult-badge, .passive-trigger-badge')
             .forEach(el => el.remove());
     }
 
@@ -500,6 +511,23 @@ export class UIManager {
         el.style.color      = '#fff';
         el.style.boxShadow  = '3px 3px 0 #000';
         el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ${parity === 'even' ? 'EVEN' : 'ODD'} ×${value}`;
+        stack.appendChild(el);
+        el.addEventListener('animationend', () => el.remove());
+    }
+
+    // Generisk transient trigger-badge til nyere passiver (Hero/Analog Timer/
+    // Digital Timer/Magic) — samme pop-ind/pop-ud-stil og stack som rarity/parity/
+    // flatbonus ovenfor, bare med frit label/farve i stedet for en dedikeret
+    // metode pr. passiv-type (der er for mange nye typer til at retfærdiggøre det).
+    showPassiveTriggerBadge(slammer, label, bg, fg = '#fff') {
+        const stack = document.getElementById('slammer-badge-stack');
+        if (!stack || !slammer?.texFront) return;
+        const el = document.createElement('div');
+        el.className = 'passive-trigger-badge';
+        el.style.background = bg;
+        el.style.color      = fg;
+        el.style.boxShadow  = '3px 3px 0 #000';
+        el.innerHTML = `<img class="slammer-badge-icon" src="${slammer.texFront}" alt="${slammer.name}"> ${label}`;
         stack.appendChild(el);
         el.addEventListener('animationend', () => el.remove());
     }
@@ -905,11 +933,20 @@ export class UIManager {
                 const extraBase   = (gsEntry?.storedBonus ?? 0) + (this._getExtraBase?.(entry.entryId) ?? 0);
                 const carryBadge  = extraBase > 0
                     ? `<span class="cap-thumb-carry-badge">+${extraBase}</span>` : '';
+                // Destroyed (fx jackpot/martyr, destroy-ability-draft.md): en RIGTIG
+                // cap (entryId >= 0, ikke en ghost's negative syntetiske id) der ikke
+                // længere findes i ownedCaps er per definition destroyet — samme
+                // gsEntry-opslag som carry-badgen ovenfor genbruges, intet nyt
+                // tracking-state nødvendigt. Kun "Won caps"-overlayet (lit=true) kan
+                // reelt vise dette, da destroySelf først evalueres efter flip.
+                const isDestroyed = entry.entryId != null && entry.entryId >= 0 && !gsEntry;
+                const destroyedBadge = isDestroyed
+                    ? `<span class="cap-thumb-destroyed-badge" title="Destroyed — permanently removed">💥</span>` : '';
                 return capThumbnailHTML(
                     { ...entry, enchant: this._liveEnchant(entry) },
                     { wrapClass: `cap-thumb${lit ? '' : ' dimmed'}`, imgClass: 'cap-thumb-img',
                       dimmed: !lit, extraAttrs: `data-idx="${i}" data-lit="${lit}"`,
-                      innerHTML: ghostBadge + carryBadge }
+                      innerHTML: ghostBadge + carryBadge + destroyedBadge }
                 );
             }
             const hex = '#' + (def.color ?? 0xaaaaaa).toString(16).padStart(6, '0');

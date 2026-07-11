@@ -150,8 +150,10 @@
 .effect-indicator--boomerang  { color: #ffcc44; font-size: 22px; }
 .effect-indicator--rally      { color: #44ffcc; }
 .effect-indicator--crew       { color: #aaffaa; }
+.effect-indicator--martyr     { color: #cc44ff; }
 .effect-indicator--surge      { color: #ff6622; font-size: 20px; }
 .effect-indicator--clone      { color: #88aaff; font-size: 22px; }
+.effect-indicator--destroy    { color: #ff4444; font-size: 22px; }
 .effect-indicator.ind-pop { animation: ind-pop-anim 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 @keyframes effect-ind-anim {

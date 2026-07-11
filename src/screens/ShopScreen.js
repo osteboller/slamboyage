@@ -10,7 +10,10 @@ import { formatScore } from '../ui/formatScore.js';
 
 const BAND_SIZE       = 5;
 const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 6, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
-const ENCHANT_IDS     = ['gilded', 'reverb', 'boomerang', 'halflife'];
+// FEATHER holdes bevidst udenfor — enchants/index.js's handler er stadig
+// udkommenteret (ingen stack-space-implementering endnu). IRONCLAD har nu en
+// reel handler (beskytter mod destroySelf) og kan derfor rulles.
+const ENCHANT_IDS     = ['gilded', 'reverb', 'boomerang', 'halflife', 'ironclad'];
 const CARD_IN_BAND_CHANCE = 0.3; // 30% chance one band slot is a card instead of a cap
 
 export class ShopScreen {
@@ -121,10 +124,10 @@ export class ShopScreen {
         if (discardImg) {
             const entry = this._gs.ownedCaps.find(c => c.id === +discardImg.dataset.capId);
             if (entry) {
-                const canAfford = this._gs.canAfford(this._gs.discardCost);
+                const canAfford = this._gs.canAfford(this._gs.destroyCost);
                 this._ui.showCapDetail(entry, true, canAfford ? {
                     label:    'DISCARD',
-                    price:    `${this._gs.discardCost}★`,
+                    price:    `${this._gs.destroyCost}★`,
                     color:    'var(--clr-red)',
                     callback: () => this._doDiscard(entry),
                 } : {
@@ -738,7 +741,7 @@ export class ShopScreen {
           <div class="shop-skull-box">💀</div>
           <span>REMOVE CAPS</span>
         </div>
-        <div class="shop-discard-price">${gs.discardCost}★</div>
+        <div class="shop-discard-price">${gs.destroyCost}★</div>
       </button>
       <button id="shop-continue-btn" class="shop-next-btn">
         <span>${nextLabel}</span>
@@ -758,7 +761,7 @@ export class ShopScreen {
       <span class="discard-title">Remove a cap</span>
       <button id="shop-discard-close" class="discard-close-btn">✕</button>
     </div>
-    <p class="discard-cost-label">Costs ${gs.discardCost}★ · doubles each use</p>
+    <p class="discard-cost-label">Costs ${gs.destroyCost}★ · doubles each use</p>
     <div class="discard-grid">${this._buildDiscardGrid()}</div>
   </div>
 </div>`;
@@ -900,21 +903,21 @@ export class ShopScreen {
     }
 
     _doDiscard(entry) {
-        if (!this._gs.canAfford(this._gs.discardCost)) return;
+        if (!this._gs.canAfford(this._gs.destroyCost)) return;
 
         const overlay = this._el?.querySelector('#shop-discard-overlay');
         const capEl   = overlay?.querySelector(`[data-cap-id="${entry.id}"]`)
                                 ?.closest('.discard-cap');
 
         const apply = () => {
-            this._gs.useDiscard(entry.id);
+            this._gs.useDestroy(entry.id);
             this._ui.setScore(this._gs.score);
 
             if (!overlay) return;
             const grid = overlay.querySelector('.discard-grid');
             if (grid) grid.innerHTML = this._buildDiscardGrid();
             const label = overlay.querySelector('.discard-cost-label');
-            if (label) label.textContent = `Costs ${this._gs.discardCost}★ · doubles each use`;
+            if (label) label.textContent = `Costs ${this._gs.destroyCost}★ · doubles each use`;
 
             if (this._gs.ownedCaps.length === 0) {
                 overlay.style.animation = 'screen-fade-out 0.15s ease-in forwards';
@@ -940,14 +943,14 @@ export class ShopScreen {
         if (gs.ownedCaps.length === 0) {
             return `<p class="discard-empty">No caps to discard.</p>`;
         }
-        const canAfford = gs.canAfford(gs.discardCost);
+        const canAfford = gs.canAfford(gs.destroyCost);
         return gs.ownedCaps.map(({ id, def, enchant }) =>
             `<div class="discard-cap ${canAfford ? '' : 'cant-afford'}">
                 ${capThumbnailHTML({ id, def, enchant }, { imgClass: 'discard-cap-img' })}
                 <div class="discard-cap-name">${def.name}</div>
                 <button class="discard-price-tag ${canAfford ? '' : 'cant-afford'}"
                         data-cap-id="${id}" ${canAfford ? '' : 'disabled'}>
-                    💀 ${gs.discardCost}★
+                    💀 ${gs.destroyCost}★
                 </button>
             </div>`
         ).join('');

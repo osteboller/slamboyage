@@ -126,6 +126,9 @@ consumables.onSell = (def) => {
 const factory      = new EntityFactory(physics, render, texCache);
 const throwCtrl = new ThrowController({ physics, render, cam, collisions, factory, ui });
 const roundMgr  = new RoundManager({ physics, render, cam, collisions, throwCtrl, factory, ui, powerBar, gameState });
+// Square/Illusionist (slammer-passiver) — giver et gratis kort passivt, uafhængigt
+// af hvilken run-skærm der er aktiv lige nu, så wires globalt ligesom throwCtrl.onThrowEnd.
+roundMgr.onFreeCardGranted = (idx) => consumables.flashSlot(idx);
 
 loadingScreen.style.opacity = '0';
 setTimeout(() => { loadingScreen.style.display = 'none'; }, 400);
@@ -326,6 +329,12 @@ function showScreen(name, context = null) {
         } else if (name === 'boss-shop') {
             currentScreen = bossShopScreen;
             bossShopScreen.onContinue = () => {
+                // Sharden (Sub-Terra King) — no-op (returnerer null) uden slammeren.
+                const shardenGain = gameState.convertUnusedShards();
+                if (shardenGain) {
+                    const label = `unused Shard${shardenGain.unspent === 1 ? '' : 's'}`;
+                    ui.showRelicGain(shardenGain.icon, shardenGain.oldValue, shardenGain.newValue, shardenGain.unspent, label);
+                }
                 returnToAfterMap = 'start';
                 if (gameState.isRunComplete) gameState.nextLoop();
                 showScreen('map');
