@@ -6,13 +6,15 @@ import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js';
 import { pulseIconRotate } from '../ui/domUtils.js';
 import { formatScore } from '../ui/formatScore.js';
+import { seriesPillHTML } from '../config/seriesDefs.js';
 
 const SKIP_BONUS = 5;
 
 export class RewardScreen {
-    constructor({ gameState, ui }) {
-        this._gs         = gameState;
-        this._ui         = ui;
+    constructor({ gameState, ui, consumables }) {
+        this._gs          = gameState;
+        this._ui          = ui;
+        this._consumables = consumables;
         this._el         = null;
         this._node       = null;
         this._mode       = 'cap'; // 'cap' | 'slammer' | 'enchant' | 'boss' | 'chest' | 'mystery'
@@ -201,6 +203,8 @@ export class RewardScreen {
                     this._ui.showCapDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() });
                 } else if (item?.kind === 'slammer') {
                     this._ui.showSlammerDetail(item.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmChest() });
+                } else if (item?.kind === 'card') {
+                    this._consumables.showPickPopup(item.def, { label: 'TAKE', callback: () => this._confirmChest() });
                 }
                 return;
             }
@@ -233,6 +237,8 @@ export class RewardScreen {
                     this._ui.showCapDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
                 } else if (a?.kind === 'new_slammer') {
                     this._ui.showSlammerDetail(a.def, false, { label: 'TAKE', color: '#000', callback: () => this._confirmMystery() });
+                } else if (a?.kind === 'card') {
+                    this._consumables.showPickPopup(a.def, { label: 'TAKE', callback: () => this._confirmMystery() });
                 } else if (a?.kind === 'swap_cap') {
                     // Bytte-forhåndsvisning — begge ikoner (før/efter) skal kunne
                     // inspiceres, ellers aner spilleren ikke hvad han bytter TIL.
@@ -265,6 +271,17 @@ export class RewardScreen {
     // de alle går gennem denne ene helper) — klik/tap-baseret i stedet for
     // den gamle rene :hover-effekt, som slet ikke virkede på touch.
     _iconClick(e) {
+        // Consumable-kort: HELE kortet (minus PICK-knappen — dens click-handler
+        // kører altid FØR dette kald og returnerer tidligt) er klik-mål for at
+        // inspicere, ikke kun emoji-ikonet. Emojien alene er for lille til
+        // pålidelig mobil-tryk, i modsætning til cap/slammer-billedernes store
+        // cirkulære .png'er, som beholder deres eget (mindre) klik-mål uændret.
+        const gumCard = e.target.closest('.reward-card--gumcard[data-key]');
+        if (gumCard) {
+            const icon = gumCard.querySelector('.gum-pack-icon');
+            if (icon) pulseIconRotate(icon);
+            return icon ?? gumCard;
+        }
         const icon = e.target.closest('.cap-enchant-wrap, .reward-cap-img, .transform-result-img');
         if (icon) pulseIconRotate(icon);
         return icon;
@@ -548,7 +565,6 @@ export class RewardScreen {
     }
 
     _capCards(caps) {
-        const seriesLabel = s => s.replaceAll('_', ' ');
         return caps.map(cap => {
             const r           = this._rarityInfo(cap.rarity ?? 1);
             const effectLabel = cap.effect ? effectName(cap.effect) : '';
@@ -557,8 +573,10 @@ export class RewardScreen {
             return `<div class="reward-card" data-key="${cap.name}">
                 <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 ${capThumbnailHTML(cap, { imgClass: 'reward-cap-img' })}
-                <div class="reward-cap-name">${cap.name}</div>
-                <div class="reward-cap-series">${seriesLabel(cap.series)}</div>
+                <div class="reward-cap-name-row">
+                    <div class="reward-cap-name">${cap.name}</div>
+                    ${seriesPillHTML(cap.series)}
+                </div>
                 ${effectBadge}
                 <button class="reward-quick-pick" data-key="${cap.name}">▶ PICK</button>
             </div>`;
@@ -566,7 +584,6 @@ export class RewardScreen {
     }
 
     _enchantCards(choices) {
-        const seriesLabel = s => (s ?? '').replaceAll('_', ' ');
         return choices.map((choice, i) => {
             const { entry, enchantDef } = choice;
             const oldEnchant = entry.enchant ? ENCHANT_DEFS.find(e => e.id === entry.enchant) : null;
@@ -576,8 +593,10 @@ export class RewardScreen {
             return `<div class="reward-card" data-key="${i}">
                 <div class="reward-rarity reward-rarity--uncommon">ENCHANT</div>
                 ${capThumbnailHTML(entry, { imgClass: 'reward-cap-img' })}
-                <div class="reward-cap-name">${entry.def.name}</div>
-                <div class="reward-cap-series">${seriesLabel(entry.def.series)}</div>
+                <div class="reward-cap-name-row">
+                    <div class="reward-cap-name">${entry.def.name}</div>
+                    ${seriesPillHTML(entry.def.series)}
+                </div>
                 <div class="reward-enchant-name" style="color:${enchantDef.color}">${enchantDef.icon} ${enchantDef.name}</div>
                 <div class="reward-enchant-desc">${enchantDef.description}</div>
                 ${replaceHTML}
@@ -587,27 +606,25 @@ export class RewardScreen {
     }
 
     _slammerCards(slammers) {
-        return slammers.map(s => `
+        return slammers.map(s => {
+            const r = this._rarityInfo(s.rarity ?? 1);
+            return `
             <div class="reward-card reward-card--relic" data-key="${s.name}">
+                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
                 ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
                 <button class="reward-quick-pick" data-key="${s.name}">▶ PICK</button>
-            </div>`
-        ).join('');
+            </div>`;
+        }).join('');
     }
 
-    _headerTextColor(hex) {
-        if (!hex) return '#fff';
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#000' : '#fff';
-    }
-
-    // Delt gum-pack-kort for et consumable-kort — brugt af BÅDE chest- og
-    // mystery-visningen, så der kun er ét sted der definerer hvordan et kort
-    // ser ud som reward (reward-and-shop-card-consistency-prompten, Opgave 1+2).
+    // Delt gum-pack-kort for et consumable-valg — brugt af BÅDE chest- og
+    // mystery-visningen, samme stribe+PICK-knap-look som cap/slammer-kortene
+    // for at holde reward-skærmen konsekvent. Ikonet (.gum-pack-icon) er
+    // klik-målet for "inspicér i sikker popup" (se _iconClick() og
+    // enterChest()/enterMystery()'s click-handlere), PICK-knappen committer
+    // direkte — samme to-lags mønster som cap/slammer-kort allerede har.
     _consumableCardHTML(def, key) {
         const stripe = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 2px, #fff 2px, #fff 4px)`;
         const tCol   = this._headerTextColor(def.color);
@@ -626,24 +643,30 @@ export class RewardScreen {
         </div>`;
     }
 
+    _headerTextColor(hex) {
+        if (!hex) return '#fff';
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.55 ? '#000' : '#fff';
+    }
+
     // Sølv/guld-kiste — ÉT kort, ikke 3 (reward-chests-draft.md). Udseendet
     // afhænger af hvad kisten reelt indeholder (cap/slammer/kort/point).
-    // Kiste-tier (sølv/guld) vises nu som en separat lille indikator OVER
-    // kortet, i stedet for at overskrive cappens/slammerens EGEN rarity-badge
-    // (tidligere bug — badgens farve var allerede rigtig rarity, men teksten
-    // sagde "SILVER/GOLD CHEST" i stedet for fx "RARE").
+    // Kiste-tieren (sølv/guld) står allerede i selve titlen (_render()'s
+    // nodeLabel) — en separat "GOLD CHEST"-indikator ovenover kortet var ren
+    // gentagelse af samme tekst og er fjernet.
     _chestCard(item) {
-        const tierLabel = this._chestTier === 'gold' ? '✪ GOLD CHEST' : '◎ SILVER CHEST';
-        const tierIndicatorHTML = `<div class="reward-chest-tier-label">${tierLabel}</div>`;
-
         if (item.kind === 'cap') {
             const r    = this._rarityInfo(item.def.rarity ?? 1);
             const effL = item.def.effect ? effectName(item.def.effect) : '';
-            return tierIndicatorHTML + `<div class="reward-card" data-key="chest">
-                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
+            return `<div class="reward-card" data-key="chest">
+                <div class="reward-rarity reward-rarity--${r.cls}">CAP · ${r.label}</div>
                 ${capThumbnailHTML(item.def, { imgClass: 'reward-cap-img' })}
-                <div class="reward-cap-name">${item.def.name}</div>
-                <div class="reward-cap-series">${item.def.series.replaceAll('_', ' ')}</div>
+                <div class="reward-cap-name-row">
+                    <div class="reward-cap-name">${item.def.name}</div>
+                    ${seriesPillHTML(item.def.series)}
+                </div>
                 ${effL ? `<div class="reward-effect">${effL}</div>` : ''}
                 <button class="reward-quick-pick" data-key="chest">▶ TAKE</button>
             </div>`;
@@ -651,8 +674,8 @@ export class RewardScreen {
         if (item.kind === 'slammer') {
             const s = item.def;
             const r = this._rarityInfo(s.rarity ?? 1);
-            return tierIndicatorHTML + `<div class="reward-card reward-card--relic" data-key="chest">
-                <div class="reward-rarity reward-rarity--${r.cls}">${r.label}</div>
+            return `<div class="reward-card reward-card--relic" data-key="chest">
+                <div class="reward-rarity reward-rarity--${r.cls}">SLAMMER · ${r.label}</div>
                 <img class="reward-cap-img" src="${s.texFront}" alt="${s.name}">
                 <div class="reward-cap-name">${s.name}</div>
                 ${s.passive ? `<div class="reward-effect reward-effect--passive">${s.passive.icon} ${s.passive.name}</div>` : ''}
@@ -660,10 +683,10 @@ export class RewardScreen {
             </div>`;
         }
         if (item.kind === 'card') {
-            return tierIndicatorHTML + this._consumableCardHTML(item.def, 'chest');
+            return this._consumableCardHTML(item.def, 'chest');
         }
-        // points — ingen rarity-koncept, tier-indikatoren ovenfor er nok
-        return tierIndicatorHTML + `<div class="reward-card" data-key="chest">
+        // points — ingen rarity-koncept, men titlen siger allerede hvilken kiste det er
+        return `<div class="reward-card" data-key="chest">
             <div class="reward-points-display">★${formatScore(item.amount)}</div>
             <div class="reward-cap-name">Bonus Score</div>
             <button class="reward-quick-pick" data-key="chest">▶ TAKE</button>

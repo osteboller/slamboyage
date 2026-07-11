@@ -18,3 +18,13 @@ export const DEFAULT_SERIES_DEF = { label: '???', color: '#888888', icon: '●' 
 export function getSeriesDef(seriesId) {
     return SERIES_DEFS[seriesId] ?? DEFAULT_SERIES_DEF;
 }
+
+// Færdig HTML til en lille farvet serie-pille — samme visuelle opskrift som
+// #cap-detail-series-pill i UIManager.js (${color}22 baggrund, ${color} tekst,
+// ${color}55 kant), bare uden at kræve et fast DOM-element at style'e ind i.
+// Genbrugt i reward/pack-kort (RewardScreen.js/ShopScreen.js) så cap-navnet
+// ikke længere behøver sin egen fulde tekstlinje bare for serien.
+export function seriesPillHTML(seriesId) {
+    const s = getSeriesDef(seriesId);
+    return `<span class="reward-series-pill" style="background:${s.color}22; color:${s.color}; border-color:${s.color}55;">${s.icon} ${s.label}</span>`;
+}

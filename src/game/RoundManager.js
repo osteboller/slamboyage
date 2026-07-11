@@ -86,7 +86,7 @@ export class RoundManager {
 
     addVoltage(amount) {
         this._voltageBonus = (this._voltageBonus ?? 0) + amount;
-        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb, this._exhaustedThisRound);
     }
 
     addToBase(amount) {
@@ -139,7 +139,7 @@ export class RoundManager {
         });
 
         if (this._pendingFaceDown.length === 0) this._throwCtrl.setCaps(this.caps);
-        this._ui.updatePileButtons(pool, this._wonCapsAll, this._geb);
+        this._ui.updatePileButtons(pool, this._wonCapsAll, this._geb, this._exhaustedThisRound);
         this._spawnGhostFeedback(ghost);
     }
 
@@ -238,6 +238,7 @@ export class RoundManager {
         this._voltageBonus      = 0;
         this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
         this._roundCapMultipliers = new Map(); // entryId → accumulated round multiplier (fx martyr/Relic Hunter)
+        this._exhaustedThisRound = []; // caps exhausted (territorial) denne runde — vises i stack-overlay med Zzz-badge, tæller ikke med i pile-rem-count
         this._activeTrickShot   = null; // any normal buildStack() call exits Trick Shot mode
         this._nextGhostId       = -1; // unikke negative ids til Twinsies-ghosts denne runde
         this._activeBoss        = null; // sættes eksplicit af BattleScreen EFTER dette kald
@@ -288,7 +289,7 @@ export class RoundManager {
             });
         }
 
-        this._ui.updatePileButtons(this.caps, [], this._geb);
+        this._ui.updatePileButtons(this.caps, [], this._geb, this._exhaustedThisRound);
         this._ui.setStatus('Building stack...');
         this._ui.setActionPrompt(null);
         this.delay(() => {
@@ -380,7 +381,7 @@ export class RoundManager {
         });
 
         this.caps = this._pendingFaceDown;
-        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb, this._exhaustedThisRound);
         this._collisions.reset();
         this._powerBar.reset();
         this._cam.zoomIn();
@@ -432,6 +433,7 @@ export class RoundManager {
         this._pendingFaceDown   = [];
         this._pendingThrowsDone = this._throwsTotal - state.throwsLeft;
         this._pendingSpawnDefs  = [];
+        this._exhaustedThisRound = []; // ikke persisteret i captureState() endnu — nulstilles ved resume
 
         this._throwCtrl.reset();
         this._throwCtrl.setCaps(this.caps);
@@ -445,7 +447,7 @@ export class RoundManager {
         this._ui.setScore(state.scoreBase + state.totalScore);
         this._ui.hideResults();
         this._ui.updateThrowPips(state.throwsLeft, this._throwsTotal);
-        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb);
+        this._ui.updatePileButtons(this.caps, this._wonCapsAll, this._geb, this._exhaustedThisRound);
         this._ui.setStatus(`Throw ${this._pendingThrowsDone + 1}/${this._throwsTotal}`);
         this._ui.setActionPrompt('Hold to aim');
     }
@@ -546,6 +548,49 @@ export class RoundManager {
             const ctx    = this._resolver.buildContext(cap, allCaps, this._throwIndex, allWon.length, roundExtras);
             const result = this._resolver.resolve(cap, ctx);
             return { cap, ...result };
+        });
+
+        // ── Phase 1.5: exhaust — fjerner very-nearby caps fra ANDRE serier midlertidigt
+        // (kun resten af DENNE runde — rører ALDRIG GameState.ownedCaps, så cappen er
+        // tilbage helt normalt næste node). Rammer kun stadig-face-down caps (stillDown),
+        // FØR surge-kæden (Phase 2.5) læser samme pulje — så en exhaustet cap heller
+        // ikke kan blive surge-flippet af en tredje cap samme kast.
+        // Løser "hvad hvis to exhaust-caps flipper very-near hinanden i samme kast"
+        // helt uden særlig kode: en cap der selv er i wonNow/magnetWon er allerede
+        // fjernet fra stillDown FØR denne fase kører, så den kan aldrig exhauste eller
+        // blive exhaustet af en anden donor i SAMME kast — kun en cap der flippede i et
+        // TIDLIGERE kast (og stadig ligger face-down nu) kan rammes. Donor'en der
+        // flipper først får med andre ord altid "første ret".
+        resolved.forEach(entry => {
+            if (!entry.exhaustFilter) return;
+            const donor = entry.cap;
+            const dp    = donor.body.position;
+            let exhaustedCount = 0;
+            for (let i = stillDown.length - 1; i >= 0; i--) {
+                const target = stillDown[i];
+                if (target.def?.series === donor.def?.series) continue; // kun ANDRE serier
+                if (target.enchant === 'ironclad') continue;            // Ironclad beskytter mod exhaust
+                const tp = target.body.position;
+                const dx = dp.x - tp.x, dz = dp.z - tp.z;
+                if (Math.sqrt(dx * dx + dz * dz) >= VERY_NEARBY_RADIUS) continue;
+                stillDown.splice(i, 1);
+                // isExhausted mærkes FØR mesh/body fjernes — cap-objektet lever videre
+                // som ren data (def/entryId/enchant), så stack-overlayet stadig kan vise
+                // den med et Zzz-badge resten af runden (se _exhaustedThisRound).
+                target.isExhausted = true;
+                this._exhaustedThisRound.push(target);
+                this._render.removeMesh(target.mesh);
+                this._physics.world.removeBody(target.body);
+                exhaustedCount++;
+            }
+            if (exhaustedCount > 0) {
+                entry.bonus = (entry.bonus ?? 0) + entry.exhaustBonus * exhaustedCount;
+            }
+            // Ringen vises ALTID (også ved 0 ramte), samme princip som martyr —
+            // eneste måde spilleren kan se/bekræfte VERY_NEARBY_RADIUS-grænsen visuelt,
+            // i stedet for at gætte om "relativt tæt" rent faktisk var tæt nok.
+            const { x, y } = this._projectToScreen(dp);
+            this._spawnEffectFeedback(dp, x, y, { type: 'exhaust', count: exhaustedCount });
         });
 
         // ── Phase 2: partition returnToStack vs scored ────────────────────────
@@ -789,7 +834,10 @@ export class RoundManager {
                 ownedCaps:      this._gs?.ownedCaps ?? [],
             })
             : 1;
-        const finalGlobalMult = globalMult * bossMult * overdriveMult;
+        // Overdrive holdes UDENFOR finalGlobalMult bevidst — den skal gange den
+        // SAMLEDE kast-score ÉN gang (se scoreGained nedenfor), ikke hver enkelt
+        // caps score for sig, som ville floor()'e 0.5 væk N gange i stedet for én.
+        const finalGlobalMult = globalMult * bossMult;
 
         // Parity-boss feedback (Even Steven/Odd Todd) — et grønt flueben/rødt kryds
         // pr. kast så spilleren straks kan se OM og HVORFOR kastet scorer 0, i
@@ -851,7 +899,15 @@ export class RoundManager {
             const holoSlammer = slammers.find(s => s.passive?.type === 'holoMultiplier');
             if (holoSlammer) this._ui.showPassiveTriggerBadge(holoSlammer, `×${holoTriggerValue}`, '#d4af37', '#000');
         }
-        const scoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
+        // Overdrive (Quarterback Sis) ganges her, ÉN gang på den samlede kast-score
+        // — undgår at hver cap floor()'er sin egen halvering væk for sig (se note
+        // ved finalGlobalMult ovenfor).
+        const rawScoreGained = scoredCaps.reduce((sum, { finalScore }) => sum + finalScore, 0);
+        const scoreGained    = Math.floor(rawScoreGained * overdriveMult);
+        if (overdriveMult < 1 && actualWon.length > 0) {
+            const overdriveSlammer = slammers.find(s => s.passive?.type === 'overdrive');
+            if (overdriveSlammer) this._ui.showPassiveTriggerBadge(overdriveSlammer, `×${overdriveMult}`, '#cc2222');
+        }
 
         this._wonCapsAll.push(...actualWon.map(({ cap }) => cap));
         this._totalScore += scoreGained;
@@ -916,7 +972,7 @@ export class RoundManager {
         const displayRemaining = hasNextThrow
             ? [...updatedFaceDown, ...spawnDefs]
             : updatedFaceDown;
-        this._ui.updatePileButtons(displayRemaining, this._wonCapsAll, this._geb);
+        this._ui.updatePileButtons(displayRemaining, this._wonCapsAll, this._geb, this._exhaustedThisRound);
         this._ui.updateThrowPips(this._throwsLeft, this._throwsTotal);
 
         if (hasNextThrow) {
@@ -987,7 +1043,7 @@ export class RoundManager {
             this._voltageBonus    = 0;
             this._roundCapBonuses = new Map();
             this._roundCapMultipliers = new Map();
-            this._ui.updatePileButtons(updatedFaceDown, this._wonCapsAll, this._geb);
+            this._ui.updatePileButtons(updatedFaceDown, this._wonCapsAll, this._geb, this._exhaustedThisRound);
 
             this._phase = 'done';
             this._ui.setStatus('Round over!');
@@ -1053,6 +1109,11 @@ export class RoundManager {
             // "poof"-ring i selve battle-viewet i stedet for en sticker-overlay.
             this._render.spawnEffectRing(worldPos, 2.5, 0x1a1a1a, 350, 300);
             this._render.spawnEffectRing(worldPos, 1.2, 0xff4444, 250, 250);
+        } else if (meta.type === 'exhaust') {
+            // Midlertidig fjernelse (kun denne runde) — grå/tåget ring, bevidst
+            // adskilt fra destroys mørke/røde, matcher VERY_NEARBY_RADIUS (det er
+            // derfra targets faktisk blev fundet).
+            this._render.spawnEffectRing(worldPos, VERY_NEARBY_RADIUS, 0x888899, 600, 400);
         }
         this._ui.showEffectIndicator(screenX, screenY, meta);
     }

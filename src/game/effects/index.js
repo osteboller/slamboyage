@@ -11,6 +11,7 @@ import { surgeEffect }     from './surgeEffect.js';
 import { absorbEffect }    from './absorbEffect.js';
 import { jackpotEffect }   from './jackpotEffect.js';
 import { martyrEffect }    from './martyrEffect.js';
+import { territorialEffect } from './territorialEffect.js';
 
 // Registry: effect ID → handler function
 // Adding a new effect = one line here + one file in this folder
@@ -30,4 +31,5 @@ export const EFFECTS = {
     'absorb':     absorbEffect,
     'jackpot':    jackpotEffect,
     'martyr':     martyrEffect,
+    'territorial': territorialEffect,
 };

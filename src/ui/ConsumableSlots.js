@@ -16,6 +16,12 @@ export class ConsumableSlots {
         document.getElementById('consumable-use-btn').addEventListener('click',   () => this._doUse());
         document.getElementById('consumable-sell-btn').addEventListener('click',  () => this._doSell());
         this._popupEl.addEventListener('click', e => { if (e.target === this._popupEl) this._closePopup(); });
+        // Samme mønster som UIManager's cap/slammer/relic-detail (_buildPileOverlay) —
+        // uden denne ville ethvert klik inde i popup'en boble op til UIManager's
+        // globale document-pointerdown-lytter, som blindt kalder setDetailBackdrop(false)
+        // og slukker dæmpningen selvom popup'en (nu centreret, delende samme
+        // backdrop) stadig er åben.
+        this._popupEl.addEventListener('pointerdown', e => e.stopPropagation());
     }
 
     setContext(screenName) {
@@ -79,9 +85,68 @@ export class ConsumableSlots {
         if (!def) return;
 
         const canUse = this._context && def.usableIn.includes(this._context);
-        const textCol = this._headerTextColor(def.color);
+        this._populatePopupChrome(def);
+        document.getElementById('consumable-popup-desc').textContent = def.description;
+        document.getElementById('consumable-sell-btn').textContent   = `SELL ${def.sellPrice}★`;
 
-        const stripe = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 2px, #fff 2px, #fff 4px)`;
+        const useBtn  = document.getElementById('consumable-use-btn');
+        const sellBtn = document.getElementById('consumable-sell-btn');
+        useBtn.style.display  = '';
+        sellBtn.style.display = '';
+        useBtn.disabled = !canUse;
+        useBtn.title    = canUse ? '' : `Only usable in: ${def.usableIn.join(', ')}`;
+        this._hidePickBtn();
+
+        this._openPopup();
+    }
+
+    // Viser SAMME popup som _showPopup(idx), men for et endnu IKKE-ejet
+    // valg (reward/pack-pick i RewardScreen.js/ShopScreen.js, ELLER et
+    // købbart bånd-kort i shoppen) — én fri action-knap (PICK/TAKE/BUY) i
+    // stedet for USE/SELL. Bruges ALDRIG fra battle-slots, derfor
+    // this._openSlot = null (forhindrer at _doUse()/_doSell() ved en fejl
+    // kan ramme et forkert ejet slot-index, selvom de knapper er skjulte
+    // her). action = { label, price, color, callback } — samme form som
+    // cap/slammer-detailens action, for konsekvent BUY/CAN'T AFFORD-stil.
+    showPickPopup(def, action) {
+        this._openSlot = null;
+        this._populatePopupChrome(def);
+        document.getElementById('consumable-popup-desc').textContent = def.description;
+
+        document.getElementById('consumable-use-btn').style.display  = 'none';
+        document.getElementById('consumable-sell-btn').style.display = 'none';
+
+        let pickBtn = document.getElementById('consumable-pick-btn');
+        if (!pickBtn) {
+            pickBtn = document.createElement('button');
+            pickBtn.id = 'consumable-pick-btn';
+            document.getElementById('consumable-popup-btns').appendChild(pickBtn);
+        }
+        pickBtn.innerHTML     = `${action.label}${action.price ? `<br>${action.price}` : ''}`;
+        pickBtn.style.background = action.color ?? '#000';
+        pickBtn.style.display = '';
+        // Erstat node — undgår at lyttere hobes op på tværs af flere åbninger
+        // (samme mønster som cap/slammer-detailens action-knap).
+        const fresh = pickBtn.cloneNode(true);
+        pickBtn.parentNode.replaceChild(fresh, pickBtn);
+        fresh.addEventListener('click', () => {
+            this._closePopup();
+            action.callback();
+        });
+
+        this._openPopup();
+    }
+
+    _hidePickBtn() {
+        const pickBtn = document.getElementById('consumable-pick-btn');
+        if (pickBtn) pickBtn.style.display = 'none';
+    }
+
+    // Fælles "chrome" (stribet baggrund, header-farve, ikon, navn, flavor) —
+    // delt mellem _showPopup (ejet slot) og showPickPopup (endnu ikke ejet).
+    _populatePopupChrome(def) {
+        const textCol = this._headerTextColor(def.color);
+        const stripe  = `repeating-linear-gradient(-45deg, ${def.bg} 0px, ${def.bg} 2px, #fff 2px, #fff 4px)`;
         document.getElementById('consumable-popup-top').style.background    = stripe;
         document.getElementById('consumable-popup-footer').style.background = stripe;
 
@@ -95,16 +160,20 @@ export class ConsumableSlots {
         document.getElementById('consumable-popup-icon').textContent   = def.icon;
         document.getElementById('consumable-popup-name').textContent   = def.name;
         document.getElementById('consumable-popup-flavor').textContent = def.flavor || '';
-        document.getElementById('consumable-popup-desc').textContent   = def.description;
-        document.getElementById('consumable-sell-btn').textContent     = `SELL ${def.sellPrice}★`;
+    }
 
-        const useBtn = document.getElementById('consumable-use-btn');
-        useBtn.disabled = !canUse;
-        useBtn.title    = canUse ? '' : `Only usable in: ${def.usableIn.join(', ')}`;
-
+    _openPopup() {
         this._popupEl.style.display = '';
         this._popupEl.classList.add('open');
+        // Samme dæmpnings-lag som cap/slammer/relic-detail — nu hvor popup'en
+        // er centreret ligesom dem, skal den også dæmpe baggrunden ligesom dem.
+        this._ui.setDetailBackdrop(true);
         const inner = document.getElementById('consumable-popup-inner');
+        // Ny tilfældig skæv vinkel hver gang (2-3° til en tilfældig side) —
+        // læses af @keyframes consumable-popup-in (consumables.css) via
+        // var(--popup-rot). Sat FØR animationen genstartes nedenfor.
+        const deg = (2 + Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+        inner.style.setProperty('--popup-rot', `${deg.toFixed(2)}deg`);
         inner.style.animation = 'none';
         void inner.offsetWidth;
         inner.style.animation = '';
@@ -122,6 +191,7 @@ export class ConsumableSlots {
         this._openSlot = null;
         this._popupEl.style.display = 'none';
         this._popupEl.classList.remove('open');
+        this._ui.setDetailBackdrop(false);
     }
 
     _doUse() {

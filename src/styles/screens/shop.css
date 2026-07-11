@@ -502,7 +502,20 @@ button.band-price-tag.cant-afford {
 
 .shop-next-btn {
     flex: 1;
-    background: var(--clr-bg-panel);
+    /* To forsøg med en DIAGONAL (135°) gradient gav begge en synlig søm —
+       enten fordi %-baseret background-size skævvrider en diagonal gradient i
+       en aflang (ikke-kvadratisk) boks, eller fordi repeating-linear-gradient
+       selv har kendte afrundings-sømme ved sine egne gentagelses-grænser.
+       Droppet diagonalen: en VANDRET (90°) gradient gør %-matematikken
+       aspect-ratio-uafhængig og fjerner enhver diagonal-skævhed. Mønstret
+       (A,B,C,A) er skrevet ud TO gange i selve gradient-definitionen (ikke
+       via CSS' egen repeat-motor) over en 200%-sized baggrund, så vinduet ved
+       0% og 100% viser bogstaveligt den samme håndskrevne kopi. */
+    background: linear-gradient(90deg,
+        #fff59d 0%, #ffffff 16.67%, #ffd54f 33.33%,
+        #fff59d 50%, #ffffff 66.67%, #ffd54f 83.33%, #fff59d 100%);
+    background-size: 200% 100%;
+    animation: shop-next-shift 3s linear infinite;
     border: 4px solid #000;
     box-shadow: var(--shadow-raised);
     border-radius: 0;
@@ -523,6 +536,11 @@ button.band-price-tag.cant-afford {
     color: #000;
 }
 .shop-next-btn:active { box-shadow: var(--shadow-pressed); transform: rotate(2deg) translate(3px, 3px); }
+@keyframes shop-next-shift {
+    /* Tilbage til %, samme "høj → lav"-rækkefølge som gav retningen mod højre. */
+    0%   { background-position: 100% 0; }
+    100% { background-position: 0% 0; }
+}
 .shop-next-price {
     background: var(--clr-bg-panel);
     border: 3px solid #000;

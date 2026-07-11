@@ -8,22 +8,31 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    /* "safe center": opfører sig som almindelig centrering når kortene
+       passer i den resterende plads under titlen — men falder tilbage til
+       at starte foroven i stedet for at presse indhold symmetrisk ud af
+       syne, hvis det IKKE passer. Ingen scroll (droppet igen — gjorde
+       SKIP-knappen upålidelig, se chatten): på de sjældne viewports hvor
+       kort stadig er for høje, klippes bunden nu simpelt af overflow:hidden
+       i stedet, og man kan altid vælge via ikon-klikket (åbner detail-popup)
+       som fallback for PICK-knappen. */
+    justify-content: safe center;
+    overflow: hidden;
     gap: clamp(12px, 2vh, 20px);
     z-index: 200;
-    /* Bunden reserverer altid mindst --hud-corner-reserve, uanset viewport-
-       højde, så et kortgitters PICK/TAKE-knap aldrig render under det
-       permanente #score-display (bottom:16px; z-index:220, altid øverst).
-       Ramte specifikt Card-pack (gum-pack-ikonet har bevidst ingen
-       sekundær ikon-klik-detail-vej som cap/slammer-packs har). Da
-       #reward-screen er en centreret flex-column, skubber den ekstra
-       bundplads bare indholdet en anelse opad på korte/mobile viewports —
-       uændret på desktop, hvor der i forvejen er rigelig margin. */
-    padding: clamp(16px, 3vh, 24px) clamp(12px, 3vw, 24px)
-             max(clamp(16px, 3vh, 24px), var(--hud-corner-reserve));
+    /* Toppen reserverer plads til .reward-title-box, som IKKE længere er en
+       flex-child her — den er position:absolute, fast forankret til toppen
+       (se dens egne regler), præcis som #reward-skip-btn allerede var. Det
+       var netop DERFOR skip-knappen aldrig flyttede sig på tværs af
+       opløsninger, mens titlen gjorde: den var stadig en del af den
+       centrerede flex-gruppe, så dens Y-position drev med afhængigt af
+       kortenes samlede højde. Nu opfører titlen sig som skip-knappen —
+       helt uafhængig af kortenes højde/viewportens størrelse. Bunden
+       reserverer stadig lidt plads mod #score-display som før. */
+    padding: clamp(90px, 16vh, 112px) clamp(12px, 3vw, 24px)
+             calc(clamp(16px, 3vh, 24px) + 24px);
 }
 
-/* Skip — absolute top-right, red sticker */
 #reward-skip-btn,
 #pack-skip-btn {
     position: absolute;
@@ -49,16 +58,24 @@
 #reward-skip-btn:active, #pack-skip-btn:active { box-shadow: none;              transform: rotate(-2deg) translateY(4px); }
 .reward-skip-bonus { font-weight: 800; }
 
-/* Title sticker box */
+/* Title sticker box — position:absolute, fast forankret til toppen (samme
+   princip som #reward-skip-btn ovenfor), IKKE en flex-child af
+   #reward-screen længere. left:50% + translateX(-50%) centrerer den
+   vandret uafhængigt af sin egen (indholds-afhængige) bredde. Den lille
+   rotate(-1deg) er så minimal at den ikke mærkbart forstyrrer -50%-
+   centreringen, så det sammensatte transform er trygt. */
 .reward-title-box {
+    position: absolute;
+    top: 14px;
+    left: 50%;
     display: inline-block;
     background: var(--clr-bg-panel);
     border: 4px solid #000;
     box-shadow: 6px 6px 0px #000;
     padding: clamp(8px, 1.5vh, 14px) clamp(16px, 4vw, 28px);
-    transform: rotate(-1deg) translateX(-24px);
+    transform: translateX(-50%) rotate(-1deg) translateX(-24px);
     text-align: center;
-    flex-shrink: 0;
+    z-index: 1;
 }
 
 .reward-title {
@@ -89,6 +106,9 @@
     width: 100%;
     max-width: min(92vw, 680px);
     align-items: start;
+    /* BEVIDST ingen min-height/overflow her — kortene skal ALDRIG skrumpes
+       eller scrolle internt (det gjorde dem ulæselige, se chatten). De
+       beholder altid deres fulde, naturlige størrelse. */
 }
 /* Kiste/mystery — ÉT kort, ikke 3 (reward-chests-draft.md) — ikke strakt ud
    til fuld gridbredde. */
@@ -119,25 +139,8 @@
         margin-left: calc(50vw - var(--reward-side-half) - clamp(12px, 3vw, 24px));
     }
 }
-/* Ingen :nth-child her — chest tilføjer nu en tier-label SOM SØSKENDE FØR
-   kortet (se .reward-chest-tier-label), så kortet ikke længere er 1. barn.
-   Der er altid præcis ét .reward-card i single-mode, så ren descendant-match
-   er robust uanset hvor mange søskende der kommer før det. */
+/* Der er altid præcis ét .reward-card i single-mode. */
 .reward-cards--single .reward-card { --rot: 1deg; }
-
-/* Kiste-tier-indikator (SØLV/GULD) — separat, mindre mærke OVER selve kortet,
-   så den ikke længere overskriver cappens/slammerens egen rarity-badge
-   (reward-and-shop-card-consistency-prompten, Opgave 2). */
-.reward-chest-tier-label {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    text-align: center;
-    color: var(--text-secondary);
-    margin-bottom: 6px;
-}
 
 /* Point-udfald i en kiste — stort tal i stedet for et billede */
 .reward-points-display {
@@ -261,7 +264,11 @@
 .reward-card .cap-enchant-wrap { transition: transform 0.5s; align-self: center; }
 .reward-card:hover .cap-enchant-wrap { transform: rotate(15deg); }
 
-/* Cap name with border-bottom separator */
+/* Cap name with border-bottom separator — bruges STANDALONE (slammere/point-
+   udfald, ingen serie) med sin egen fulde bredde+underline. Når navnet i
+   stedet sidder i en .reward-cap-name-row (cap-kort med serie-pille ved
+   siden af), overskrives border/bredde nedenfor — rækken selv bærer
+   underlinen i stedet, så den stadig spænder under BÅDE navn og pille. */
 .reward-cap-name {
     font-family: 'JetBrains Mono', monospace;
     font-size: clamp(9px, 1.8vw, 13px);
@@ -276,14 +283,125 @@
     margin-bottom: clamp(2px, 0.4vh, 4px);
 }
 
-.reward-cap-series {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(8px, 1.4vw, 11px);
-    color: var(--text-muted);
+/* Navn + serie-pille på ÉN linje i stedet for serien på sin egen linje under
+   — sparer en hel tekstlinjes højde pr. kort (mindsker risikoen for at kort
+   klipper ud af bunden på reward-skærme). Samme farve-opskrift som capviewer's
+   #cap-detail-series-pill (se seriesDefs.js's seriesPillHTML()). */
+.reward-cap-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+    border-bottom: 4px solid #000;
+    padding-bottom: clamp(4px, 0.8vh, 7px);
+    margin-bottom: clamp(2px, 0.4vh, 4px);
+}
+.reward-cap-name-row .reward-cap-name {
+    width: auto;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.reward-series-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 6px;
+    border: 1px solid;
+    border-radius: 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+/* ── Gum card variant in pack-open ──────────────────────────────────────── */
+.reward-card--gumcard {
+    padding: 0;
+    overflow: hidden;
+    align-items: stretch;
+    gap: 0;
+}
+
+.gum-pack-top {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.gum-pack-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    flex: 1;
+    padding: 0 clamp(10px, 2vw, 16px) clamp(8px, 1.5vh, 14px);
+}
+
+.gum-pack-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: clamp(11px, 2.2vw, 15px);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: clamp(8px, 1.5vw, 12px) 12px;
+    flex-shrink: 0;
+}
+
+/* Ikon = klik-mål for "inspicér i sikker popup" (ligesom .reward-cap-img for
+   caps), derfor cursor:pointer her — resten af kortet reagerer ikke på klik. */
+.gum-pack-icon {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: clamp(28px, 5vw, 42px);
+    line-height: 1;
+    text-align: center;
+    padding: clamp(12px, 2vh, 20px) 0 clamp(6px, 1vh, 10px);
+    align-self: center;
+    cursor: pointer;
+}
+
+.gum-pack-flavor {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: clamp(8px, 1.2vw, 10px);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    pointer-events: none;
+    text-align: center;
+    color: #000;
+    opacity: 0.45;
+    padding: clamp(6px, 1vh, 10px) 0 clamp(4px, 0.6vh, 6px);
     width: 100%;
+}
+
+.gum-pack-desc {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(9px, 1.6vw, 11px);
+    color: var(--text-secondary);
+    line-height: 1.4;
+    text-align: center;
+    padding: clamp(6px, 1vh, 10px) clamp(10px, 2vw, 16px);
+    flex: 1;
+}
+
+.gum-pack-footer {
+    display: flex;
+    justify-content: center;
+    padding: clamp(8px, 1.5vh, 12px);
+}
+
+.gum-pack-footer .reward-quick-pick {
+    margin: 0;
 }
 
 .reward-effect {
@@ -337,83 +455,6 @@
     pointer-events: none;
     line-height: 1.4;
     width: 100%;
-}
-
-/* ── Gum card variant in pack-open ──────────────────────────────────────── */
-.reward-card--gumcard {
-    padding: 0;
-    overflow: hidden;
-    align-items: stretch;
-    gap: 0;
-}
-
-.gum-pack-top {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-}
-
-.gum-pack-bottom {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background: #fff;
-    flex: 1;
-    padding: 0 clamp(10px, 2vw, 16px) clamp(8px, 1.5vh, 14px);
-}
-
-.gum-pack-header {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 800;
-    font-size: clamp(11px, 2.2vw, 15px);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    text-align: center;
-    padding: clamp(8px, 1.5vw, 12px) 12px;
-    flex-shrink: 0;
-}
-
-.gum-pack-icon {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 800;
-    font-size: clamp(28px, 5vw, 42px);
-    line-height: 1;
-    text-align: center;
-    padding: clamp(12px, 2vh, 20px) 0 clamp(6px, 1vh, 10px);
-    align-self: center;
-}
-
-.gum-pack-flavor {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 700;
-    font-size: clamp(8px, 1.2vw, 10px);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    text-align: center;
-    color: #000;
-    opacity: 0.45;
-    padding: clamp(6px, 1vh, 10px) 0 clamp(4px, 0.6vh, 6px);
-    width: 100%;
-}
-
-.gum-pack-desc {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(9px, 1.6vw, 11px);
-    color: var(--text-secondary);
-    line-height: 1.4;
-    text-align: center;
-    padding: clamp(6px, 1vh, 10px) clamp(10px, 2vw, 16px);
-    flex: 1;
-}
-
-.gum-pack-footer {
-    display: flex;
-    justify-content: center;
-    padding: clamp(8px, 1.5vh, 12px);
-}
-
-.gum-pack-footer .reward-quick-pick {
-    margin: 0;
 }
 
 /* Enchant reward variant */

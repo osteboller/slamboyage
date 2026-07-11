@@ -137,7 +137,7 @@ setTimeout(() => { loadingScreen.style.display = 'none'; }, 400);
 let currentScreen     = null;
 let currentScreenName = 'start';
 let returnToAfterMap  = 'start'; // hvor MAP-back-knappen sender brugeren hen
-const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState };
+const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState, consumables };
 
 const startScreen     = new StartScreen(deps);
 const mapScreen       = new MapScreen(deps);

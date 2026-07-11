@@ -14,6 +14,7 @@ export const EFFECT_LABELS = {
     'absorb':     { name: 'Absorb',     desc: 'gains all extra base value from every other cap this round (max +1000★)' },
     'jackpot':    { name: 'Jackpot',    desc: '+50★ flat, then permanently destroyed' },
     'martyr':     { name: 'Martyr',     desc: '2.5× to nearby caps, then permanently destroyed' },
+    'territorial': { name: 'Territorial', desc: 'exhausts very-nearby caps from other series for the rest of the round — +4★ per cap exhausted' },
 };
 
 // Kort ability-navn — brugt i collection/reward/shop-kort, hvor der ikke er plads til en hel sætning.

@@ -81,14 +81,19 @@
 
 /* ─── POPUP ─────────────────────────────────────────────────────────────── */
 
+/* Centreret overlay (var før forankret nede i højre hjørne) — samme placering
+   som cap/slammer-detail, så alle "inspicér før valg"-popups er konsekvente
+   og ikke forvirrer spilleren med forskellige positioner. #detail-backdrop
+   (samme dæmpnings-lag som cap/slammer/relic-detail) tændes/slukkes af
+   ConsumableSlots via UIManager.setDetailBackdrop(). */
 #consumable-popup {
     position: fixed;
     inset: 0;
-    z-index: 350; /* above shop popups at 300 */
+    z-index: 350; /* above shop popups at 300, above #detail-backdrop at 295 */
     display: flex;
-    align-items: flex-end;
-    justify-content: flex-end;
-    padding: 0 16px 90px 0;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
     pointer-events: none;
 }
 
@@ -102,10 +107,21 @@
     box-shadow: 6px 6px 0 #000;
     padding: 0;
     width: 180px;
-    transform: rotate(-1deg);
     position: relative;
     overflow: hidden;
-    animation: screen-fade-in 0.15s ease-out forwards;
+    /* Egen keyframes i stedet for den delte screen-fade-in — den sætter sin
+       egen transform:scale(...) i keyframes, som fuldstændig ERSTATTER (ikke
+       lægger oveni) elementets statiske rotation mens/efter animationen
+       kører. cap/slammer-detail rammes ikke af dette, da de slet ingen åbne-
+       animation har. Denne udgave holder rotationen med gennem hele forløbet.
+       --popup-rot sættes med en ny tilfældig vinkel af ConsumableSlots.js
+       hver gang popup'en åbnes (2-3° til en tilfældig side) — fallback -3deg
+       hvis den af en eller anden grund ikke er sat. */
+    animation: consumable-popup-in 0.15s ease-out forwards;
+}
+@keyframes consumable-popup-in {
+    from { opacity: 0; transform: rotate(var(--popup-rot, -3deg)) scale(0.98); }
+    to   { opacity: 1; transform: rotate(var(--popup-rot, -3deg)) scale(1);    }
 }
 
 #consumable-popup-top {
@@ -156,7 +172,8 @@
 }
 
 #consumable-use-btn,
-#consumable-sell-btn {
+#consumable-sell-btn,
+#consumable-pick-btn {
     flex: 1;
     padding: 8px 4px;
     border: 3px solid #000;
@@ -176,7 +193,7 @@
     color: #000;
 }
 
-#consumable-use-btn:hover, #consumable-sell-btn:hover {
+#consumable-use-btn:hover, #consumable-sell-btn:hover, #consumable-pick-btn:hover {
     transform: translate(2px, 2px);
     box-shadow: 1px 1px 0 #555;
 }

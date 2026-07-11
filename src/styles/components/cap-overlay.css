@@ -206,6 +206,22 @@
     pointer-events: none;
 }
 
+/* ─── EXHAUSTED BADGE (pile overlay) ──────────────────────────────────────────
+   Samme fulde-ikon-dækning som destroyed-badgen ovenfor, men blågrå i stedet for
+   sort/rød — midlertidig (tilbage næste node), ikke permanent, skal ikke se ud
+   som den samme alvor. Matcher exhaust-ringens farve (0x888899) i battle-viewet. */
+.cap-thumb-exhausted-badge {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    background: rgba(60,60,80,0.6);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
 /* ─── EXTRA BASE VALUE BADGE (pile overlay) ─────────────────────────────────
    Matcher .score-float.bonus's stil (guld tekst, ingen baggrundsboks) i stedet
    for en solid farvet pille — samme "ekstra grundværdi"-koncept, samme sprog. */
@@ -243,4 +259,30 @@
     z-index: 10;
     box-shadow: 0 1px 5px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.15);
     pointer-events: none;
+}
+
+/* ─── STATUS BADGE (2D overlay on cap-detail viewer) ──────────────────────────
+   Destroyed/exhausted — top-right (enchant-badgen ovenfor sidder top-left).
+   Tekst + ikon i stedet for en lille cirkel, så det læser som en rigtig
+   klistermærke-advarsel i stedet for endnu et lille ikon man kan overse. */
+#cap-detail-status-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 2.5px solid #fff;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    color: #fff;
+    z-index: 10;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,0,0,0.15);
+    pointer-events: none;
+    white-space: nowrap;
+    transform: rotate(-2deg);
 }

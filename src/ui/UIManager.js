@@ -184,6 +184,10 @@ export class UIManager {
             el.classList.add('effect-indicator--destroy');
             el.textContent = '💥';
             setTimeout(() => el.remove(), 1000);
+        } else if (meta.type === 'exhaust') {
+            el.classList.add('effect-indicator--exhaust');
+            el.textContent = meta.count > 0 ? `💤×${meta.count}` : '💤';
+            setTimeout(() => el.remove(), 1000);
         }
     }
 
@@ -615,11 +619,15 @@ export class UIManager {
     }
 
     // ─── PILE BUTTONS ────────────────────────────────────────────────────────
-    updatePileButtons(remainingDefs, wonDefs, getExtraBase = null) {
-        this._remainingDefs  = remainingDefs;
+    // exhaustedDefs (territorial) tælles ALDRIG med i pile-rem-count (de er ikke
+    // "i spil" resten af runden), men vises stadig i selve stack-overlayet med et
+    // Zzz-badge — og holder nævneren (total) intakt, så "3/10" ikke krymper til
+    // "3/8" bare fordi 2 caps blev exhausted undervejs.
+    updatePileButtons(remainingDefs, wonDefs, getExtraBase = null, exhaustedDefs = []) {
+        this._remainingDefs  = [...remainingDefs, ...exhaustedDefs];
         this._wonDefs        = wonDefs;
         this._getExtraBase   = typeof getExtraBase === 'function' ? getExtraBase : () => (getExtraBase ?? 0);
-        const total      = remainingDefs.length + wonDefs.length;
+        const total      = remainingDefs.length + wonDefs.length + exhaustedDefs.length;
         const stackLimit = this._gameState?.stackSizeLimit ?? total;
         document.getElementById('pile-rem-count').textContent = `${remainingDefs.length}/${Math.min(total, stackLimit)}`;
         document.getElementById('pile-won-count').textContent = `${wonDefs.length}/${total}`;
@@ -891,7 +899,7 @@ export class UIManager {
             detail.style.display      = 'none';
             slamDetail.style.display  = 'none';
             relicDetail.style.display = 'none';
-            this._setDetailBackdrop(false);
+            this.setDetailBackdrop(false);
             this._capViewer.hide();
             this._slammerViewer.hide();
         });
@@ -942,11 +950,17 @@ export class UIManager {
                 const isDestroyed = entry.entryId != null && entry.entryId >= 0 && !gsEntry;
                 const destroyedBadge = isDestroyed
                     ? `<span class="cap-thumb-destroyed-badge" title="Destroyed — permanently removed">💥</span>` : '';
+                // Exhausted (territorial, se destroy-ability-draft.md) — RoundManager
+                // mærker cap-objektet direkte med isExhausted (samme mønster som
+                // isGhost). Kun midlertidig, IKKE fjernet fra ownedCaps, så isDestroyed
+                // ovenfor forbliver false for den — de to badges udelukker hinanden.
+                const exhaustedBadge = entry.isExhausted
+                    ? `<span class="cap-thumb-exhausted-badge" title="Exhausted — back next node">💤</span>` : '';
                 return capThumbnailHTML(
                     { ...entry, enchant: this._liveEnchant(entry) },
                     { wrapClass: `cap-thumb${lit ? '' : ' dimmed'}`, imgClass: 'cap-thumb-img',
                       dimmed: !lit, extraAttrs: `data-idx="${i}" data-lit="${lit}"`,
-                      innerHTML: ghostBadge + carryBadge + destroyedBadge }
+                      innerHTML: ghostBadge + carryBadge + destroyedBadge + exhaustedBadge }
                 );
             }
             const hex = '#' + (def.color ?? 0xaaaaaa).toString(16).padStart(6, '0');
@@ -955,11 +969,13 @@ export class UIManager {
                     border:2px solid rgba(255,255,255,0.15)"></span>`;
         }).join('');
 
-        dotsEl.querySelectorAll('.cap-thumb').forEach(el => {
-            el.addEventListener('pointerdown', e => {
-                e.stopPropagation();
-                this._showCapDetail(defs[+el.dataset.idx], el.dataset.lit === 'true');
-            });
+        // bindTapSelect i stedet for rå pointerdown — #cap-overlay-dots scroller
+        // (overflow-y:auto) når der er mange caps, og et rent pointerdown-tryk
+        // fyrer FØR en scroll-gestus kan skelnes fra et tap, så et forsøg på at
+        // scrolle forbi en cap åbnede den med det samme. Samme rodårsag/fix som
+        // pause-panel og Mystixx-cap-vælgeren (se dem for referencen).
+        bindTapSelect(dotsEl, '.cap-thumb', el => {
+            this._showCapDetail(defs[+el.dataset.idx], el.dataset.lit === 'true');
         });
 
         const rect = anchorEl.getBoundingClientRect();
@@ -1144,11 +1160,22 @@ export class UIManager {
     }
 
     // ─── DETAIL BACKDROP ─────────────────────────────────────────────────────
-    // Delt dæmpnings-lag bag cap/slammer/relic-detail (modals.css) — kaldes
-    // fra alle steder der viser/skjuler en af de tre popups, inklusive deres
-    // egne action-knapper (BUY/PICK/TAKE/Sell), ikke kun klik-udenfor.
-    _setDetailBackdrop(open) {
+    // Delt dæmpnings-lag bag cap/slammer/relic/consumable-detail (modals.css) —
+    // kaldes fra alle steder der viser/skjuler en af disse popups, inklusive
+    // deres egne action-knapper (BUY/PICK/TAKE/Sell), ikke kun klik-udenfor.
+    // Offentlig (ikke længere _-præfikset) — genbruges nu også af
+    // ConsumableSlots.js's reward/pack-pick-popup, på tværs af klasser.
+    setDetailBackdrop(open) {
         document.getElementById('detail-backdrop')?.classList.toggle('open', open);
+    }
+
+    // Ny tilfældig skæv vinkel (2-3°, tilfældig side) hver gang en detail-popup
+    // åbnes — samme --detail-rot-custom-property-mønster som
+    // ConsumableSlots._openPopup() bruger for sin popup. Delt helper for
+    // cap/slammer-detail, kaldt fra begge ved hver visning.
+    _randomDetailRotation(el) {
+        const deg = (2 + Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+        el.style.setProperty('--detail-rot', `${deg.toFixed(2)}deg`);
     }
 
     // ─── CAP DETAIL POPUP ────────────────────────────────────────────────────
@@ -1237,7 +1264,7 @@ export class UIManager {
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
                 detail.style.display = 'none';
-                this._setDetailBackdrop(false);
+                this.setDetailBackdrop(false);
                 this._capViewer.hide();
                 action.callback();
             });
@@ -1261,9 +1288,35 @@ export class UIManager {
             badgeEl.style.display = 'none';
         }
 
+        // Destroyed/exhausted status-sticker — top-right (enchant-badgen ovenfor
+        // sidder top-left). Samme deriverings-logik som pile-overlayet: isDestroyed
+        // er en RIGTIG cap (entryId >= 0) der ikke længere findes i ownedCaps;
+        // isExhausted er en direkte property sat af RoundManager (ligesom isGhost).
+        let statusEl = document.getElementById('cap-detail-status-badge');
+        if (!statusEl) {
+            statusEl = document.createElement('div');
+            statusEl.id = 'cap-detail-status-badge';
+            document.querySelector('.cap-viewer-wrap').appendChild(statusEl);
+        }
+        const isDestroyed2 = capOrEntry.entryId != null && capOrEntry.entryId >= 0 && !gsEntry2;
+        if (isDestroyed2) {
+            statusEl.innerHTML        = '💥 DESTROYED';
+            statusEl.title            = 'Destroyed — permanently removed';
+            statusEl.style.background = '#1a1a1a';
+            statusEl.style.display    = '';
+        } else if (capOrEntry.isExhausted) {
+            statusEl.innerHTML        = '💤 EXHAUSTED';
+            statusEl.title            = 'Exhausted — back next node';
+            statusEl.style.background = '#3c3c50';
+            statusEl.style.display    = '';
+        } else {
+            statusEl.style.display = 'none';
+        }
+
         this._capViewer.show(def, 'cap', enchant);
+        this._randomDetailRotation(detail);
         detail.style.display = 'block';
-        this._setDetailBackdrop(true);
+        this.setDetailBackdrop(true);
     }
 
     // ─── RELIC / CARD DETAIL POPUP ───────────────────────────────────────────
@@ -1289,7 +1342,7 @@ export class UIManager {
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
                 detail.style.display = 'none';
-                this._setDetailBackdrop(false);
+                this.setDetailBackdrop(false);
                 action.callback();
             });
         } else {
@@ -1297,7 +1350,7 @@ export class UIManager {
         }
 
         detail.style.display = 'block';
-        this._setDetailBackdrop(true);
+        this.setDetailBackdrop(true);
     }
 
     // ─── SLAMMER DETAIL POPUP ────────────────────────────────────────────────
@@ -1315,8 +1368,9 @@ export class UIManager {
 
         this._slammerViewer.show(def, 'slammer');
         this._renderSlammerStats(def);
+        this._randomDetailRotation(detail);
         detail.style.display = 'block';
-        this._setDetailBackdrop(true);
+        this.setDetailBackdrop(true);
         detail.classList.toggle('slammer-detail--side', !!opts.side);
 
         const rarityEl = document.getElementById('slammer-detail-rarity');
@@ -1340,7 +1394,7 @@ export class UIManager {
                 fresh.addEventListener('click', e => {
                     e.stopPropagation();
                     detail.style.display = 'none';
-                    this._setDetailBackdrop(false);
+                    this.setDetailBackdrop(false);
                     this._slammerViewer.hide();
                     action.callback();
                 });
@@ -1357,11 +1411,21 @@ export class UIManager {
         const PASSIVE_COLOR = '#2e8fa3';
         const passiveSlot = document.getElementById('slammer-detail-passive-slot');
         if (passiveSlot) {
+            let desc = def.passive?.description ?? '';
+            // Analog/Digital Timer — regner "N kast til næste trigger" live ud fra
+            // GameState.runThrowCount (den run-persistente tæller), så spilleren
+            // ikke skal huske/holde styr på det selv.
+            if (def.passive && (def.passive.type === 'analogTimer' || def.passive.type === 'digitalTimer') && this._gameState) {
+                const interval  = def.passive.interval;
+                const done      = this._gameState.runThrowCount ?? 0;
+                const remaining = interval - (done % interval);
+                desc += ` · ${remaining} throw${remaining === 1 ? '' : 's'} until next trigger`;
+            }
             passiveSlot.innerHTML = def.passive
                 ? abilityBoxHTML({
                       color:       PASSIVE_COLOR,
                       name:        `${def.passive.icon} ${def.passive.name}`,
-                      description: def.passive.description,
+                      description: desc,
                   })
                 : '';
         }
@@ -1399,7 +1463,7 @@ export class UIManager {
                     this._gameState.sellSlammer(def.name);
                     this.setScore(this._gameState.score);
                     detail.style.display = 'none';
-                    this._setDetailBackdrop(false);
+                    this.setDetailBackdrop(false);
                     // Genopfrisk collection-oversigten hvis den er åben, så ejerskabet opdateres
                     if (document.getElementById('map-collection-overlay')) this.openCollection('slammers');
                 };

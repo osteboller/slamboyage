@@ -24,6 +24,11 @@ const EMPTY_RESULT = Object.freeze({
                            // are protected — ironcladEnchant() forces this back to false
                            // via the normal enchant-override pipeline, no special-case
                            // check needed elsewhere.
+    exhaustBonus:   0,    // flat bonus PER exhausted cap, granted to this cap's own score
+    exhaustFilter:  null, // e.g. 'other_series_very_near' — RoundManager does the actual
+                          // targeting/removal (same declarative pattern as auraFilter above);
+                          // round-scoped ONLY (never touches GameState.ownedCaps), unlike
+                          // destroySelf which is permanent.
 });
 
 export class EffectResolver {
