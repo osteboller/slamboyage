@@ -24,10 +24,6 @@ export const CARD_PRICE_GROWTH = 1.5;
 export const MAX_OWNED_SLAMMERS = 10;
 export const MAX_OWNED_CAPS     = 50;
 
-// Cap-/pakke-priser i shoppen vokser +35% pr. loop (kort-priser har sin egen
-// CARD_PRICE_GROWTH ovenfor og er upåvirket af denne).
-export const CAP_PRICE_GROWTH_PER_LOOP = 0.35;
-
 export const CAM_BASE  = { x: 0, y: 16, z: 22 }; // zoomed ud (post-blast) — original vinkel
 export const CAM_CLOSE = { x: 0, y: 12, z: 8  }; // zoomed ind (idle/aiming) — mere ovenfra
 

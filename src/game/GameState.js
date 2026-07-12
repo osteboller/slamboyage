@@ -1,5 +1,5 @@
-import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNED_CAPS, CAP_PRICE_GROWTH_PER_LOOP } from '../config/constants.js';
-import { BASE_NODES } from '../config/mapData.js';
+import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNED_CAPS } from '../config/constants.js';
+import { getLoopThresholds, getBossClearScore, SHOP_PRICE_START_DISCOUNT, SHOP_PRICE_GROWTH_PER_NODE, SHOP_PRICE_MAX_MULT, SHOP_ENCHANT_BASE_CHANCE } from '../config/mapData.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
 import { BOSS_DEFS } from '../config/bossDefs.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
@@ -16,9 +16,10 @@ export class GameState {
         this.ownedSlammers  = [];
         this._loop          = 1;
         this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
-        this._rerollCostBase  = 1;
-        this._destroyCostBase = 2;
-        this._cardPriceMult   = 1;
+        this._rerollCostBase   = 1;
+        this._destroyCostBase  = 2;
+        this._cardPriceMult    = 1;
+        this._totalNodesCleared = 0;
         this.shopOffer      = null;
         this.consumables    = [null, null, null];
         this.activeDouble   = 0; // stacks: 0=none, 1=×2, 2=×4, 3=×8 …
@@ -69,9 +70,10 @@ export class GameState {
         const starterSlammer = SLAMMER_DEFS.find(s => s.name === 'Regal Pug');
         if (starterSlammer) this.addSlammer(starterSlammer);
         this.runNodes       = this._generateNodes(1);
-        this._rerollCostBase  = 1;
-        this._destroyCostBase = 2;
-        this._cardPriceMult   = 1;
+        this._rerollCostBase   = 1;
+        this._destroyCostBase  = 2;
+        this._cardPriceMult    = 1;
+        this._totalNodesCleared = 0;
         this.shopOffer      = null;
         // Starter uden kort — main menuens dev-kort-knapper dækker nu ad-hoc
         // test-behov for specifikke consumables, ligesom dev-serie-knapperne
@@ -100,6 +102,9 @@ export class GameState {
     completeNode(totalScore) {
         const node = this.currentNode;
         if (!node) return { won: false };
+        // Run-bredt (IKKE nulstillet pr. loop, i modsætning til nodeIndex) —
+        // driver shop-prisernes pr.-node-vækst, se capPriceMultiplier.
+        this._totalNodesCleared++;
         if (node.type === 'slammer') {
             this.nodeIndex++;
             return { won: true };
@@ -255,8 +260,25 @@ export class GameState {
     get destroyCost() { return Math.max(1, Math.ceil(this._destroyCostBase * this.shopDiscountMult)); }
     // Kort-pris-inflationen (CARD_PRICE_GROWTH) er run-persistent ligesom reroll/destroy.
     get cardPriceMultiplier() { return this._cardPriceMult; }
-    // Cap-/pakke-priser vokser pr. loop (CAP_PRICE_GROWTH_PER_LOOP) — se ShopScreen._price().
-    get capPriceMultiplier() { return 1 + (this._loop - 1) * CAP_PRICE_GROWTH_PER_LOOP; }
+    // Cap-/pakke-priser vokser pr. NODE ryddet (run-bredt, IKKE nulstillet pr.
+    // loop) i stedet for i spring pr. loop — en flad pris gennem en hel loop
+    // gjorde den for dyr lige efter node 1 (mindst tjent score) og relativt
+    // for billig sent i loopet (mest tjent score). START_DISCOUNT gør den
+    // billigere end "normalt" lige efter node 1, GROWTH_PER_NODE eskalerer
+    // den derefter jævnt pr. node — se mapData.js for de tunbare konstanter.
+    get capPriceMultiplier() {
+        return Math.min(SHOP_PRICE_MAX_MULT, SHOP_PRICE_START_DISCOUNT * Math.pow(SHOP_PRICE_GROWTH_PER_NODE, this._totalNodesCleared));
+    }
+
+    // Base-chance for at en shop-bånd-cap allerede er enchantet — se
+    // SHOP_ENCHANT_BASE_CHANCE (mapData.js). Eksponeret som en getter (ikke
+    // brugt direkte i ShopScreen) så en fremtidig slammer-passiv kan booste
+    // den uden at ændre nogen af kaldestederne — samme mønster som
+    // shopDiscountMult ovenfor. Ingen slammer bruger 'shopEnchantBoost' endnu.
+    get shopEnchantChance() {
+        const boost = this.ownedSlammers.find(s => s.passive?.type === 'shopEnchantBoost');
+        return SHOP_ENCHANT_BASE_CHANCE + (boost?.passive.value ?? 0);
+    }
 
     hasConsumableRoom() { return this.consumables.some(s => s === null); }
 
@@ -290,11 +312,14 @@ export class GameState {
     // Betalt køb i shoppen — undtaget fra ★-kompensationen (shop-UI'et skal i
     // stedet aktivt disable/vise "FULL", så spilleren aldrig betaler ★ for en
     // cap der bare konverteres tilbage). Afviser derfor stille, ligesom canAfford.
-    buyCap(capDef, price) {
+    // enchant: sat hvis shop-bånd-slottet rullede en gratis enchant (se
+    // GameState.shopEnchantChance/ShopScreen._genBand()).
+    buyCap(capDef, price, enchant = null) {
         if (!this.canAfford(price)) return false;
         if (!this.canAddCap()) return false;
         this.score -= price;
-        this.gainCap(capDef);
+        if (enchant) this.gainEnchantedCap(capDef, enchant);
+        else this.gainCap(capDef);
         return true;
     }
 
@@ -369,12 +394,12 @@ export class GameState {
 
     // ─── PRIVATE ──────────────────────────────────────────────────────────────
     _generateNodes(loop) {
-        const scale = 1 + (loop - 1) * 0.5; // loop 1: ×1.0 | loop 2: ×1.5 | loop 3: ×2.0
-        const battles = BASE_NODES.map((n, i) => ({
+        const { nodes: nodeThresholds } = getLoopThresholds(loop);
+        const battles = nodeThresholds.map((clearScore, i) => ({
             type:       'battle',
             id:         i + 1,
             name:       `${loop}-${i + 1}`,
-            clearScore: Math.ceil(n.baseClear * scale),
+            clearScore,
         }));
 
         // Node 1 (battles[0]): altid helt tom — 0★ ved start, ingen baseline-
@@ -428,7 +453,7 @@ export class GameState {
             type:       'battle',
             id:         6,
             name:       `${loop}-BOSS`,
-            clearScore: Math.ceil(BASE_NODES[4].baseClear * scale * (bossDef.clearScoreMultiplier ?? 1.5)),
+            clearScore: getBossClearScore(loop, bossDef),
             boss:       bossDef,
         };
 

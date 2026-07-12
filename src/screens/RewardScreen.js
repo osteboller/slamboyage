@@ -544,11 +544,19 @@ export class RewardScreen {
         // det _doBossSkip() rent faktisk tildeler.
         const skipLabel = this._mode === 'boss' ? `+${1 + this._gs.bossShardBonus}🔶` : `+${SKIP_BONUS}★`;
 
+        // Tematisk titel-farve pr. reward-type — boss holdes bevidst neutral
+        // (eksplicit brugerønske), cap/slammer node-rewards har ingen fælles
+        // rarity-garanti på tværs af alle 3 kort og forbliver derfor også neutrale.
+        const titleModClass = this._mode === 'enchant' ? 'reward-title-box--holo'
+            : this._mode === 'mystery' ? 'reward-title-box--mystery'
+            : this._mode === 'chest'   ? (this._chestTier === 'gold' ? 'reward-title-box--gold' : 'reward-title-box--silver')
+            : '';
+
         this._el.innerHTML = `
             <button id="reward-skip-btn">
                 SKIP &nbsp;<span class="reward-skip-bonus">${skipLabel}</span>
             </button>
-            <div class="reward-title-box">
+            <div class="reward-title-box ${titleModClass}">
                 <h2 class="reward-title">${nodeLabel}</h2>
             </div>
             <div class="reward-cards ${(this._mode === 'chest' || this._mode === 'mystery') ? 'reward-cards--single' : ''}">${cardsHTML}</div>`;

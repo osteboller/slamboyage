@@ -1,5 +1,5 @@
 import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
-import { CAP_PRICE } from '../config/mapData.js';
+import { CAP_PRICE, CAP_PRICE_BY_RARITY } from '../config/mapData.js';
 import { effectName } from '../game/effects/labels.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
@@ -11,7 +11,7 @@ import { seriesPillHTML } from '../config/seriesDefs.js';
 import { watchRewardTitleSpacing } from '../ui/rewardTitleSpacing.js';
 
 const BAND_SIZE       = 5;
-const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 6, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
+const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 4, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
 // FEATHER holdes bevidst udenfor — enchants/index.js's handler er stadig
 // udkommenteret (ingen stack-space-implementering endnu). IRONCLAD har nu en
 // reel handler (beskytter mod destroySelf) og kan derfor rulles.
@@ -187,7 +187,7 @@ export class ShopScreen {
                         callback: () => {},
                     };
                 }
-                this._ui.showCapDetail(def, false, action);
+                this._ui.showCapDetail({ def, enchant: item?.enchant ?? null }, false, action);
             }
             return;
         }
@@ -241,7 +241,7 @@ export class ShopScreen {
             }
 
             const capPrice = this._price(item.basePrice, 'cap');
-            if (this._gs.buyCap(item.def, capPrice)) {
+            if (this._gs.buyCap(item.def, capPrice, item.enchant ?? null)) {
                 this._ui.showScoreDeduct(capPrice);
                 this._ui.flashBagBtn();
                 item.bought = true;
@@ -281,10 +281,20 @@ export class ShopScreen {
     _genBand() {
         // Owned caps sorteres IKKE fra — duplikater er fair spil (fx for at stakke effekter).
         // Priser gemmes som `basePrice` (u-rabatteret) og omregnes til den aktuelle
-        // rabat (fx Bargain Bin) live ved hvert render/køb — se `_price()`.
+        // rabat (fx Bargain Bin) live ved hvert render/køb — se `_price()`. Pris
+        // pr. rarity (CAP_PRICE_BY_RARITY) i stedet for en flad pris for alle —
+        // vokser pr. node ryddet (gs.capPriceMultiplier), bevidst IKKE pr. køb.
         // Rarity vægtes efter gs.loop (rarityWeights.js) — commons dominerer tidligt.
+        // Ren pr.-slot-sandsynlighed (gs.shopEnchantChance) for at en cap allerede
+        // er enchantet — UAFHÆNGIGT af hvor mange gange man har rerollet, så det
+        // ikke bliver en "reroll indtil enchant"-mekanik.
         const caps = pickWeightedItems(CAP_DEFS, this._gs.loop, BAND_SIZE)
-            .map(def => ({ type: 'cap', def, basePrice: CAP_PRICE, bought: false }));
+            .map(def => {
+                const enchant = Math.random() < this._gs.shopEnchantChance
+                    ? ENCHANT_DEFS[Math.floor(Math.random() * ENCHANT_DEFS.length)].id
+                    : null;
+                return { type: 'cap', def, enchant, basePrice: CAP_PRICE_BY_RARITY[def.rarity ?? 1] ?? CAP_PRICE, bought: false };
+            });
 
         // Occasionally replace one random slot with a card
         if (Math.random() < CARD_IN_BAND_CHANCE) {
@@ -530,6 +540,17 @@ export class ShopScreen {
             card: 'CARD PACK', cap_holo: 'HOLO PACK', cap_uncommon: 'UNCOMMON PACK',
             cap_rare: 'RARE PACK', mystery: 'MYSTERY PACK',
         };
+        // Genbruger den etablerede pack--X-farvekonvention fra pakke-ikonerne
+        // i shoppen (.pack--relic/card/uncommon/rare/holo, se shop.css) på
+        // selve titlen — samme tema, ét sted at kigge for at ændre en farve.
+        // 'cap' (den umærkede standardpakke) har ingen tilsvarende .pack--X
+        // og forbliver derfor neutral, ligesom dens ikon gør.
+        const titleModClassMap = {
+            slammer: 'reward-title-box--relic', slammer_rare: 'reward-title-box--rare',
+            card: 'reward-title-box--card', cap_holo: 'reward-title-box--holo',
+            cap_uncommon: 'reward-title-box--uncommon', cap_rare: 'reward-title-box--rare',
+            mystery: 'reward-title-box--mystery',
+        };
         let cardsHTML;
         if      (pack.type === 'slammer' || pack.type === 'slammer_rare') cardsHTML = this._packSlammerCards(pack.choices);
         else if (pack.type === 'card')      cardsHTML = this._packCardCards(pack.choices);
@@ -539,9 +560,8 @@ export class ShopScreen {
 
         this._packEl.innerHTML = `
             <button id="pack-skip-btn">SKIP</button>
-            <div class="reward-title-box">
+            <div class="reward-title-box ${titleModClassMap[pack.type] ?? ''}">
                 <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'}</h2>
-                <p class="reward-sub">You paid ${this._price(pack.basePrice, 'pack')}★ · choose one to keep</p>
             </div>
             <div class="reward-cards">${cardsHTML}</div>`;
 
@@ -937,7 +957,7 @@ export class ShopScreen {
         const item = this._band[bandIdx];
         if (!item || item.bought) return;
         const price = this._price(item.basePrice, 'cap');
-        if (this._gs.buyCap(item.def, price)) {
+        if (this._gs.buyCap(item.def, price, item.enchant ?? null)) {
             this._ui.showScoreDeduct(price);
             this._ui.flashBagBtn();
             item.bought = true;
