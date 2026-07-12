@@ -242,6 +242,37 @@
     margin-top: 2px;
 }
 
+/* Enchant-forhåndsvisning der erstatter en eksisterende enchant — gammel og
+   ny boks SIDE OM SIDE med en pil imellem (ikke stablet ovenpå hinanden).
+   Spillet spilles kun i landscape, så bredde er den rigelige ressource og
+   højde den knappe — en vandret række koster næsten ingen ekstra højde i
+   forhold til at vise ét enkelt enchant, i modsætning til en stablet
+   version. #cap-detail har ingen max-width, så popup'en vokser naturligt i
+   bredden for at rumme rækken. */
+.cap-detail-enchant-compare {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    width: min(360px, 82vw);
+    margin: 8px auto 0;
+}
+.cap-detail-enchant-compare-box {
+    flex: 1 1 0;
+    min-width: 0;
+}
+.cap-detail-enchant-compare-box .ability-box { margin-top: 0; height: 100%; }
+.cap-detail-enchant-compare-arrow {
+    align-self: center;
+    font-size: 16px;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+.ability-box--replaced {
+    opacity: 0.55;
+    border-style: dashed;
+}
+.ability-box--replaced .ability-box-name { text-decoration: line-through; }
+
 /* Korte viewports — modvirk scale(0.72)-nedskaleringen af selve popup'en (se
    @media (max-height:520px) nedenfor) ved at kompensere med en STØRRE base-
    størrelse, så det VISUELT rendrede resultat efter skalering forbliver

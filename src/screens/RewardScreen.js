@@ -120,7 +120,7 @@ export class RewardScreen {
                     label:    'PICK',
                     color:    choice.enchantDef.color,
                     callback: () => this._confirmEnchant(idx),
-                });
+                }, { previewEnchant: choice.enchantDef.id });
                 return;
             }
             if (e.target.closest('#reward-skip-btn')) this._doSkip();
@@ -420,11 +420,21 @@ export class RewardScreen {
     _pickEnchantChoices() {
         const caps = this._gs.ownedCaps;
         if (caps.length === 0) return [];
+        // Samme cap må gerne optræde i flere af de 3 slots (det har den altid
+        // kunnet) — men samme cap+enchant-KOMBINATION må ikke gentages, det er
+        // reelt et duplikeret valg. usedPairs sporer "cap-id:enchant-id" på
+        // tværs af de 3 slots i dette kald.
+        const usedPairs = new Set();
         return [0, 1, 2].map(() => {
             const entry = caps[Math.floor(Math.random() * caps.length)];
-            // Udeluk capens nuværende enchant — at "vinde" det den allerede har er ingen reward
-            const pool  = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
+            // Udeluk capens nuværende enchant (ingen reward i at "vinde" den man
+            // allerede har) OG enchants allerede tilbudt på DENNE SAMME cap i et
+            // af de andre slots.
+            let pool = ENCHANT_DEFS.filter(e =>
+                e.id !== entry.enchant && !usedPairs.has(`${entry.id}:${e.id}`));
+            if (pool.length === 0) pool = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
             const enchantDef = pool[Math.floor(Math.random() * pool.length)];
+            usedPairs.add(`${entry.id}:${enchantDef.id}`);
             return { entry, enchantDef };
         });
     }
@@ -523,13 +533,6 @@ export class RewardScreen {
             : this._mode === 'chest'   ? (this._chestTier === 'gold' ? '✪ Gold Chest' : '◎ Silver Chest')
             : this._mode === 'mystery' ? '❔ Mystery'
             : (this._node?.type === 'slammer' ? 'Slammer Event' : (this._node ? `Node ${this._node.name} cleared!` : 'Node cleared!'));
-        const sub = this._mode === 'enchant' ? 'Choose a cap from your collection to enchant'
-            : this._mode === 'boss'    ? 'Choose a rare cap — or skip for +1 more Shard'
-            : this._mode === 'chest'   ? 'Take it, or skip for ★ instead'
-            : this._mode === 'mystery' ? 'A special one-off effect — take it, or skip for ★ instead'
-            : (this._mode === 'slammer'
-                ? 'Choose a slammer — permanent passive bonus'
-                : 'Choose a cap for your collection');
 
         const cardsHTML = this._mode === 'enchant' ? this._enchantCards(choices)
             : this._mode === 'slammer' ? this._slammerCards(choices)
@@ -547,7 +550,6 @@ export class RewardScreen {
             </button>
             <div class="reward-title-box">
                 <h2 class="reward-title">${nodeLabel}</h2>
-                <p class="reward-sub">${sub}</p>
             </div>
             <div class="reward-cards ${(this._mode === 'chest' || this._mode === 'mystery') ? 'reward-cards--single' : ''}">${cardsHTML}</div>`;
 
@@ -600,9 +602,21 @@ export class RewardScreen {
             const replaceHTML = oldEnchant
                 ? `<div class="reward-enchant-replace">${oldEnchant.icon} ${oldEnchant.name} → replaced</div>`
                 : '';
-            return `<div class="reward-card" data-key="${i}">
+            // Crossfade mellem cappens NUVÆRENDE udseende og hvordan den ser ud
+            // MED den nye enchant — samme --preview-delay forskyder billed-
+            // skiftet OG navne-pulsen synkront, men de 3 kort imellem hinanden,
+            // så de ikke alle blinker på samme tid (reward-card-in-entrancen
+            // bruger samme forskudte mønster).
+            return `<div class="reward-card" data-key="${i}" style="--preview-delay:${i * 350}ms">
                 <div class="reward-rarity reward-rarity--uncommon">ENCHANT</div>
-                ${capThumbnailHTML(entry, { imgClass: 'reward-cap-img' })}
+                <div class="reward-enchant-preview">
+                    <div class="reward-enchant-preview-layer reward-enchant-preview-layer--before">
+                        ${capThumbnailHTML(entry, { imgClass: 'reward-cap-img' })}
+                    </div>
+                    <div class="reward-enchant-preview-layer reward-enchant-preview-layer--after">
+                        ${capThumbnailHTML({ ...entry, enchant: enchantDef.id }, { imgClass: 'reward-cap-img' })}
+                    </div>
+                </div>
                 <div class="reward-cap-name-row">
                     <div class="reward-cap-name">${entry.def.name}</div>
                     ${seriesPillHTML(entry.def.series)}

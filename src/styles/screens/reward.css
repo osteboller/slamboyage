@@ -472,6 +472,37 @@
 }
 
 /* Enchant reward variant */
+
+/* "Hvad bliver den til?"-crossfade: to identiske cap-thumbnails (nuværende
+   udseende + med den nye enchant) stacket oldenpå hinanden via CSS grid,
+   krydsblændet med opacity-animation i stedet for et side-om-side "før→efter"-
+   layout (som mystery-rewardens transform-result-img bruger) — der er ikke
+   plads til det i et 3-korts grid. --preview-delay (sat pr. kort i JS)
+   forskyder de 3 korts cyklusser indbyrdes, så de ikke blinker samtidig. */
+.reward-enchant-preview {
+    display: grid;
+    align-self: center;
+}
+.reward-enchant-preview-layer { grid-area: 1 / 1; }
+.reward-enchant-preview-layer--before {
+    animation: reward-enchant-crossfade-before 5.2s ease-in-out infinite;
+    animation-delay: var(--preview-delay, 0ms);
+}
+.reward-enchant-preview-layer--after {
+    animation: reward-enchant-crossfade-after 5.2s ease-in-out infinite;
+    animation-delay: var(--preview-delay, 0ms);
+}
+@keyframes reward-enchant-crossfade-before {
+    0%, 38.5%  { opacity: 1; }
+    50%, 88.5% { opacity: 0; }
+    100%       { opacity: 1; }
+}
+@keyframes reward-enchant-crossfade-after {
+    0%, 38.5%  { opacity: 0; }
+    50%, 88.5% { opacity: 1; }
+    100%       { opacity: 0; }
+}
+
 .reward-enchant-name {
     font-family: 'JetBrains Mono', monospace;
     font-size: clamp(10px, 2vw, 14px);
@@ -483,6 +514,16 @@
     border-bottom: 4px solid #000;
     padding-bottom: clamp(4px, 0.8vh, 7px);
     margin-bottom: clamp(2px, 0.4vh, 4px);
+    /* Pulserer i takt med .reward-enchant-preview-layer--after ovenfor —
+       samme cyklus/forskydning, så øjet kobler "badgen lyser op" sammen med
+       "billedet viser nu holo-udgaven". */
+    animation: reward-enchant-name-pulse 5.2s ease-in-out infinite;
+    animation-delay: var(--preview-delay, 0ms);
+}
+@keyframes reward-enchant-name-pulse {
+    0%, 38.5%  { opacity: 0.6; text-shadow: none; }
+    50%, 88.5% { opacity: 1;   text-shadow: 0 0 6px currentColor; }
+    100%       { opacity: 0.6; text-shadow: none; }
 }
 
 .reward-enchant-desc {

@@ -1,6 +1,24 @@
 import { POG_R, POG_H, SLAM_H, ENCHANT_OVERLAY_OPACITY } from '../config/constants.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 
+// Enchant-preview crossfade-timing — matcher .reward-enchant-preview's CSS-
+// keyframes (reward.css) så 2D-kortenes billed-skift og den 3D-mønts
+// overlay-puls føles som SAMME effekt, bare i to forskellige renderere.
+const PREVIEW_CYCLE_MS = 5200;
+const PREVIEW_HOLD_MS  = 2000;
+const PREVIEW_FADE_MS  = 600;
+
+// Trekant-kurve med hold-faser: 0 (hold) → fade op → ENCHANT_OVERLAY_OPACITY
+// (hold) → fade ned → gentag. Samme rytme som CSS-crossfaden på reward-kortene.
+function previewOpacityCurve(elapsedMs) {
+    const t = elapsedMs % PREVIEW_CYCLE_MS;
+    if (t < PREVIEW_HOLD_MS)                               return 0;
+    if (t < PREVIEW_HOLD_MS + PREVIEW_FADE_MS)              return (t - PREVIEW_HOLD_MS) / PREVIEW_FADE_MS;
+    if (t < PREVIEW_HOLD_MS * 2 + PREVIEW_FADE_MS)          return 1;
+    if (t < PREVIEW_HOLD_MS * 2 + PREVIEW_FADE_MS * 2)      return 1 - (t - (PREVIEW_HOLD_MS * 2 + PREVIEW_FADE_MS)) / PREVIEW_FADE_MS;
+    return 0;
+}
+
 export class CapViewer {
     constructor(container) {
         this._container = container;
@@ -12,6 +30,14 @@ export class CapViewer {
         this._loadId    = 0;
         this._lastX     = 0;
         this._lastY     = 0;
+
+        // Enchant-preview crossfade (reward-screen "hvad bliver den til?"-forhåndsvisning)
+        // — se previewEnchant() nedenfor. To materialer, ikke ét: hvis capen i
+        // forvejen HAR en enchant, skal den gamle overlay falme UD præcis når
+        // den nye falmer IND, ellers ses begge samtidig i "efter"-fasen.
+        this._previewNewMat = null;
+        this._previewOldMat = null;
+        this._previewStart  = 0;
 
         // ── Scene ───────────────────────────────────────────────────────────
         this._scene  = new THREE.Scene();
@@ -78,6 +104,8 @@ export class CapViewer {
 
         // Stop old loop and clear canvas immediately — prevents old cap flashing
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
+        this._previewNewMat = null;
+        this._previewOldMat = null;
         this._clearMesh();
         this._renderer.render(this._scene, this._camera);
 
@@ -157,7 +185,35 @@ export class CapViewer {
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
     }
 
+    // Forhåndsvis en NY enchant oven på den allerede-byggede mesh (kaldes
+    // EFTER show() er landet — mesh skal eksistere, og skal være bygget UDEN
+    // sin egen statiske enchant-overlay — se UIManager._showCapDetail, som
+    // sender enchant:null til show() når der forhåndsvises, netop for at
+    // undgå at denne metode duplikerer den gamle overlay oveni sig selv).
+    // oldEnchantId (capens NUVÆRENDE enchant, hvis nogen) krydsblændes ud
+    // præcis når newEnchantId blændes ind — show() selv er ikke egnet til
+    // gentagne kald for animationen (fuld mesh-rebuild pr. kald giver et
+    // synligt "pop" i stedet for en blød crossfade).
+    async previewEnchant(newEnchantId, oldEnchantId = null) {
+        const newDef = ENCHANT_DEFS.find(e => e.id === newEnchantId);
+        if (!newDef || !this._mesh) return;
+        const oldDef = oldEnchantId ? ENCHANT_DEFS.find(e => e.id === oldEnchantId) : null;
+        const loadId = this._loadId;
+
+        const [newTex, oldTex] = await Promise.all([
+            this._loadTex(`assets/enchants/${newDef.overlayAsset}`),
+            oldDef ? this._loadTex(`assets/enchants/${oldDef.overlayAsset}`) : Promise.resolve(null),
+        ]);
+        if (loadId !== this._loadId || !this._mesh) return;
+
+        if (newTex) this._previewNewMat = this._addEnchantOverlay(newTex, 0).material[1];
+        if (oldTex) this._previewOldMat = this._addEnchantOverlay(oldTex, ENCHANT_OVERLAY_OPACITY).material[1];
+        this._previewStart = performance.now();
+    }
+
     _clearMesh() {
+        this._previewNewMat = null;
+        this._previewOldMat = null;
         if (!this._mesh) return;
         this._mesh.children.forEach(child => {
             child.geometry?.dispose();
@@ -170,7 +226,7 @@ export class CapViewer {
         this._mesh = null;
     }
 
-    _addEnchantOverlay(overlayTex) {
+    _addEnchantOverlay(overlayTex, opacity = ENCHANT_OVERLAY_OPACITY) {
         const capHeight = POG_H * 0.35;
         const overlayGeo = new THREE.CylinderGeometry(POG_R * 0.97, POG_R * 0.97, 0.001, 64, 1, false);
         const overlayMat = [
@@ -179,7 +235,7 @@ export class CapViewer {
                 map: overlayTex,
                 transparent: true,
                 blending: THREE.AdditiveBlending,
-                opacity: ENCHANT_OVERLAY_OPACITY,
+                opacity,
                 depthWrite: false,
             }),
             new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
@@ -187,6 +243,7 @@ export class CapViewer {
         const overlayMesh = new THREE.Mesh(overlayGeo, overlayMat);
         overlayMesh.position.y = capHeight / 2 + 0.002;
         this._mesh.add(overlayMesh);
+        return overlayMesh;
     }
 
     _startLoop() {
@@ -195,6 +252,11 @@ export class CapViewer {
             if (!this._visible) return;
             this._animId = requestAnimationFrame(tick);
             if (!this._dragging && this._mesh) this._mesh.quaternion.premultiply(this._autoQ);
+            if (this._previewNewMat || this._previewOldMat) {
+                const curve = previewOpacityCurve(performance.now() - this._previewStart);
+                if (this._previewNewMat) this._previewNewMat.opacity = curve * ENCHANT_OVERLAY_OPACITY;
+                if (this._previewOldMat) this._previewOldMat.opacity = (1 - curve) * ENCHANT_OVERLAY_OPACITY;
+            }
             this._renderer.render(this._scene, this._camera);
         };
         tick();

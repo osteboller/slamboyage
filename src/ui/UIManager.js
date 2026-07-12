@@ -1223,6 +1223,12 @@ export class UIManager {
     _showCapDetail(capOrEntry, lit, action = null, opts = {}) {
         const def     = capOrEntry.def ?? capOrEntry;
         const enchant = capOrEntry.enchant ?? null;
+        // opts.previewEnchant (enchant-reward-forhåndsvisning) vinder over den
+        // NUVÆRENDE enchant for TEKST/badge-visning — spilleren skal se hvad
+        // de er ved at VÆLGE, ikke hvad cappen allerede har. Den 3D-mønt
+        // crossfader stadig fra den faktiske nuværende tilstand (inkl. evt.
+        // gammel enchant, se show() nedenfor) til den nye.
+        const displayEnchant = opts.previewEnchant ?? enchant;
 
         const detail    = document.getElementById('cap-detail');
         const nameEl    = document.getElementById('cap-detail-name');
@@ -1265,8 +1271,36 @@ export class UIManager {
             : '';
 
         const enchantSlot = document.getElementById('cap-detail-enchant-slot');
-        const enchantDefForBox = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
-        enchantSlot.innerHTML = enchantDefForBox
+        const enchantDefForBox = displayEnchant ? ENCHANT_DEFS.find(e => e.id === displayEnchant) : null;
+        const currentEnchantDef = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
+        // Forhåndsvisning der ERSTATTER en enchant capen allerede har: vis
+        // BEGGE bokse SIDE OM SIDE (ikke stablet ovenpå hinanden) — spillet
+        // spilles kun i landscape, så bredde er den rigelige ressource og
+        // højde den knappe. En stablet version gjorde popup'en højere og
+        // risikerede at klippe PICK-knappen ud i bunden på korte viewports;
+        // en vandret række med pil imellem (samme mønster som showEnchantResult's
+        // før→efter-billeder) koster næsten ingen ekstra højde.
+        if (opts.previewEnchant && currentEnchantDef && currentEnchantDef.id !== enchantDefForBox.id) {
+            enchantSlot.innerHTML = `
+                <div class="cap-detail-enchant-compare">
+                    <div class="cap-detail-enchant-compare-box">
+                        ${abilityBoxHTML({
+                            color:       currentEnchantDef.color,
+                            name:        `${currentEnchantDef.icon} ${currentEnchantDef.name}`,
+                            description: currentEnchantDef.description,
+                            extraClass:  'ability-box--replaced',
+                        })}
+                    </div>
+                    <span class="cap-detail-enchant-compare-arrow">→</span>
+                    <div class="cap-detail-enchant-compare-box">
+                        ${abilityBoxHTML({
+                            color:       enchantDefForBox.color,
+                            name:        `${enchantDefForBox.icon} ${enchantDefForBox.name}`,
+                            description: enchantDefForBox.description,
+                        })}
+                    </div>
+                </div>`;
+        } else enchantSlot.innerHTML = enchantDefForBox
             ? abilityBoxHTML({
                   color:       enchantDefForBox.color,
                   description: enchantDefForBox.description,
@@ -1313,10 +1347,9 @@ export class UIManager {
             badgeEl.id = 'cap-detail-enchant-badge';
             document.querySelector('.cap-viewer-wrap').appendChild(badgeEl);
         }
-        const enchantDef = enchant ? ENCHANT_DEFS.find(e => e.id === enchant) : null;
-        if (enchantDef) {
-            badgeEl.textContent   = enchantDef.icon;
-            badgeEl.style.background = enchantDef.color;
+        if (enchantDefForBox) {
+            badgeEl.textContent   = enchantDefForBox.icon;
+            badgeEl.style.background = enchantDefForBox.color;
             badgeEl.style.display = '';
         } else {
             badgeEl.style.display = 'none';
@@ -1347,7 +1380,14 @@ export class UIManager {
             statusEl.style.display = 'none';
         }
 
-        this._capViewer.show(def, 'cap', enchant);
+        // Ved forhåndsvisning bygges mønten UDEN sin egen statiske enchant-
+        // overlay (enchant:null) — previewEnchant() nedenfor tager sig af BÅDE
+        // den gamle (hvis nogen) og den nye, krydsblændet, så den gamle rent
+        // faktisk forsvinder når den nye kommer frem i stedet for at stå
+        // oveni den (to samtidige overlays ville ellers se ud som "begge
+        // enchants på én gang", ikke en erstatning).
+        const capViewerShown = this._capViewer.show(def, 'cap', opts.previewEnchant ? null : enchant);
+        if (opts.previewEnchant) capViewerShown.then(() => this._capViewer.previewEnchant(opts.previewEnchant, enchant));
         this._randomDetailRotation(detail);
         detail.style.display = 'block';
         this.setDetailBackdrop(true);
