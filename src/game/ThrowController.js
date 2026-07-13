@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { Vec3, BODY_TYPES } from '../../lib/cannon.js';
 import { POG_H, POG_R, SLAM_H, SHOT_DELAY,
          POWER_SPEED_MIN, POWER_SPEED_MAX, SETTLE } from '../config/constants.js';
@@ -83,6 +84,15 @@ export class ThrowController {
             this.phase         = 'falling';
             this._fallingStart = now;
             this._ui.setStatus('Slammer falling...');
+
+            // Swoosh-lyd valgt efter power-bar-styrke (1=svagest, 5=kraftigst) —
+            // samme powerRatio-formel som _blast() bruger til kamera-shake.
+            // rate:1 (ingen tilfældig pitch-variation her) — de 5 filer ER
+            // allerede variationen, og tilfældig pitch oveni ville kunne gøre
+            // en svag swoosh_2 lyde kraftigere end en kraftig swoosh_4.
+            const powerRatio  = (this._shotSpeed - POWER_SPEED_MIN) / (POWER_SPEED_MAX - POWER_SPEED_MIN);
+            const swooshIndex = Math.min(5, Math.max(1, Math.ceil(powerRatio * 5)));
+            audio.play(`swoosh_${swooshIndex}`, { rate: 1 });
         }
 
         if (this.phase === 'falling' && now - this._fallingStart > 5000) {
@@ -137,6 +147,15 @@ export class ThrowController {
         // sqrt(3.5) ≈ 1.87 — matcher original force-niveau (mass var altid 3.5 før stats)
         const force = Math.sqrt(3.5) * this._shotSpeed * (this._slammerDef?.power ?? 0.55);
         const powerRatio = (this._shotSpeed - POWER_SPEED_MIN) / (POWER_SPEED_MAX - POWER_SPEED_MIN);
+
+        // Selve brag-lyden, i fem styrker (samme bucketing som swoosh_1..5) —
+        // adskilt fra swoosh, som allerede spillede ved selve kastet. rate:1 af
+        // samme grund som swoosh: de 5 filer ER variationen, tilfældig pitch
+        // oveni ville sløre rækkefølgen.
+        const hitTiers = ['slammer_hit_weak', 'slammer_hit_low_mid', 'slammer_hit_mid', 'slammer_hit_high_mid', 'slammer_hit_big'];
+        const hitIdx   = Math.min(5, Math.max(1, Math.ceil(powerRatio * 5))) - 1;
+        audio.play(hitTiers[hitIdx], { rate: 1 });
+
         const shakeFloor = 0.90;
         if (powerRatio >= shakeFloor) {
             const t = (powerRatio - shakeFloor) / (1 - shakeFloor);
@@ -148,6 +167,9 @@ export class ThrowController {
             body.linearDamping  = SETTLE.AIR_LINEAR;
             body.angularDamping = SETTLE.AIR_ANGULAR;
             body.wakeUp();
+            // Nulstiller "har allerede spillet sin landingslyd"-flaget for DETTE
+            // kast — se CollisionManager.js's beginContact-udvidelse.
+            body.userData.hasLanded = false;
 
             const angle = (i / this._caps.length) * Math.PI * 2 + (Math.random() - 0.5) * 1.5;
             const r     = 0.6 + Math.random() * 0.9;

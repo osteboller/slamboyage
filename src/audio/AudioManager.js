@@ -1,0 +1,246 @@
+import { SFX_DEFS, BGM_DEFS } from '../config/audioDefs.js';
+
+const VOL_STORAGE_KEY = 'slamberz_audio_volumes';
+// Var 1500ms, men gav problemer når man klikkede sig hurtigt gennem flere
+// BGM-udløsende skærme i træk (map/shop/battle) — næste playBGM()-kald kunne
+// nå at afbryde et spor midt i et allerede igangværende 1500ms-fade, hvilket
+// gjorde skiftet mærkbart "hakkende"/uklart. 900ms er stadig tydeligt blødere
+// end den oprindelige 700ms, men giver rig hurtigere klik-gennem mindre tid
+// til at kollidere med et fade der endnu ikke er færdigt.
+const BGM_FADE_MS = 900;
+
+// Global lyd-singleton — importér `audio` direkte hvor den skal bruges
+// (`import { audio } from '.../audio/AudioManager.js'`) i stedet for at sende
+// den gennem hver skærms deps-objekt. Samme mønster som CAP_DEFS/EFFECTS-
+// registrene: AudioManager er et rent cross-cutting UI-lag uden egen game-
+// state, så konstruktør-plumbing gennem alle skærme ville kun være støj.
+//
+// Bygget oven på Howler (lib/howler.min.js, global window.Howl/window.Howler)
+// fremfor rå Web Audio API — Howler håndterer selv mobil-autoplay-unlock
+// (afspilning køes automatisk indtil første rigtige bruger-tap) og OGG/MP3-
+// format-fallback, så der er ingen grund til at genopfinde det her.
+class AudioManager {
+    constructor() {
+        const savedVol   = this._loadVolumes();
+        this._sfxVolume  = savedVol.sfx;
+        this._bgmVolume  = savedVol.bgm;
+
+        this._sfx = {};
+        for (const [id, def] of Object.entries(SFX_DEFS)) {
+            this._sfx[id] = new Howl({ src: def.src, volume: (def.volume ?? 1) * this._sfxVolume });
+        }
+
+        // IKKE html5:true — blev prøvet for hurtigere opstart (BGM-filerne er
+        // store, bgm_battle er ~4MB), men et almindeligt <audio>-element er
+        // skrøbeligt overfor hurtige stop()→play()-cyklusser (browseren kan
+        // afvise et play()-kald der kolliderer med et lige-afsluttet pause(),
+        // og fejler ofte helt tavst) — det var reelt roden til at BGM nogle
+        // gange slet ikke kom tilbage ved hurtig navigation. Web Audio-
+        // tilstanden (default) håndterer stop+genstart langt mere robust.
+        // Howler køer selv .play()-kald til loading er færdig, så SFX'ernes
+        // whenReady()-gate nedenfor er nok — BGM behøver ikke samme garanti,
+        // en lille forsinkelse på allerførste afspilning er ikke kritisk.
+        this._bgm         = {};
+        for (const [id, def] of Object.entries(BGM_DEFS)) {
+            this._bgm[id] = new Howl({ src: def.src, loop: true, volume: 0 });
+        }
+        this._activeBgmId = null;
+        // "Generation" pr. spor — bumpes hver gang sporet (gen)startes via
+        // next.play() i playBGM(). Et planlagt fade-ud→stop()-kald husker hvilken
+        // generation DET tilhørte, og springer stop() over hvis sporet er blevet
+        // genstartet (= ny generation) siden — ellers kunne et forældet,
+        // forsinket stop-kald dræbe en frisk afspilning af SAMME spor et par
+        // hundrede ms efter den startede (fx battle→menu→battle igen, hurtigere
+        // end BGM_FADE_MS), hørt som "musikken forsvinder ved Continue".
+        this._bgmEpoch = {};
+        // Hvilke BGM-spor der er blevet spillet mindst én gang denne session —
+        // se randomStart-håndteringen i playBGM(): et spor springer bevidst det
+        // tilfældige startpunkt over FØRSTE gang det nogensinde spiller, så man
+        // altid hører intro'en mindst én gang, før senere afspilninger begynder
+        // et vilkårligt sted.
+        this._bgmHeardIds = new Set();
+
+        // Global, delegeret klik-lyd — ALLE <button>-elementer i hele spillet får
+        // automatisk 'button_click', uden at nogen skærm selv skal huske at kalde
+        // audio.play() ved hver ny knap. To indbyggede overrides, begge helt
+        // deklarative (ingen JS-ændring nødvendig andre steder for at bruge dem):
+        //   - class="cant-afford" (etableret konvention i ShopScreen/BossShopScreen,
+        //     se shop.css) → spiller 'error' i stedet, automatisk.
+        //   - data-sfx="X" på selve elementet → spiller lyd X i stedet ("none" for
+        //     slet ingen lyd). capThumbnailHTML() sætter fx data-sfx="cap_select"
+        //     på alle cap-thumbnails ét sted, så det dækker hele spillet med det samme.
+        // 'click' (ikke 'pointerdown') — pointerdown fyrer FØR en scroll-gestus kan
+        // skelnes fra et tryk, så et forsøg på at scrolle en liste hen over en knap
+        // udløste lyden hver gang uden at der reelt blev klikket. 'click' undertrykkes
+        // automatisk af browseren hvis touchet bevæger sig (bliver en scroll), så den
+        // rammer kun rigtige, gennemførte tryk — samme grundproblem/løsning som
+        // bindTapSelect (se pause-panel) allerede bruger andre steder i koden.
+        document.addEventListener('click', e => this._onGlobalClick(e));
+    }
+
+    // Resolver når alle SFX (IKKE BGM, se html5-kommentaren ovenfor) enten er
+    // loaded eller er fejlet (loaderror) — én manglende/404'et fil skal aldrig
+    // kunne blokere spillet fra at starte. Kaldes fra main.js, samme mønster
+    // som `await loadTextures(...)`, FØR loading-screenen skjules — retter
+    // problemet med at en lyd blev afspillet før filen var klar (kendt fra et
+    // tidligere projekt), i stedet for at stole blindt på Howlers interne kø.
+    whenReady() {
+        const sounds = Object.values(this._sfx);
+        return Promise.all(sounds.map(s => new Promise(resolve => {
+            if (s.state() === 'loaded') { resolve(); return; }
+            s.once('load', resolve);
+            s.once('loaderror', resolve);
+        })));
+    }
+
+    _onGlobalClick(e) {
+        const el = e.target.closest('button, [data-sfx]');
+        if (!el || el.disabled) return;
+        const override = el.dataset.sfx;
+        if (override === 'none') return;
+        if (override) { this.play(override); return; }
+        this.play(el.classList.contains('cant-afford') ? 'error' : 'button_click');
+    }
+
+    // opts: { volume, rate } — begge valgfrie, per-afspilning (rører ikke lydens
+    // egen standardværdi for næste gang den spiller).
+    // rate: tilfældig pitch-variation (±20%, 0.80–1.20) som DEFAULT på hver
+    // afspilning — uden det lyder et hyppigt gentaget klik (button_click/
+    // cap_select/choice_pop) helt identisk hver gang, hvilket hurtigt bliver
+    // robotisk/trættende. Startede på ±10%, men det var for svagt til at
+    // mærkes på korte perkussive lyde (fx choice_pop) — øret er dårligere til
+    // at opfatte pitch-forskelle på transiente lyde end på holdte toner.
+    // opts.rate kan sætte en eksplicit værdi og overstyrer den tilfældige
+    // variation.
+    play(id, opts = {}) {
+        const sound = this._sfx[id];
+        if (!sound) return;
+        const soundId = sound.play();
+        sound.volume((opts.volume ?? 1) * this._sfxVolume, soundId);
+        sound.rate(opts.rate ?? (0.80 + Math.random() * 0.40), soundId);
+    }
+
+    // Kaldes én gang PR. valg der popper frem på skærmen (reward/enchant-reward/
+    // chest-reward/mystery-reward/slammer-choice/boss-reward/pack-opening).
+    // Egen navngivet metode (ikke bare et rått play('choice_pop') alle steder)
+    // så evt. fremtidig variation/timing kan ændres ét sted uden at røre
+    // kaldestederne.
+    playChoiceReveal() {
+        this.play('choice_pop');
+    }
+
+    // ─── BGM ──────────────────────────────────────────────────────────────────
+    // Crossfade: forrige spor toner ud, nyt spor toner ind — kaldes fra
+    // main.js's showScreen()-router pr. skærm. Ingen effekt hvis samme spor
+    // allerede spiller (fx to reward-agtige skærme i træk).
+    //
+    // Robusthed: Howler GENBRUGER ikke automatisk en allerede-spillende
+    // instans når .play() kaldes igen — den lægger en NY instans oven på den
+    // gamle. En tidligere version af denne metode stolede på et tidsvindue
+    // (fade færdig → stop), men ved hurtig navigation (map→shop→map igen,
+    // inden for selve fade-vinduet) kunne SAMME spor blive bedt om at spille
+    // igen, før dets forrige instans nåede at blive stoppet — hørtes som to
+    // numre oven i hinanden. Løsning: stop ALT andet BGM eksplicit hver gang,
+    // i stedet for at regne på timing.
+    playBGM(id) {
+        if (!id || id === this._activeBgmId) return;
+        const next = this._bgm[id];
+        if (!next) return;
+
+        const prevId = this._activeBgmId;
+        this._activeBgmId = id;
+
+        Object.entries(this._bgm).forEach(([bid, howl]) => {
+            if (bid === id || !howl.playing()) return;
+            if (bid === prevId) {
+                // Det spor der faktisk var hørbart lige nu — blød fade-ud. Husker
+                // DENNE generation af sporet — hvis det bliver genstartet (ny
+                // generation) før fade'et når at fuldføre, skal dette forældede
+                // stop-kald IKKE dræbe den nye afspilning (se _bgmEpoch ovenfor).
+                const epoch = this._bgmEpoch[bid] ?? 0;
+                howl.fade(howl.volume(), 0, BGM_FADE_MS);
+                howl.once('fade', () => {
+                    if ((this._bgmEpoch[bid] ?? 0) === epoch) howl.stop();
+                });
+            } else {
+                // Enhver anden efterladt/spøgelses-instans (fx en tidligere
+                // 'next' der aldrig nåede at blive registreret som prevId,
+                // se ovenstående race) — stoppes med det samme, tavst.
+                howl.stop();
+            }
+        });
+
+        // Garanterer at 'next' selv ikke har en efterladt instans kørende
+        // (fx hvis DEN var en 'prev' der endnu ikke var nået at blive
+        // stoppet) — uden dette kunne .play() lægge en frisk instans oven på
+        // en gammel, stadig-fadende-ud instans af SAMME spor.
+        if (next.playing()) next.stop();
+        this._bgmEpoch[id] = (this._bgmEpoch[id] ?? 0) + 1;
+
+        // seek() kræver at filen faktisk er loaded (duration() ellers 0) — vent
+        // til 'play' rent faktisk er fyret (Howler køer selv play() til load er
+        // færdig), så et tilfældigt startpunkt altid rammer inden for sporets
+        // reelle længde. Springes over hvis dette er FØRSTE gang sporet nogensinde
+        // spiller denne session (se _bgmHeardIds) — fx battle-temaets intro skal
+        // altid høres mindst én gang, før senere afspilninger starter tilfældigt.
+        if (BGM_DEFS[id]?.randomStart && this._bgmHeardIds.has(id)) {
+            next.once('play', () => next.seek(Math.random() * next.duration()));
+        }
+        this._bgmHeardIds.add(id);
+        next.volume(0);
+        next.play();
+        next.fade(0, this._bgmVolume, BGM_FADE_MS);
+    }
+
+    stopBGM() {
+        const curId = this._activeBgmId;
+        const cur   = curId ? this._bgm[curId] : null;
+        this._activeBgmId = null;
+        if (cur?.playing()) {
+            const epoch = this._bgmEpoch[curId] ?? 0;
+            cur.fade(cur.volume(), 0, BGM_FADE_MS);
+            cur.once('fade', () => {
+                if ((this._bgmEpoch[curId] ?? 0) === epoch) cur.stop();
+            });
+        }
+    }
+
+    // ─── VOLUME (burger-menu slidere) ──────────────────────────────────────────
+    setSfxVolume(v) {
+        this._sfxVolume = Math.max(0, Math.min(1, v));
+        Object.values(this._sfx).forEach(s => s.volume(this._sfxVolume));
+        this._saveVolumes();
+    }
+
+    setBgmVolume(v) {
+        this._bgmVolume = Math.max(0, Math.min(1, v));
+        const cur = this._activeBgmId ? this._bgm[this._activeBgmId] : null;
+        if (cur?.playing()) cur.volume(this._bgmVolume);
+        this._saveVolumes();
+    }
+
+    getSfxVolume() { return this._sfxVolume; }
+    getBgmVolume() { return this._bgmVolume; }
+
+    _loadVolumes() {
+        try {
+            const raw = localStorage.getItem(VOL_STORAGE_KEY);
+            if (!raw) return { sfx: 1, bgm: 0.6 };
+            const parsed = JSON.parse(raw);
+            return {
+                sfx: typeof parsed.sfx === 'number' ? parsed.sfx : 1,
+                bgm: typeof parsed.bgm === 'number' ? parsed.bgm : 0.6,
+            };
+        } catch {
+            return { sfx: 1, bgm: 0.6 };
+        }
+    }
+
+    _saveVolumes() {
+        try {
+            localStorage.setItem(VOL_STORAGE_KEY, JSON.stringify({ sfx: this._sfxVolume, bgm: this._bgmVolume }));
+        } catch { /* privat browsing e.l. — ikke kritisk, bare ikke persisteret */ }
+    }
+}
+
+export const audio = new AudioManager();

@@ -1,3 +1,4 @@
+import { audio }            from './audio/AudioManager.js';
 import { PhysicsEngine }    from './physics/PhysicsEngine.js';
 import { CollisionManager } from './physics/CollisionManager.js';
 import { RenderEngine }     from './render/RenderEngine.js';
@@ -43,26 +44,40 @@ const loadingScreen = document.getElementById('loading-screen');
 const texCache = await loadTextures(p => {
     if (loadingFill) loadingFill.style.width = (p * 100) + '%';
 });
+// Venter på at alle SFX er loaded (eller fejlet) FØR loading-screenen skjules
+// og spillet bliver interaktivt — ellers kunne en lyd nå at blive afspillet,
+// før filen var klar, tidligt i en session (kendt problem fra et tidligere
+// projekt). BGM ventes der bevidst ikke på, se whenReady()'s kommentar.
+await audio.whenReady();
 
 const gameState    = new GameState();
 ui.setGameState(gameState);
 const consumables  = new ConsumableSlots({ gameState, ui });
-consumables.onUse = (def) => {
-    if (def.id === 'extra_throw') roundMgr.addThrow();
-    if (def.id === 'power_up')   roundMgr.addVoltage(8);
-    if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); }
-    if (def.id === 'double_relic') { gameState.amplifyStacks++; ui.showAmplifyBadge(gameState.amplifyStacks); roundMgr.refreshAmplifyBadges(); }
+consumables.onUse = (def, idx) => {
+    // Kortet fjernes IKKE fra slottet før effekten rent faktisk sker (se
+    // ConsumableSlots._doUse()) — for clone/transform/enchant sker det først
+    // inde i ui.showCapPicker()'s callback, ALDRIG hvis man lukker den picker
+    // uden at vælge noget. For de øvrige (ingen ekstra valg) sker det med det
+    // samme, ligesom før.
+    const consume = () => { gameState.useConsumable(idx); consumables.refresh(); };
+
+    if (def.id === 'extra_throw') { roundMgr.addThrow(); consume(); }
+    if (def.id === 'power_up')   { roundMgr.addVoltage(8); consume(); }
+    if (def.id === 'double_next') { gameState.activeDouble++; ui.showDoubleBadge(2 ** gameState.activeDouble); consume(); }
+    if (def.id === 'double_relic') { gameState.amplifyStacks++; ui.showAmplifyBadge(gameState.amplifyStacks); roundMgr.refreshAmplifyBadges(); consume(); }
     if (def.id === 'refresh') {
         if (currentScreenName === 'shop')                                   shopScreen.refreshCurrentView();
         if (currentScreenName === 'boss-shop')                               bossShopScreen.reroll();
         const rerollableRewardScreens = new Set(['reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         if (rerollableRewardScreens.has(currentScreenName)) rewardScreen.reroll?.();
+        consume();
     }
     if (def.id === 'clone') {
         const remaining = roundMgr.remainingCaps;
         if (remaining.length > 0) {
             ui.showCapPicker('Pick a cap to clone', remaining, entry => {
                 roundMgr.addGhostCap(entry.def, entry.enchant);
+                consume();
             });
         }
     }
@@ -74,6 +89,7 @@ consumables.onUse = (def) => {
                 entry.def  = pool[Math.floor(Math.random() * pool.length)];
             });
             ui.showBlancoResult(caps.length, () => ui.openCollection('caps'));
+            consume();
         }
     }
     if (def.id === 'transform') {
@@ -86,6 +102,7 @@ consumables.onUse = (def) => {
                 const live   = gameState.ownedCaps.find(c => c.id === entry.id);
                 if (live) live.def = newDef;
                 ui.showTransformResult(oldDef, newDef);
+                consume();
             });
         }
     }
@@ -104,6 +121,7 @@ consumables.onUse = (def) => {
                     if (gameState.currentNode?.boss) ui.setBossInfo(gameState.currentNode.boss);
                 }
                 ui.showEnchantResult(enchantDef, entry);
+                consume();
             });
         }
     }
@@ -112,6 +130,7 @@ consumables.onUse = (def) => {
         if (node?.trickShot && !node.rewardUpgrade) {
             gameState.markRewardUpgraded(node.id, node.trickShot.rewardType);
             mapScreen.refresh();
+            consume();
         }
     }
 };
@@ -149,6 +168,14 @@ const bossShopScreen  = new BossShopScreen(deps);
 const runEndScreen    = new RunEndScreen(deps);
 
 const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop']);
+
+// Skærme uden noget resume-mekanik (ingen battleSaveState/resumeScreen-håndtering
+// for dem, se onPauseMainMenu/onContinueRun nedenfor) — pause-knappen (Retry/Main
+// Menu) skjules helt her, så man ikke kan navigere væk og miste en reward man er
+// midt i at vælge, eller et Trick Shot-forsøg. 'shop' er IKKE med her, da den har
+// sin egen resume-håndtering — MEN se ShopScreen._showPackScreen()/_pickFromPack(),
+// som selv skjuler pause-knappen mens en pakke er åben (samme problem, lokalt scope).
+const UNSAFE_MENU_SCREENS = new Set(['trickshot', 'reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -217,12 +244,33 @@ function showScreen(name, context = null) {
 
         if (RUN_SCREENS.has(name)) ui.showRunOverlay();
         else                       ui.hideRunOverlay();
+        // Se UNSAFE_MENU_SCREENS ovenfor — disse skærme har intet resume-system,
+        // så pause-knappen (som eneste vej til Retry/Main Menu herfra) skjules for
+        // slet ikke at kunne miste en reward/pakke/forsøg man er midt i.
+        if (UNSAFE_MENU_SCREENS.has(name)) document.getElementById('pause-btn').style.display = 'none';
 
         const CONSUMABLE_SCREENS = new Set(['map', 'battle', 'reward', 'shop', 'boss-shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         const rewardLikeScreens = new Set(['slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward']);
         const contextName = rewardLikeScreens.has(name) ? 'reward' : name;
         if (CONSUMABLE_SCREENS.has(name)) { consumables.setContext(contextName); consumables.show(); }
         else                              consumables.hide();
+
+        // BGM pr. skærm — reward-agtige skærme (reward/slammer-choice/enchant-
+        // reward/chest-reward/mystery-reward/boss-reward) og trickshot har
+        // BEVIDST ingen egen entry her: musikken fra forrige skærm spiller bare
+        // videre igennem dem i stedet for at blive klippet ved hver overgang i
+        // en hurtig reward-kæde. 'battle' skifter mellem 'battle'/'boss' alt
+        // efter om noden der spilles er en boss-node (node.boss, se goToNode()).
+        // 'map' spiller 'battle' proaktivt (også ved New Run's allerførste
+        // map-besøg) — man er altid på vej til at vælge/kæmpe en node herfra,
+        // uanset om det er første eller femtende gang.
+        if (name === 'battle') {
+            const node = context?.__resume ? context.node : context;
+            audio.playBGM(node?.boss ? 'boss' : 'battle');
+        } else {
+            const bgmByScreen = { start: 'menu', map: 'battle', shop: 'shop', 'boss-shop': 'shop' };
+            if (bgmByScreen[name]) audio.playBGM(bgmByScreen[name]);
+        }
 
         if (name === 'start') {
             currentScreen = startScreen;
@@ -333,7 +381,7 @@ function showScreen(name, context = null) {
                 const shardenGain = gameState.convertUnusedShards();
                 if (shardenGain) {
                     const label = `unused Shard${shardenGain.unspent === 1 ? '' : 's'}`;
-                    ui.showRelicGain(shardenGain.icon, shardenGain.oldValue, shardenGain.newValue, shardenGain.unspent, label);
+                    ui.showRelicGain(shardenGain.texFront, shardenGain.oldValue, shardenGain.newValue, shardenGain.unspent, label);
                 }
                 returnToAfterMap = 'start';
                 if (gameState.isRunComplete) gameState.nextLoop();

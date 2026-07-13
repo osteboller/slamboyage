@@ -1,5 +1,6 @@
+import { audio } from '../audio/AudioManager.js';
 import { BODY_TYPES, Vec3 } from '../../lib/cannon.js';
-import { POG_H, POG_R, THROWS_PER_ROUND } from '../config/constants.js';
+import { POG_H, POG_R, THROWS_PER_ROUND, HUSK_CAP_DEF } from '../config/constants.js';
 import { NEARBY_RADIUS, VERY_NEARBY_RADIUS } from './EffectResolver.js';
 import { EffectResolver } from './EffectResolver.js';
 import { isFaceUp } from './capUtils.js';
@@ -27,6 +28,11 @@ export class RoundManager {
         this._pendingWon        = [];
         this._pendingFaceDown   = [];
         this._pendingThrowsDone = 0;
+        // ALLE instant-spawn-caps denne runde (hit og miss, se Phase 2.6) — de er
+        // BEVIDST ikke en del af this.caps, så de skal ryddes op eksplicit et sted.
+        // Tømmes af applyRestack() (mellem kast) OG buildStack() (runde-slut —
+        // sikkerhedsnet for når applyRestack aldrig når at køre, fx sidste kast).
+        this._extraSpawnedCaps = [];
 
         // Caps er ejet af RoundManager — main.js læser via this.caps
         this.caps = [];
@@ -117,6 +123,44 @@ export class RoundManager {
         return pool.map((cap, i) => ({ id: i, def: cap.def, enchant: cap.enchant }));
     }
 
+    // Bruges KUN til ghost-caps (Twinsies-klonen, "clone"-consumable) — en
+    // spiller-trigget UI-handling mens runden er idle, hvor en øjeblikkelig
+    // visuel reshuffle af stacken er forventet og korrekt. Husk fra Ballast
+    // bruger IKKE denne vej (se _pendingHuskGrants i applyRestack()) — det
+    // sker midt i selve kastets scoring, hvor en synkron reshuffle af hele
+    // poolen ville se ud som om stacken "restackede" sig selv for tidligt.
+    _addCapToStack(def, entryId, enchant, isGhost) {
+        const cap  = this._factory.spawnCap(def, POG_H * 0.5, enchant, entryId, isGhost);
+        const pool = this._pendingFaceDown.length > 0 ? this._pendingFaceDown : this.caps;
+        pool.push(cap);
+
+        // Shuffle ind på tilfældig position og repositioner alle bodies
+        for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        pool.forEach((c, i) => {
+            // remove/addBody (ikke bare position.set) — ellers kan Cannons broadphase
+            // stadig have cappen registreret på dens GAMLE (spawn-)position, og en
+            // efterfølgende slammer "faser igennem" den i stedet for at kollidere.
+            // Samme mønster som applyRestack()'s egen reposition-loop bruger.
+            this._physics.world.removeBody(c.body);
+            c.body.position.set(0, POG_H * 0.5 + i * (POG_H + 0.01), 0);
+            c.body.previousPosition.copy(c.body.position);
+            this._physics.world.addBody(c.body);
+            // Mesh følger ellers kun med via RenderEngine.sync(), som KUN rører caps
+            // der allerede er i this.caps — en cap tilføjet midt i et kast (fx Husk
+            // fra Ballast) er det ikke før applyRestack() senere forfremmer den, så
+            // uden dette stod dens mesh og "svævede" ved sin oprindelige spawn-plads.
+            c.mesh.position.copy(c.body.position);
+            c.mesh.quaternion.copy(c.body.quaternion);
+        });
+
+        if (this._pendingFaceDown.length === 0) this._throwCtrl.setCaps(this.caps);
+        this._ui.updatePileButtons(pool, this._wonCapsAll, this._geb, this._exhaustedThisRound);
+        return cap;
+    }
+
     // Spawner en ghost-kopi af en cap, shuffler den ind i stacken på en tilfældig position
     addGhostCap(def, enchant = null) {
         // Unikt (negativt) id pr. ghost — IKKE null. Ellers kolliderer flere
@@ -124,26 +168,11 @@ export class RoundManager {
         // forhindrer helt at en ghosts egen effekt-bonus (fx absorb) bliver
         // gemt/vist som badge, selvom den stadig tæller korrekt med i scoren.
         const ghostEntryId = this._nextGhostId--;
-        const ghost = this._factory.spawnCap(def, POG_H * 0.5, enchant, ghostEntryId, true);
-        const pool  = this._pendingFaceDown.length > 0 ? this._pendingFaceDown : this.caps;
-        pool.push(ghost);
-
-        // Shuffle ghost ind på tilfældig position og repositioner alle bodies
-        for (let i = pool.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [pool[i], pool[j]] = [pool[j], pool[i]];
-        }
-        pool.forEach((cap, i) => {
-            cap.body.position.set(0, POG_H * 0.5 + i * (POG_H + 0.01), 0);
-            cap.body.previousPosition.copy(cap.body.position);
-        });
-
-        if (this._pendingFaceDown.length === 0) this._throwCtrl.setCaps(this.caps);
-        this._ui.updatePileButtons(pool, this._wonCapsAll, this._geb, this._exhaustedThisRound);
-        this._spawnGhostFeedback(ghost);
+        const ghost = this._addCapToStack(def, ghostEntryId, enchant, true);
+        this._spawnGhostFeedback(ghost, 0x88aaff, 'clone');
     }
 
-    _spawnGhostFeedback(ghost) {
+    _spawnGhostFeedback(ghost, ringColor = 0x88aaff, indicatorType = 'clone') {
         // Bounce-in på mesh: skala 0 → 1.25 → 1
         ghost.mesh.scale.setScalar(0);
         const start = performance.now();
@@ -158,11 +187,11 @@ export class RoundManager {
         };
         requestAnimationFrame(tick);
 
-        // Blå ring i 3D + 👻 indikator
+        // Ring i 3D (farve varierer pr. kalder) + effekt-indikator
         const pos = ghost.body.position;
-        this._render.spawnEffectRing(pos, 1.8, 0x88aaff, 500, 400);
+        this._render.spawnEffectRing(pos, 1.8, ringColor, 500, 400);
         const { x, y } = this._projectToScreen(pos);
-        this._ui.showEffectIndicator(x, y, { type: 'clone' });
+        this._ui.showEffectIndicator(x, y, { type: indicatorType });
     }
 
     updateLiveCapEnchant(entryId, enchantId) {
@@ -201,6 +230,15 @@ export class RoundManager {
         });
         this.caps = [];
 
+        // Sikkerhedsnet: instant-spawn-caps (Phase 2.6) fra rundens SIDSTE kast når
+        // aldrig applyRestack() (ingen "næste kast" i samme runde) og var bevidst
+        // ikke en del af this.caps — uden dette lækkede de synligt ind i næste runde.
+        this._extraSpawnedCaps.forEach(({ mesh, body }) => {
+            this._render.removeMesh(mesh);
+            this._physics.world.removeBody(body);
+        });
+        this._extraSpawnedCaps = [];
+
         if (this._throwCtrl.slammer) {
             this._render.removeMesh(this._throwCtrl.slammer.mesh);
             this._physics.world.removeBody(this._throwCtrl.slammer.body);
@@ -238,6 +276,7 @@ export class RoundManager {
         this._pendingFaceDown   = [];
         this._pendingThrowsDone = 0;
         this._pendingSpawnDefs  = [];
+        this._pendingHuskGrants = []; // entryIds fra Ballast — injiceres i applyRestack(), se dér
         this._halflifeEarned    = new Map(); // entryId → bonus earned this session
         this._voltageBonus      = 0;
         this._roundCapBonuses   = new Map(); // entryId → accumulated round bonus (crew/rally)
@@ -293,12 +332,12 @@ export class RoundManager {
                 s.passive.currentValue = atMaxStack ? oldValue + s.passive.value : 1.0;
                 s.passive.description  = `Each consecutive round your collection exactly fills max stack size: +${s.passive.value} permanently · Current: ×${s.passive.currentValue.toFixed(1)}`;
                 if (atMaxStack) {
-                    this._ui.showRelicGain(s.passive.icon, oldValue, s.passive.currentValue, 1, 'round at max stack');
+                    this._ui.showRelicGain(s.texFront, oldValue, s.passive.currentValue, 1, 'round at max stack');
                 } else if (oldValue > 1.0) {
                     // Streaken blev brudt — vis samme slags sticker som ved en
                     // gevinst, bare tydeligt markeret som et reset, så spilleren
                     // faktisk kan se HVORFOR multiplikatoren pludselig er væk.
-                    this._ui.showRelicReset(s.passive.icon, oldValue);
+                    this._ui.showRelicReset(s.texFront, oldValue);
                 }
             });
         }
@@ -363,6 +402,18 @@ export class RoundManager {
             this._physics.world.removeBody(body);
         });
 
+        // Alle instant-spawn-caps denne kast (Phase 2.6 i _resolveAndScore) — både
+        // dem der scorede (også med i _pendingWon, allerede fjernet lige ovenfor —
+        // pendingWonSet undgår at fjerne dem to gange) og dem der landede forkert
+        // (lå synligt fremme gennem sidste kast, ryddes stille væk nu).
+        const pendingWonSet = new Set(this._pendingWon);
+        this._extraSpawnedCaps.forEach(cap => {
+            if (pendingWonSet.has(cap)) return;
+            this._render.removeMesh(cap.mesh);
+            this._physics.world.removeBody(cap.body);
+        });
+        this._extraSpawnedCaps = [];
+
         if (this._throwCtrl.slammer) {
             this._render.removeMesh(this._throwCtrl.slammer.mesh);
             this._physics.world.removeBody(this._throwCtrl.slammer.body);
@@ -377,6 +428,19 @@ export class RoundManager {
                 this._pendingFaceDown.push(this._factory.spawnCap(def, 100, enchant));
             });
             this._pendingSpawnDefs = [];
+        }
+
+        // Samme princip for Husk-caps fra Ballast (se _pendingHuskGrants i
+        // _resolveAndScore()) — bevidst injiceret HER, ikke straks når Ballast
+        // udløses midt i kastet. Reshufflen/reposition-loopet lige nedenfor rører
+        // hele poolen, så at kalde addLiveCapToStack() synkront under selve kastets
+        // scoring fik hele resten af stacken til synligt at "restacke" for tidligt,
+        // midt i score-floats — før spilleren overhovedet har trykket "continue".
+        if (this._pendingHuskGrants.length > 0) {
+            this._pendingHuskGrants.forEach(entryId => {
+                this._pendingFaceDown.push(this._factory.spawnCap(HUSK_CAP_DEF, 100, null, entryId, false));
+            });
+            this._pendingHuskGrants = [];
         }
 
         for (let i = this._pendingFaceDown.length - 1; i > 0; i--) {
@@ -427,6 +491,12 @@ export class RoundManager {
         });
         this.caps = [];
 
+        this._extraSpawnedCaps.forEach(({ mesh, body }) => {
+            this._render.removeMesh(mesh);
+            this._physics.world.removeBody(body);
+        });
+        this._extraSpawnedCaps = [];
+
         if (this._throwCtrl.slammer) {
             this._render.removeMesh(this._throwCtrl.slammer.mesh);
             this._physics.world.removeBody(this._throwCtrl.slammer.body);
@@ -448,6 +518,7 @@ export class RoundManager {
         this._pendingFaceDown   = [];
         this._pendingThrowsDone = this._throwsTotal - state.throwsLeft;
         this._pendingSpawnDefs  = [];
+        this._pendingHuskGrants = [];
         this._exhaustedThisRound = []; // ikke persisteret i captureState() endnu — nulstilles ved resume
 
         this._throwCtrl.reset();
@@ -580,7 +651,11 @@ export class RoundManager {
             if (!entry.exhaustFilter) return;
             const donor = entry.cap;
             const dp    = donor.body.position;
-            let exhaustedCount = 0;
+            // isExhausted mærkes/target flyttes ud af stillDown MED DET SAMME (rører
+            // score/pool-logik, som andre faser nedenfor er afhængige af) — men selve
+            // den VISUELLE fjernelse (mesh/body + ikon-pop) er samlet i exhaustedTargets
+            // og skydes drypvis nedenfor, i stedet for at forsvinde alle på én gang.
+            const exhaustedTargets = [];
             for (let i = stillDown.length - 1; i >= 0; i--) {
                 const target = stillDown[i];
                 if (target.def?.series === donor.def?.series) continue; // kun ANDRE serier
@@ -594,23 +669,44 @@ export class RoundManager {
                 // den med et Zzz-badge resten af runden (se _exhaustedThisRound).
                 target.isExhausted = true;
                 this._exhaustedThisRound.push(target);
-                this._render.removeMesh(target.mesh);
-                this._physics.world.removeBody(target.body);
-                exhaustedCount++;
+                exhaustedTargets.push(target);
             }
-            if (exhaustedCount > 0) {
-                entry.bonus = (entry.bonus ?? 0) + entry.exhaustBonus * exhaustedCount;
+            if (exhaustedTargets.length > 0) {
+                entry.bonus = (entry.bonus ?? 0) + entry.exhaustBonus * exhaustedTargets.length;
             }
             // Ringen vises ALTID (også ved 0 ramte), samme princip som martyr —
             // eneste måde spilleren kan se/bekræfte VERY_NEARBY_RADIUS-grænsen visuelt,
             // i stedet for at gætte om "relativt tæt" rent faktisk var tæt nok.
             const { x, y } = this._projectToScreen(dp);
-            this._spawnEffectFeedback(dp, x, y, { type: 'exhaust', count: exhaustedCount });
+            this._spawnEffectFeedback(dp, x, y, { type: 'exhaust', count: exhaustedTargets.length });
+
+            // Drypvis fjernelse: hver ramt cap forsvinder ét ad gangen (i stedet for
+            // alle samtidig) og popper sit eget ikon op ved stack-knappen undervejs,
+            // i samme rækkefølge som de exhaustes — samme "flyv op til knappen"-
+            // mønster som spawnDefs/Husk allerede bruger ved tilføjelser.
+            const EXHAUST_DRIP_MS = 200;
+            exhaustedTargets.forEach((target, i) => {
+                this.delay(() => {
+                    this._render.removeMesh(target.mesh);
+                    this._physics.world.removeBody(target.body);
+                    this._ui.popStackIcon(target.def);
+                }, i * EXHAUST_DRIP_MS);
+            });
         });
 
         // ── Phase 2: partition returnToStack vs scored ────────────────────────
         const actualWon  = resolved.filter(r => !r.returnToStack);
         const returnCaps = resolved.filter(r =>  r.returnToStack).map(r => r.cap);
+
+        // Miss-lyd (tilfældigt mellem 2 varianter) — KUN når slammeren ramte
+        // gulvet uden at røre en eneste cap (miss-parameteren, sat af
+        // CollisionManager's onMiss vs. onBlast — se ThrowController.forceEnd()).
+        // BEVIDST ikke actualWon.length===0: ramte den rent faktisk en cap, men
+        // fik bare 0 flippet, skal miss-lyden IKKE spille, kun stilheden/UI'ets
+        // "Miss!"-tekst. areaDelay (se _handleThrowEnd) er altid 0 for et ægte
+        // miss (wonNow er tomt, så magnetCaps kan ikke udløse forsinkelsen), så
+        // dette kører allerede reelt med det samme, ingen ekstra timing nødvendig.
+        if (miss) audio.play(Math.random() < 0.5 ? 'miss_1' : 'miss_2');
 
         returnCaps.forEach(cap => {
             cap.body.quaternion.setFromEuler(
@@ -665,15 +761,11 @@ export class RoundManager {
             if ((result.flipNearby ?? 0) > 0) surgeQueue.push(resolved);
         }
 
-        // spawnDefs collected AFTER surge so surge-flipped caps' spawn effects are included
-        const spawnDefs = actualWon.flatMap(r => r.spawnCaps ?? []);
-
-        const updatedFaceDown = [...faceDownPool, ...returnCaps];
-
         // ── Surge-flip animationer — rene visuel/fysik-effekter, ingen scoring ──
-        // Flyttet hertil (før Trick Shot-forket) så surge stadig SES under et forsøg,
-        // ikke kun tælles med usynligt. Viser altid en radius-ring ved surgeren
-        // (grøn = fandt mål, rød = ingen face-down cap i NEARBY_RADIUS).
+        // Flyttet hertil (før Trick Shot-forket, OG før Phase 2.6 nedenfor som
+        // genbruger surgeLandDelay) så surge stadig SES under et forsøg, ikke kun
+        // tælles med usynligt. Viser altid en radius-ring ved surgeren (grøn =
+        // fandt mål, rød = ingen face-down cap i NEARBY_RADIUS).
         surgeAttempts.forEach(({ pos, success, step, targetPos }) => {
             this.delay(() => {
                 const { x, y } = this._projectToScreen(pos);
@@ -693,6 +785,111 @@ export class RoundManager {
                 });
             }, startAt);
         });
+
+        // ── Phase 2.6: instant-spawn ("Spawn"-effekten, fx Team Raptor) ──────────
+        // Materialiserer HELT NYE caps midt i kastet (i modsætning til Flipper/surge
+        // ovenfor, som flipper en cap der ALLEREDE lå på pladen). Landingsudfaldet
+        // (face-up/face-down) rulles FØR animationen starter — samme "resultat kendt,
+        // skjules af spin undervejs"-mønster som surge selv bruger. Face-up scorer
+        // dette kast (pushes til actualWon, helt automatisk arvet ind i score/flip-
+        // tæller/pile-overlay via samme mekanisme som surge). Face-down scorer IKKE
+        // og bliver IKKE en rigtig (flippable) del af næste kasts stack — men den
+        // fjernes heller ikke øjeblikkeligt idet den lander (så ud som om den
+        // "forsvandt med det samme"). Den bliver liggende synligt, rent kosmetisk,
+        // og ryddes stille væk når næste kast bygges (applyRestack — se _extraSpawnedCaps).
+        const instantSpawnQueue = actualWon
+            .filter(r => (r.instantSpawn?.length ?? 0) > 0)
+            .flatMap(r => r.instantSpawn.map(def => ({ def, donor: r.cap })));
+        const MAX_INSTANT_SPAWN  = 8;
+        const SPAWN_FALL_MS      = 850;
+        let   instantSpawnStep   = 0;
+
+        while (instantSpawnQueue.length > 0 && instantSpawnStep < MAX_INSTANT_SPAWN) {
+            const { def, donor } = instantSpawnQueue.shift();
+            instantSpawnStep++;
+
+            // Placering: tilfældig vinkel/afstand NÆR donor-cappen (ikke blindt
+            // hen over hele pladen) — genbruger NEARBY_RADIUS, samme "hvad er tæt
+            // på" som surge/aura allerede bruger andre steder i denne funktion.
+            const dp    = donor.body.position;
+            const angle = Math.random() * Math.PI * 2;
+            const dist  = Math.random() * NEARBY_RADIUS;
+            const x     = dp.x + Math.cos(angle) * dist;
+            const z     = dp.z + Math.sin(angle) * dist;
+            const restY = POG_H * 0.5;
+
+            const newCap = this._factory.spawnCap(def, restY, null, this._nextGhostId--, true);
+            // isGhost giver en blå gennemsigtig tint (Twinsies-look) — denne cap skal
+            // se "rigtig" ud, den er ikke en midlertidig duplikat.
+            newCap.mesh.material.forEach(m => { m.transparent = false; m.opacity = 1; m.emissiveIntensity = 0; });
+            newCap.body.position.set(x, restY, z);
+            newCap.body.previousPosition.copy(newCap.body.position);
+            // newCap er BEVIDST ikke en del af this.caps (skal ikke tælles med i næste
+            // kasts stack), men det betyder den aldrig rammes af RenderEngine.sync()'s
+            // per-frame body→mesh-kopiering — uden dette ville mesh'et blive hængende
+            // på Three.js' default (0,0,0), altså scenens centrum, uanset body-positionen.
+            newCap.mesh.position.copy(newCap.body.position);
+            newCap.mesh.quaternion.set(
+                newCap.body.quaternion.x, newCap.body.quaternion.y,
+                newCap.body.quaternion.z, newCap.body.quaternion.w
+            );
+            // Usynlig indtil selve faldet starter — undgår at den blitzer synligt i
+            // hvilehøjde i det staggered delay-vindue før animateCapMaterialize kører.
+            newCap.mesh.visible = false;
+            // Sporet HER (ved oprettelse), ikke kun ved miss — så selv en cap der
+            // scorer (og dermed også havner i _pendingWon) er dækket af sikkerhedsnettet
+            // i buildStack(), hvis runden slutter FØR applyRestack() når at fjerne den
+            // via _pendingWon (se pendingWonSet-guarden i applyRestack, undgår dobbelt-fjernelse).
+            this._extraSpawnedCaps.push(newCap);
+
+            const endFaceUp = Math.random() < 0.5;
+            const step       = instantSpawnStep;
+            const startAt    = (step - 1) * 220;
+            surgeLandDelay.set(newCap, startAt + SPAWN_FALL_MS + 120);
+
+            this.delay(() => {
+                newCap.mesh.visible = true;
+                this._render.animateCapMaterialize(newCap.mesh, endFaceUp, 3, SPAWN_FALL_MS, () => {
+                    // Snapper body-quaternion til den faktiske landing — IKKE fjernet her
+                    // ved miss, den bliver liggende synligt til næste kast rydder den
+                    // (allerede sporet i _extraSpawnedCaps ved oprettelse ovenfor).
+                    newCap.body.quaternion.setFromEuler(endFaceUp ? 0 : Math.PI, newCap.mesh.rotation.y, 0);
+                });
+            }, startAt);
+
+            if (endFaceUp) {
+                const newAllCaps = [...actualWon.map(r => r.cap), ...faceDownPool, newCap];
+                const ctx        = this._resolver.buildContext(
+                    newCap, newAllCaps, this._throwIndex,
+                    actualWon.length + instantSpawnStep, roundExtras
+                );
+                const result   = this._resolver.resolve(newCap, ctx);
+                const resolved = { cap: newCap, ...result };
+                actualWon.push(resolved);
+                // v1-afgrænsning: en spawnet caps EGEN instantSpawn fodrer tilbage i
+                // DENNE kø (samme MAX_INSTANT_SPAWN-loft) — men dens flipNearby fodrer
+                // bevidst IKKE ind i surge-kæden ovenfor (den er allerede færdigkørt).
+                if ((result.instantSpawn?.length ?? 0) > 0) {
+                    instantSpawnQueue.push(...result.instantSpawn.map(d => ({ def: d, donor: newCap })));
+                }
+                // Cell (Osmosis) — slammer-passive: hver gang en SPAWNET cap selv
+                // scorer (face-up), materialiser ÉN kopi mere af den. Bevidst kun
+                // spawn-caps (denne løkke), IKKE Flipper/surge-flippede caps —
+                // Flipper håndteres i et helt separat kodeafsnit ovenfor (Phase 2.5)
+                // som Osmosis aldrig rører. Fødes ind i SAMME kø, begrænset af
+                // samme MAX_INSTANT_SPAWN-loft — kan derfor i teorien selv duplikere
+                // sig selv videre (osmose-agtig kædereaktion), ikke kun ét ekstra lag.
+                const osmosisSlammer = (this._gs?.ownedSlammers ?? []).find(s => s.passive?.type === 'osmosis');
+                if (osmosisSlammer) {
+                    instantSpawnQueue.push({ def: newCap.def, donor: newCap });
+                }
+            }
+        }
+
+        // spawnDefs collected AFTER surge so surge-flipped caps' spawn effects are included
+        const spawnDefs = actualWon.flatMap(r => r.spawnCaps ?? []);
+
+        const updatedFaceDown = [...faceDownPool, ...returnCaps];
 
         // ── Trick Shot fork: springer scoring/GameState-persistence helt over ──
         // Effekter + magnet + surge-kæde er allerede kørt ovenfor, så abilities
@@ -852,10 +1049,58 @@ export class RoundManager {
                 ownedCaps:      this._gs?.ownedCaps ?? [],
             })
             : 1;
+        // Ballast — hver KAST den ligger uflippet i denne rundes stack giver 2×
+        // til HELE kastets score (holdt udenfor positionChain ligesom bossMult
+        // nedenfor — det er ikke en per-cap-effekt-kæde, det er en rundevis
+        // tilstand). "Uflippet DENNE kast" = stadig tilbage i updatedFaceDown
+        // EFTER kastets egne flips er fjernet fra poolen — det opfylder
+        // automatisk "medmindre den er flippet", siden en Ballast-cap der
+        // rent faktisk blev flippet i DETTE kast allerede er fjernet derfra.
+        // Husk-cappen gives HVER GANG denne betingelse er sand (ikke kun én
+        // gang når Ballast til sidst flippes) — samme trigger som 2×'en. UNDTAGEN
+        // på et rent miss-kast (0 flips denne tur) — Husk skal belønne et kast
+        // hvor SPILLEREN rent faktisk gjorde noget, ikke et bomkast.
+        const ballastActive = updatedFaceDown.some(c => c.def?.effect === 'ballast');
+        const ballastMult   = ballastActive ? 2 : 1;
+        // huskGranted styrer popStackIcon-animationen nedenfor (samme "flyv op
+        // til stack-knappen"-mønster som spawnDefs allerede bruger) — sat her,
+        // men selve animationen skydes af LÆNGERE NEDE, EFTER scoredCaps/popDelay
+        // er beregnet, så den kan vente pænt til score-floats er landet.
+        let huskGranted = false;
+        if (ballastActive && actualWon.length > 0 && this._gs) {
+            // gainCap() først (permanent, rigtigt id) — derefter en LIVE fysisk
+            // kopi med SAMME id ind i denne rundes stack, så den kan flippes med
+            // det samme (og fjernes rigtigt fra ownedCaps hvis/når den flippes,
+            // via huskEffect's destroySelf).
+            const result = this._gs.gainCap(HUSK_CAP_DEF);
+            if (result.ok) {
+                // Ikke skabt/tilføjet til stacken synkront her — det ville reshuffle/
+                // repositionere HELE poolen midt i kastets egen scoring (samme mønster
+                // som backup/spawnDefs allerede undgår), og så ud som om stacken
+                // "restackede" sig selv for tidligt, før spilleren nåede at trykke
+                // "continue". I stedet lægges entryId på køen og injiceres atomisk i
+                // applyRestack() — samme sted og samme øjeblik som _pendingSpawnDefs
+                // (backup) allerede gør det.
+                this._pendingHuskGrants.push(result.entry.id);
+                huskGranted = true;
+
+                // Rent visuelt feedback (ring + ikon) må gerne ske med det samme — det
+                // rører ikke stack-poolen, kun en midlertidig effekt ved Ballast-cappens
+                // egen position.
+                const ballastCap = updatedFaceDown.find(c => c.def?.effect === 'ballast');
+                if (ballastCap) {
+                    const pos = ballastCap.body.position;
+                    this._render.spawnEffectRing(pos, 1.8, 0x555555, 500, 400);
+                    const { x, y } = this._projectToScreen(pos);
+                    this._ui.showEffectIndicator(x, y, { type: 'husk' });
+                }
+            }
+            this._ui.flashBagBtn();
+        }
         // Overdrive holdes UDENFOR finalGlobalMult bevidst — den skal gange den
         // SAMLEDE kast-score ÉN gang (se scoreGained nedenfor), ikke hver enkelt
         // caps score for sig, som ville floor()'e 0.5 væk N gange i stedet for én.
-        const finalGlobalMult = globalMult * bossMult;
+        const finalGlobalMult = globalMult * bossMult * ballastMult;
 
         // Parity-boss feedback (Even Steven/Odd Todd) — et grønt flueben/rødt kryds
         // pr. kast så spilleren straks kan se OM og HVORFOR kastet scorer 0, i
@@ -871,7 +1116,7 @@ export class RoundManager {
         // samme dedup-idé — kun ÉN badge pr. kast, uanset hvor mange enchantede caps.
         const triggeredRarities = new Set();
         let   holoTriggerValue  = 0;
-        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta, destroySelf }) => {
+        const scoredCaps = actualWon.map(({ cap, bonus, localMultiplier, baseValue, effectMeta, destroySelf, grantCaps }) => {
             const roundBonus = this._roundCapBonuses.get(cap.entryId) ?? 0;
             const gsEntry  = cap.entryId != null && this._gs ? this._gs.ownedCaps.find(c => c.id === cap.entryId) : null;
             const carry    = gsEntry?.enchant === 'halflife' ? (gsEntry?.storedBonus ?? 0) : 0;
@@ -902,7 +1147,7 @@ export class RoundManager {
             const capChain   = [...positionChain, ...(rarityMult > 1 ? [rarityMult] : []), ...(holoMult > 1 ? [holoMult] : []), ...(roundMult !== 1 ? [roundMult] : [])];
             const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1) * roundMult);
             const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult * holoMult);
-            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry, destroySelf: !!destroySelf };
+            return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry, destroySelf: !!destroySelf, grantCaps: grantCaps ?? [] };
         });
         // Rarity Multiplier-feedback: én badge pr. UNIK rarity der rent faktisk
         // triggede denne gang (se dedup ovenfor).
@@ -949,7 +1194,7 @@ export class RoundManager {
         const scoreDelays = scoredCaps.map(({ cap }, i) => Math.max(i * popDelay, surgeLandDelay.get(cap) ?? 0));
         const lastIdx      = scoreDelays.reduce((best, d, i) => d > scoreDelays[best] ? i : best, 0);
 
-        scoredCaps.forEach(({ cap, capScore, effectMeta, chain, carry, destroySelf }, i) => {
+        scoredCaps.forEach(({ cap, capScore, effectMeta, chain, carry, destroySelf, grantCaps }, i) => {
             const isLast = i === lastIdx;
             this.delay(() => {
                 const { x, y } = this._projectToScreen(cap.body.position);
@@ -971,6 +1216,26 @@ export class RoundManager {
                     if (destroySelf && this._gs) {
                         this._gs.ownedCaps = this._gs.ownedCaps.filter(c => c.id !== cap.entryId);
                         this._spawnEffectFeedback(cap.body.position, x, y, { type: 'destroy' });
+                        // Debris Eater — permanent +value til multiplieren for HVER cap
+                        // der destroyes, samme mønster som throwSaver/sharden/balance
+                        // (se GameState.multiplierChain/addSlammer). currentValue vokser
+                        // her for hver destroyet cap enkeltvis, ikke pr. kast.
+                        this._gs.ownedSlammers
+                            .filter(s => s.passive?.type === 'destroyGrowth')
+                            .forEach(s => {
+                                const p = s.passive;
+                                const oldValue = p.currentValue ?? 1.0;
+                                p.currentValue = oldValue + p.value;
+                                p.description  = `Each cap destroyed adds ×${p.value} permanently · Current: ×${p.currentValue.toFixed(1)}`;
+                                this._ui.showRelicGain(s.texFront, oldValue, p.currentValue, 1, 'cap destroyed');
+                            });
+                    }
+                    // Ballast → Husk (og fremtidige lignende effekter): permanent
+                    // tilføjelse til samlingen, samme sted/timing som destroySelf
+                    // ovenfor (efter score-floatet er landet, ikke før).
+                    if (grantCaps?.length > 0 && this._gs) {
+                        grantCaps.forEach(def => this._gs.gainCap(def));
+                        this._ui.flashBagBtn();
                     }
                     if (isLast) {
                         this._ui.setScore(finalScore);
@@ -987,8 +1252,11 @@ export class RoundManager {
             if (this.onScoreSettled) setTimeout(() => this.onScoreSettled(finalScore), 0);
         }
 
+        // huskGranted-cappen findes først rigtigt i applyRestack() (se
+        // _pendingHuskGrants) — her er den kun med som forhåndsvisning i
+        // pile-overlayets tælling, ligesom spawnDefs (backup) allerede er.
         const displayRemaining = hasNextThrow
-            ? [...updatedFaceDown, ...spawnDefs]
+            ? [...updatedFaceDown, ...spawnDefs, ...(huskGranted ? [{ def: HUSK_CAP_DEF, enchant: null }] : [])]
             : updatedFaceDown;
         this._ui.updatePileButtons(displayRemaining, this._wonCapsAll, this._geb, this._exhaustedThisRound);
         this._ui.updateThrowPips(this._throwsLeft, this._throwsTotal);
@@ -1007,6 +1275,14 @@ export class RoundManager {
                 spawnDefs.forEach((entry, i) => {
                     this.delay(() => this._ui.popStackIcon(entry.def ?? entry), spawnAnimDelay + i * 200);
                 });
+            }
+            // Samme "flyv op til stack-knappen"-animation for en Husk-cap Ballast
+            // lige har tilføjet til stacken (se ballastActive/huskGranted ovenfor).
+            if (huskGranted) {
+                const huskAnimDelay = scoredCaps.length > 0
+                    ? scoredCaps.length * popDelay + 350
+                    : 350;
+                this.delay(() => this._ui.popStackIcon(HUSK_CAP_DEF), huskAnimDelay);
             }
 
             const bossVetoMsg = bossMult === 0 && actualWon.length > 0 ? ` · ${this._activeBoss.name}: 0pts!` : '';
@@ -1028,7 +1304,7 @@ export class RoundManager {
                         const oldValue = p.currentValue ?? 1.0;
                         p.currentValue = oldValue + this._throwsLeft * p.value;
                         p.description  = `Each unused throw adds ×${p.value} · Current: ×${p.currentValue.toFixed(1)}`;
-                        this._ui.showRelicGain(p.icon, oldValue, p.currentValue, this._throwsLeft);
+                        this._ui.showRelicGain(s.texFront, oldValue, p.currentValue, this._throwsLeft);
                     });
             }
             // HALFLIFE: persist earned bonuses for flipped caps, decay unflipped

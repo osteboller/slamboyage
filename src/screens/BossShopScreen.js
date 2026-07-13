@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { pickWeightedItems } from '../config/rarityWeights.js';
@@ -116,6 +117,7 @@ export class BossShopScreen {
         // Slammers-stickeren med sælg-genvej.
         if (item.kind === 'cap' && !this._gs.canAddCap()) return;
         if (item.kind === 'slammer' && !this._gs.canAddSlammer()) { this._ui.showMaxSlammersMessage(); return; }
+        audio.play('purchase');
         this._gs.shards -= price;
         if (item.kind === 'cap') this._gs.gainCap(item.def);
         else                     this._gs.addSlammer(item.def);

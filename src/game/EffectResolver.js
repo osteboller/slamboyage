@@ -15,6 +15,7 @@ const EMPTY_RESULT = Object.freeze({
     fx:             null,
     effectMeta:     null, // { type, ... } — drives visual effect ring in UI
     spawnCaps:      [],   // cap defs to inject into the next throw's stack
+    instantSpawn:   [],   // cap defs to materialize onto the plate and score THIS throw
     auraBonus:      0,    // flat bonus to grant to other matching caps this throw
     auraMultiplier: 1,    // multiplier to grant to other matching caps this throw (fx martyrEffect)
     auraFilter:     null, // 'nearby' | 'series' | 'series_or_nearby'
@@ -29,6 +30,9 @@ const EMPTY_RESULT = Object.freeze({
                           // targeting/removal (same declarative pattern as auraFilter above);
                           // round-scoped ONLY (never touches GameState.ownedCaps), unlike
                           // destroySelf which is permanent.
+    grantCaps:      [],   // cap defs to add PERMANENT til spillerens samling når denne cap
+                          // scores (fx Ballast → Husk) — GameState.gainCap() pr. entry,
+                          // håndteret i RoundManager's scoredCaps-udbetalingsloop.
 });
 
 export class EffectResolver {

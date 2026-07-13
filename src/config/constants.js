@@ -80,10 +80,10 @@ export const SLAMMER_DEFS = [
         passive: null }, // bevidst passiv-løs — se docs/slammer-passives-draft.md
     { name: 'Swamp Skull',    type: 'skull',  texFront: 'assets/slammers/skull_slam_swamp.png',       texBack: 'assets/slammers/skull_slam_swamp_b.png',       rimColor: 0x3a4a2a, mass: 4.6, power: 0.59, precision: 0.75, rating: { power: 4, precision: 2, weight: 4 },
         rarity: 1, sellPrice: 2,
-        passive: { id: 'iron_discipline', name: 'Iron Discipline', icon: '⊛', type: 'throwSaver', value: 0.1, description: 'Each unused throw adds ×0.1 · Current: ×1.0' } },
+        passive: { id: 'osmosis', name: 'Cell (Osmosis)', icon: '🧬', type: 'osmosis', description: 'When a spawned cap scores this throw, spawns one more copy of it' } },
     { name: 'Voodoo Skull',   type: 'skull',  texFront: 'assets/slammers/skull_slam_voodoo.png',      texBack: 'assets/slammers/skull_slam_voodoo_b.png',      rimColor: 0xb0aec0, mass: 3.6, power: 0.54, precision: 1.20, rating: { power: 3, precision: 4, weight: 3 },
         rarity: 1, sellPrice: 2,
-        passive: { id: 'magnet', name: 'Magnet', icon: '◉', type: 'flatBonus', value: 1, description: '+1★ to every cap scored' } },
+        passive: { id: 'iron_discipline', name: 'Iron Discipline', icon: '⊛', type: 'throwSaver', value: 0.1, description: 'Each unused throw adds ×0.1 · Current: ×1.0' } },
     // Crypt Keeper har ingen egen bagside endnu — genbruger seriens fælles
     // Skull-bagside (jf. "fælles bagside pr. serie"-konvention i slammer-passives-draft.md).
     { name: 'Crypt Keeper',   type: 'skull',  texFront: 'assets/slammers/skull_slam_crypt_keeper.png', texBack: 'assets/slammers/skull_slammer_b.png',         rimColor: 0x1a1a1a, mass: 4.0, power: 0.57, precision: 0.95, rating: { power: 3, precision: 3, weight: 3 },
@@ -130,6 +130,12 @@ export const SLAMMER_DEFS = [
     { name: 'Neon Justice',      type: 'zrees', texFront: 'assets/slammers/slammer_zrees_neon_justice.png',     texBack: 'assets/slammers/slammer_zrees_b.png', rimColor: 0x33ffcc, mass: 2.8, power: 0.48, precision: 1.25, rating: { power: 2, precision: 4, weight: 2 },
         rarity: 2, sellPrice: 4,
         passive: { id: 'scales_of_justice', name: 'Scales of Justice', icon: '⚖', type: 'balance', value: 0.1, description: 'Each consecutive round your collection exactly fills max stack size: +0.1 permanently · Current: ×1.0' } },
+    // TODO: mangler egen bagside — genbruger ingen andens, læg en fil ved
+    // assets/slammers/slammer_debris_eater_b.png (samme "fælles/egen bagside
+    // pr. serie"-konvention som resten af filen).
+    { name: 'Debris Eater',      type: 'debris', texFront: 'assets/slammers/slammer_debris_eater.png',        texBack: 'assets/slammers/slammer_debris_eater_b.png', rimColor: 0x6a6a6a, mass: 4.2, power: 0.58, precision: 0.85, rating: { power: 4, precision: 2, weight: 4 },
+        rarity: 4, sellPrice: 12,
+        passive: { id: 'debris_eater', name: 'Debris Eater', icon: '♻', type: 'destroyGrowth', value: 0.1, description: 'Each cap destroyed adds ×0.1 permanently · Current: ×1.0' } },
 ];
 
 // ─── SETTLE / DÆMPNING ───────────────────────────────────────────────────────
@@ -162,10 +168,10 @@ export const CAP_DEFS = [
     { rarity: 2, series: 'raptor_strike', color: 0xcc2222, name: 'Red Strike',    mass: 1.0, bounce: 0.3, effect: 'streak',     texFront: 'assets/caps/raptor_strike/05_red_stance.png',    texBack: 'assets/caps/raptor_strike/01_red_b.png'    },
     { rarity: 2, series: 'raptor_strike', color: 0x1166cc, name: 'Blue Strike',   mass: 1.0, bounce: 0.3, effect: 'flat',       texFront: 'assets/caps/raptor_strike/06_blue_stance.png',   texBack: 'assets/caps/raptor_strike/02_blue_b.png'   },
     { rarity: 2, series: 'raptor_strike', color: 0x2e8b4f, name: 'Jade-a-saur',  mass: 1.0, bounce: 0.3, effect: 'zone_inner', texFront: 'assets/caps/raptor_strike/07_drake_saur.png',    texBack: 'assets/caps/raptor_strike/03_yellow_b.png' },
-    { rarity: 2, series: 'raptor_strike', color: 0xcc3333, name: 'Team Raptor',   mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/raptor_strike/08_team.png',          texBack: 'assets/caps/raptor_strike/01_red_b.png'    },
+    { rarity: 2, series: 'raptor_strike', color: 0xcc3333, name: 'Team Raptor',   mass: 1.0, bounce: 0.3, effect: 'spawn',      spawnPool: ['Red Raptor', 'Blue Raptor', 'Gold Raptor', 'Green Raptor'], spawnCount: 2, texFront: 'assets/caps/raptor_strike/08_team.png',          texBack: 'assets/caps/raptor_strike/01_red_b.png'    },
     { rarity: 3, series: 'raptor_strike', color: 0xaaaacc, name: 'Silver Raptor', mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/raptor_strike/11_silver.png',        texBack: 'assets/caps/raptor_strike/12_silver_b.png' },
     { rarity: 4, series: 'raptor_strike', color: 0xcc9933, name: 'Raptor Fusion', mass: 1.0, bounce: 0.3, effect: 'absorb',     texFront: 'assets/caps/raptor_strike/12_mecha_raptor_saur.png', texBack: 'assets/caps/raptor_strike/18_mecha_b.png'  },
-    { rarity: 3, series: 'raptor_strike', color: 0xcc2211, name: 'Droid-e-saur', mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/raptor_strike/10_red_raptor_saur.png', texBack: 'assets/caps/raptor_strike/01_red_b.png'    },
+    { rarity: 3, series: 'raptor_strike', color: 0xcc2211, name: 'Droid-e-saur', mass: 1.0, bounce: 0.3, effect: 'backup',     texFront: 'assets/caps/raptor_strike/10_red_raptor_saur.png', texBack: 'assets/caps/raptor_strike/01_red_b.png'    },
     // Legacy Discs
     { rarity: 3, series: 'legacy_discs',  color: 0xcc3377, name: 'Alien',           mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/legacy_discs/18_alien.png',  texBack: 'assets/caps/legacy_discs/18_alien_b.png'   },
     { rarity: 3, series: 'legacy_discs',  color: 0x44aa22, name: '8-Ball',          mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/legacy_discs/24_8ball.png',  texBack: 'assets/caps/legacy_discs/24_8ball_b.png'   },
@@ -177,7 +183,7 @@ export const CAP_DEFS = [
     { rarity: 1, series: 'scary_skullz',  color: 0x111111, name: 'Pirate Skull',     mass: 1.0, bounce: 0.3, effect: 'neighbour',  texFront: 'assets/caps/scary_skullz/12_pirate_skull.png',     texBack: 'assets/caps/scary_skullz/01_jebus_skull_b.png'       },
     { rarity: 2, series: 'scary_skullz',  color: 0xcc2211, name: 'Jpn Skull',        mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/scary_skullz/03_jpn_skull.png',        texBack: 'assets/caps/scary_skullz/03_jpn_skull_b.png'         },
     { rarity: 2, series: 'scary_skullz',  color: 0xcc7700, name: 'Chief Skull',      mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/scary_skullz/07_chief_skull.png',      texBack: 'assets/caps/scary_skullz/07_chief_skull_b.png'       },
-    { rarity: 2, series: 'scary_skullz',  color: 0x5a3010, name: 'Critter Skulls',   mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/scary_skullz/05_critter_skulls.png',  texBack: 'assets/caps/scary_skullz/05_critter_skulls_b.png'    },
+    { rarity: 2, series: 'scary_skullz',  color: 0x5a3010, name: 'Critter Skulls',   mass: 1.0, bounce: 0.3, effect: 'backup',     texFront: 'assets/caps/scary_skullz/05_critter_skulls.png',  texBack: 'assets/caps/scary_skullz/05_critter_skulls_b.png'    },
     { rarity: 2, series: 'scary_skullz',  color: 0x442266, name: 'Hoodoo Skull',     mass: 1.0, bounce: 0.3, effect: 'zone_inner', texFront: 'assets/caps/scary_skullz/11_hoodoo_skull.png',     texBack: 'assets/caps/scary_skullz/01_jebus_skull_b.png'       },
     { rarity: 3, series: 'scary_skullz',  color: 0xb08840, name: 'Prairie Skull',    mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/scary_skullz/08_prarie_skull.png',     texBack: 'assets/caps/scary_skullz/08_prarie_skull_b.png'      },
     { rarity: 3, series: 'scary_skullz',  color: 0x1122aa, name: 'Dual Snake Skull', mass: 1.0, bounce: 0.3, effect: 'streak',     texFront: 'assets/caps/scary_skullz/09_dual_snake_skull.png', texBack: 'assets/caps/scary_skullz/09_dual_snake_skull_b.png'  },
@@ -193,7 +199,7 @@ export const CAP_DEFS = [
     { rarity: 2, series: 'cosmic_caps', color: 0x44bb88, name: 'Save Space',       mass: 1.0, bounce: 0.3, effect: 'flat',      texFront: 'assets/caps/cosmic_caps/07_save_space.png',           texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
     { rarity: 2, series: 'cosmic_caps', color: 0x9933cc, name: 'Kino Morph',        mass: 1.0, bounce: 0.3, effect: 'solo',      texFront: 'assets/caps/cosmic_caps/08_xeno_kino.png',            texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
     { rarity: 3, series: 'cosmic_caps', color: 0xcc4422, name: 'Martian Graffiti', mass: 1.0, bounce: 0.3, effect: 'crew',      texFront: 'assets/caps/cosmic_caps/10_martian_graffiti.png',     texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
-    { rarity: 3, series: 'cosmic_caps', color: 0xffaa22, name: 'Lift Off',         mass: 1.0, bounce: 0.3, effect: 'spawn',     texFront: 'assets/caps/cosmic_caps/11_they_have_lift_off.png',   texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
+    { rarity: 3, series: 'cosmic_caps', color: 0xffaa22, name: 'Lift Off',         mass: 1.0, bounce: 0.3, effect: 'backup',    texFront: 'assets/caps/cosmic_caps/11_they_have_lift_off.png',   texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
     { rarity: 4, series: 'cosmic_caps', color: 0x558899, name: 'Meditative Space', mass: 1.0, bounce: 0.3, effect: 'magnet',    texFront: 'assets/caps/cosmic_caps/12_meditative_space.png',     texBack: 'assets/caps/cosmic_caps/cosmic_caps_b.png' },
     // Pewl Ballz  (5 common · 4 uncommon · 2 rare · 1 legendary)
     { rarity: 1, series: 'pewl_ballz', color: 0xddcc00, name: 'Yellow Pewl',   mass: 1.0, bounce: 0.35,                       texFront: 'assets/caps/pewl_ballz/01_pewls.png', texBack: 'assets/caps/pewl_ballz/01_pewls_b.png' },
@@ -220,7 +226,7 @@ export const CAP_DEFS = [
     { rarity: 2, series: 'dawgz', color: 0xaa7744, name: 'Shetsuo',      mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/dawgz/dawgz_09_shetsuo.png',      texBack: 'assets/caps/dawgz/dawgz_b.png' },
     { rarity: 3, series: 'dawgz', color: 0x99aabb, name: 'Malmutti',     mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/dawgz/dawgz_10_malmutti.png',     texBack: 'assets/caps/dawgz/dawgz_b.png' },
     { rarity: 3, series: 'dawgz', color: 0xdddddd, name: 'Dalmer',       mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/dawgz/dawgz_11_dalmay.png',       texBack: 'assets/caps/dawgz/dawgz_b.png' },
-    { rarity: 4, series: 'dawgz', color: 0xcc8822, name: 'King Corgi',   mass: 1.0, bounce: 0.3, effect: 'spawn',      texFront: 'assets/caps/dawgz/dawgz_12_king_corgi.png',   texBack: 'assets/caps/dawgz/dawgz_b.png' },
+    { rarity: 4, series: 'dawgz', color: 0xcc8822, name: 'King Corgi',   mass: 1.0, bounce: 0.3, effect: 'backup',     texFront: 'assets/caps/dawgz/dawgz_12_king_corgi.png',   texBack: 'assets/caps/dawgz/dawgz_b.png' },
 
     // Zupers  (5 common · 4 uncommon · 2 rare · 1 legendary) — deler ÉN fælles
     // texBack (zupers_b.png) på tværs af alle 12, ligesom Dawgz.
@@ -249,7 +255,7 @@ export const CAP_DEFS = [
     { rarity: 1, series: 'zrees', color: 0xee2299, name: 'Neon Justice',       mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_01_neon_justice.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 1, series: 'zrees', color: 0xddaa33, name: 'Guiding Lights',     mass: 1.0, bounce: 0.3, effect: 'solo',       texFront: 'assets/caps/zrees/zrees_02_guiding_lights.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 1, series: 'zrees', color: 0xcc3322, name: 'Quarterback Sis',    mass: 1.0, bounce: 0.3, effect: 'jackpot',    texFront: 'assets/caps/zrees/zrees_03_quarterback_sis.png',     texBack: 'assets/caps/zrees/zrees_b.png' },
-    { rarity: 1, series: 'zrees', color: 0x556633, name: 'Basement Tapes',     mass: 1.0, bounce: 0.3,                       texFront: 'assets/caps/zrees/zrees_04_basement_tapes_1.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
+    { rarity: 1, series: 'zrees', color: 0x556633, name: 'Basement Tapes',     mass: 1.0, bounce: 0.3, effect: 'ballast',    texFront: 'assets/caps/zrees/zrees_04_basement_tapes_1.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 1, series: 'zrees', color: 0x223366, name: 'Midnight Journal',   mass: 1.0, bounce: 0.3, effect: 'surge',      texFront: 'assets/caps/zrees/zrees_05_midnight_journal.png',    texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0x555555, name: 'Off the Record',     mass: 1.0, bounce: 0.3, effect: 'zone_outer', texFront: 'assets/caps/zrees/zrees_06_off_the_record.png',      texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 2, series: 'zrees', color: 0x3355aa, name: 'Orbit9',            mass: 1.0, bounce: 0.3, effect: 'magnet',     texFront: 'assets/caps/zrees/zrees_07_orbit9.png',              texBack: 'assets/caps/zrees/zrees_b.png' },
@@ -259,3 +265,15 @@ export const CAP_DEFS = [
     { rarity: 3, series: 'zrees', color: 0xccaa22, name: "Class of '96",      mass: 1.0, bounce: 0.3, effect: 'crew',       texFront: 'assets/caps/zrees/zrees_11_class_of_96.png',         texBack: 'assets/caps/zrees/zrees_b.png' },
     { rarity: 4, series: 'zrees', color: 0xaa7722, name: 'Relic Hunter',      mass: 1.0, bounce: 0.3, effect: 'martyr',     texFront: 'assets/caps/zrees/zrees_12_relic_hunter.png',        texBack: 'assets/caps/zrees/zrees_b.png' },
 ];
+
+// Husk — BEVIDST IKKE en del af CAP_DEFS. Den skal aldrig kunne trækkes i
+// shop/pakker/rewards (kun opstå som biprodukt af Ballast-effekten, se
+// ballastEffect.js) — at holde den udenfor CAP_DEFS er nok til det, da ALLE
+// pool-trækninger (pickWeightedItem/-Items) læser fra CAP_DEFS direkte.
+// texFront/texBack peger på assets/caps/husk/ — FLYT/omdøb filen dertil
+// (lå oprindeligt som assets/caps/legacy_discs/fake_hollow_png.png). Falder
+// automatisk tilbage til en flad farve indtil filerne rent faktisk findes der.
+export const HUSK_CAP_DEF = {
+    rarity: 1, series: null, color: 0x2a2a2a, name: 'Husk', mass: 1.0, bounce: 0.3, effect: 'husk',
+    texFront: 'assets/caps/husk/husk.png', texBack: 'assets/caps/husk/husk_b.png',
+};

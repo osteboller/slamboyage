@@ -129,10 +129,12 @@ export class GameState {
         const global = this.ownedSlammers
             .filter(s => s.passive?.type === 'globalMultiplier')
             .map(s => s.passive.value);
-        // throwSaver/sharden/balance deler samme mønster: en mutable currentValue der
-        // vokser permanent ved en betingelse, startende ved 1.0 (no-op indtil den vokser).
+        // throwSaver/sharden/balance/destroyGrowth deler samme mønster: en mutable
+        // currentValue der vokser permanent ved en betingelse, startende ved 1.0
+        // (no-op indtil den vokser). destroyGrowth = Debris Eater, vokser når en
+        // cap destroyes (se RoundManager's destroySelf-håndtering).
         const persistent = this.ownedSlammers
-            .filter(s => ['throwSaver', 'sharden', 'balance'].includes(s.passive?.type) && (s.passive.currentValue ?? 1.0) > 1.0)
+            .filter(s => ['throwSaver', 'sharden', 'balance', 'destroyGrowth'].includes(s.passive?.type) && (s.passive.currentValue ?? 1.0) > 1.0)
             .map(s => s.passive.currentValue);
         return [...global, ...persistent];
     }
@@ -183,7 +185,7 @@ export class GameState {
     // Sub-Terra King (Sharden) er ejet eller ej (de persisterede tidligere
     // fejlagtigt for alle uden Sharden — rettet). Sharden konverterer de
     // ubrugte Shards til permanent multiplier FØR nulstillingen, hvis ejet.
-    // Returnerer { icon, oldValue, newValue, unspent } så main.js kan vise en
+    // Returnerer { texFront, oldValue, newValue, unspent } så main.js kan vise en
     // showRelicGain-sticker (samme mønster som Iron Discipline/Balance) — eller
     // null hvis der ikke var noget at konvertere (uanset om det var pga. 0
     // Shards eller manglende Sharden).
@@ -196,7 +198,7 @@ export class GameState {
         const oldValue = p.currentValue ?? 1.0;
         p.currentValue = oldValue + unspent * p.value;
         p.description  = `Each unused Shard adds ×${p.value} permanently · Current: ×${p.currentValue.toFixed(1)}`;
-        return { icon: p.icon, oldValue, newValue: p.currentValue, unspent };
+        return { texFront: shardenSlammer.texFront, oldValue, newValue: p.currentValue, unspent };
     }
 
     hasSlammer(name)  { return this.ownedSlammers.some(s => s.name === name); }
@@ -209,7 +211,7 @@ export class GameState {
     addSlammer(slammerDef) {
         if (!this.canAddSlammer()) return false;
         const entry = { ...slammerDef, passive: slammerDef.passive ? { ...slammerDef.passive } : null };
-        if (['throwSaver', 'sharden', 'balance'].includes(entry.passive?.type)) entry.passive.currentValue = 1.0;
+        if (['throwSaver', 'sharden', 'balance', 'destroyGrowth'].includes(entry.passive?.type)) entry.passive.currentValue = 1.0;
         this.ownedSlammers.push(entry);
         if (entry.passive?.type === 'stackSize') this.stackSizeLimit += entry.passive.value;
         return true;

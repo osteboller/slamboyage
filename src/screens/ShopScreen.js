@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
 import { CAP_PRICE, CAP_PRICE_BY_RARITY } from '../config/mapData.js';
 import { effectName } from '../game/effects/labels.js';
@@ -65,6 +66,10 @@ export class ShopScreen {
     exit() {
         this._titleUnwatch?.();
         this._titleUnwatch = null;
+        // Sikkerhedsnet: hvis skærmen forlades mens en pakke stod åben (se
+        // _showPackScreen), skal pause-knappen altid vises igen bagefter —
+        // ellers ville den kunne stå skjult resten af runet.
+        if (this._packEl) document.getElementById('pause-btn').style.display = '';
         this._packEl?.remove();
         this._packEl = null;
         this._el?.remove();
@@ -106,6 +111,12 @@ export class ShopScreen {
             return;
         }
         if (e.target.closest('#shop-discard-close') || e.target.id === 'shop-discard-overlay') {
+            // Baggrundsklik (selve overlayet, IKKE luk-knappen) rammes ikke af
+            // AudioManagers globale click-lytter (den matcher kun <button>/
+            // [data-sfx]) — spilles eksplicit her. Luk-knappen selv har sin egen
+            // data-sfx="overlay_close" nedenfor og ville ellers spille lyden to
+            // gange, hvis den også blev kaldt herfra.
+            if (e.target.id === 'shop-discard-overlay') audio.play('overlay_close');
             const ov = this._el.querySelector('#shop-discard-overlay');
             ov.style.animation = 'screen-fade-out 0.15s ease-in forwards';
             ov.style.pointerEvents = 'none';
@@ -153,6 +164,7 @@ export class ShopScreen {
             if (pack.bought || pack.choices.length === 0) return;
             const cost = this._price(pack.basePrice, 'pack');
             if (!this._gs.canAfford(cost)) return;
+            audio.play('purchase');
             this._gs.score -= cost;
             this._ui.showScoreDeduct(cost);
             this._ui.setScore(this._gs.score);
@@ -242,6 +254,7 @@ export class ShopScreen {
 
             const capPrice = this._price(item.basePrice, 'cap');
             if (this._gs.buyCap(item.def, capPrice, item.enchant ?? null)) {
+                audio.play('purchase');
                 this._ui.showScoreDeduct(capPrice);
                 this._ui.flashBagBtn();
                 item.bought = true;
@@ -458,6 +471,13 @@ export class ShopScreen {
         this._renderPackScreen(pack, idx);
         this._titleUnwatch = watchRewardTitleSpacing(this._packEl);
 
+        // ★ er allerede trukket fra på dette tidspunkt (se click-handleren der kaldte
+        // _showPackScreen) — går man til main menu herfra uden at vælge/skippe først,
+        // nulstiller ShopScreen.enter() bare _pendingPack, og pakken dukker op igen som
+        // ubrugt uden at pengene refunderes. Skjul pause-knappen mens pakken er åben,
+        // genvis den ved alle 3 lukke-veje nedenfor (skip/pick/exit()).
+        document.getElementById('pause-btn').style.display = 'none';
+
         this._packEl.addEventListener('click', e => {
             if (e.target.closest('#pack-skip-btn')) {
                 this._packs[idx].bought = true;
@@ -466,6 +486,7 @@ export class ShopScreen {
                 this._titleUnwatch = null;
                 this._packEl?.remove();
                 this._packEl = null;
+                document.getElementById('pause-btn').style.display = '';
                 this._render();
                 return;
             }
@@ -570,6 +591,7 @@ export class ShopScreen {
             card.classList.add('reward-card--entering');
             card.style.animationDelay = `${delay}ms`;
             setTimeout(() => card.classList.remove('reward-card--entering'), delay + 420);
+            setTimeout(() => audio.playChoiceReveal(), delay);
         });
         this._packEl.style.animation = 'screen-fade-in 0.2s ease-out forwards';
     }
@@ -627,6 +649,7 @@ export class ShopScreen {
         this._titleUnwatch = null;
         this._packEl?.remove();
         this._packEl = null;
+        document.getElementById('pause-btn').style.display = '';
         this._render();
     }
 
@@ -809,7 +832,7 @@ export class ShopScreen {
 
     <!-- Højre: actions -->
     <div class="shop-actions">
-      <button id="shop-discard-btn" class="shop-remove-btn ${canDiscard ? '' : 'cant-afford'}">
+      <button id="shop-discard-btn" class="shop-remove-btn ${canDiscard ? '' : 'cant-afford'}" ${canDiscard ? 'data-sfx="overlay_open"' : ''}>
         <div class="shop-remove-top">
           <div class="shop-skull-box">💀</div>
           <span>REMOVE CAPS</span>
@@ -832,7 +855,7 @@ export class ShopScreen {
   <div class="discard-panel">
     <div class="discard-header">
       <span class="discard-title">Remove a cap</span>
-      <button id="shop-discard-close" class="discard-close-btn">✕</button>
+      <button id="shop-discard-close" class="discard-close-btn" data-sfx="overlay_close">✕</button>
     </div>
     <p class="discard-cost-label">Costs ${gs.destroyCost}★ · doubles each use</p>
     <div class="discard-grid">${this._buildDiscardGrid()}</div>
@@ -958,6 +981,7 @@ export class ShopScreen {
         if (!item || item.bought) return;
         const price = this._price(item.basePrice, 'cap');
         if (this._gs.buyCap(item.def, price, item.enchant ?? null)) {
+            audio.play('purchase');
             this._ui.showScoreDeduct(price);
             this._ui.flashBagBtn();
             item.bought = true;
@@ -992,6 +1016,7 @@ export class ShopScreen {
             if (result.reason === 'no_room') this._flashNoRoom(bandItem);
             return;
         }
+        audio.play('purchase');
         this._ui.showScoreDeduct(result.price);
         item.bought = true;
         if (this.onConsumableAdded) this.onConsumableAdded(result.slot);
@@ -1005,6 +1030,10 @@ export class ShopScreen {
 
     _doDiscard(entry) {
         if (!this._gs.canAfford(this._gs.destroyCost)) return;
+        // TODO: egen discard-lyd, IKKE 'purchase' (kasseapparat-blingen hører kun
+        // til rigtige "erhverv"-køb: caps/kort fra båndet og pakker) — se
+        // docs/særskilte md'er for 13. juli/13juli_audio-sfx-bgm-draft.md, tilføj
+        // en 'discard'-entry til SFX_DEFS når filen er lavet.
 
         const overlay = this._el?.querySelector('#shop-discard-overlay');
         const capEl   = overlay?.querySelector(`[data-cap-id="${entry.id}"]`)

@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
@@ -566,6 +567,10 @@ export class RewardScreen {
             card.classList.add('reward-card--entering');
             card.style.animationDelay = `${delay}ms`;
             setTimeout(() => card.classList.remove('reward-card--entering'), delay + 420);
+            // Én "choice reveal"-lyd pr. kort, timet til samme stagger som selve
+            // pop-in-animationen. Chest/mystery har kun ét kort (i=0) → spilles
+            // bare med det samme, ingen særlig håndtering nødvendig.
+            setTimeout(() => audio.playChoiceReveal(), delay);
         });
 
         // innerHTML ovenfor genskaber .reward-title-box hver gang _render()

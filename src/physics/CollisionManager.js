@@ -1,16 +1,47 @@
+import { audio } from '../audio/AudioManager.js';
+
+// Cap-landingslyd — tunbare konstanter. MIN_VELOCITY filtrerer rullende/
+// glidende caps der bare strejfer gulvet (STILL_LINEAR i constants.js er 0.7,
+// "i ro" — landinger skal være tydeligt kraftigere end det for at tælle).
+// COOLDOWN_MS er en global debounce på TVÆRS af alle caps, så 15 caps der
+// lander inden for få ms af hinanden ikke bliver til en grødet lydvæg.
+const CAP_LAND_MIN_VELOCITY = 2.5;
+const CAP_LAND_COOLDOWN_MS  = 40;
+
 export class CollisionManager {
     constructor(world) {
-        this._active      = false;
-        this.pendingBlast = false;
-        this.pendingMiss  = false;
-        this.onBlast      = null;
-        this.onMiss       = null;
+        this._active          = false;
+        this.pendingBlast      = false;
+        this.pendingMiss       = false;
+        this.onBlast           = null;
+        this.onMiss            = null;
+        this._lastLandSoundAt  = 0;
         world.addEventListener('beginContact', (event) => {
-            if (!this._active) return;
             const { bodyA, bodyB } = event;
             const isSlammer = (b) => b.userData?.kind === 'slammer';
             const isCap     = (b) => b.userData?.kind === 'cap';
             const isGround  = (b) => b.userData?.kind === 'ground';
+
+            // Cap-landing — kører UAFHÆNGIGT af _active (den er kun sand i det
+            // korte vindue inden slammerens EGEN første kontakt; caps rammer
+            // gulvet resten af settle-fasen, længe efter _active er slukket).
+            // hasLanded nulstilles pr. cap ved hvert nyt kast, se
+            // ThrowController._blast(). Sættes FØR hastigheds-/cooldown-tjek —
+            // "første kontakt" gælder uanset om selve lyden rent faktisk spiller.
+            const capBody    = isCap(bodyA) ? bodyA : (isCap(bodyB) ? bodyB : null);
+            const groundBody = isGround(bodyA) ? bodyA : (isGround(bodyB) ? bodyB : null);
+            if (capBody && groundBody && !capBody.userData.hasLanded) {
+                capBody.userData.hasLanded = true;
+                if (Math.abs(capBody.velocity.y) > CAP_LAND_MIN_VELOCITY) {
+                    const now = performance.now();
+                    if (now - this._lastLandSoundAt > CAP_LAND_COOLDOWN_MS) {
+                        this._lastLandSoundAt = now;
+                        audio.play(`cap_land_${1 + Math.floor(Math.random() * 8)}`);
+                    }
+                }
+            }
+
+            if (!this._active) return;
             if (!this.pendingBlast &&
                 ((isSlammer(bodyA) && isCap(bodyB)) || (isSlammer(bodyB) && isCap(bodyA)))) {
                 this.pendingBlast = true;

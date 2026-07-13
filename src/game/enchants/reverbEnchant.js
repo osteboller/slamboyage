@@ -9,5 +9,6 @@ export function reverbEnchant(cap, ctx, base) {
         bonus:         base.bonus + (second.bonus ?? 0),
         returnToStack: base.returnToStack || (second.returnToStack ?? false),
         spawnCaps:     [...(base.spawnCaps ?? []), ...(second.spawnCaps ?? [])],
+        instantSpawn:  [...(base.instantSpawn ?? []), ...(second.instantSpawn ?? [])],
     };
 }
