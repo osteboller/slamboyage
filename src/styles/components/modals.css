@@ -294,11 +294,6 @@
     margin-left: 3px;
 }
 
-#cap-detail.cap-detail--lit {
-    border-color: #f5c842;
-    box-shadow: var(--shadow-raised), 0 0 0 2px rgba(245,200,66,0.25);
-}
-
 #cap-detail-rarity {
     display: none;
     position: absolute;

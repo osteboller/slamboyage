@@ -121,6 +121,57 @@
     flex-shrink: 0;
 }
 
+/* Volume-slidere (SFX + Music) */
+.pause-volume {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 2px dashed var(--border-ink);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.pause-volume-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.pause-volume-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-primary);
+    width: 48px;
+    flex-shrink: 0;
+}
+.pause-volume-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    background: var(--border-ink);
+    border: 2px solid var(--border-ink);
+    cursor: pointer;
+}
+.pause-volume-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--clr-bg-panel);
+    border: 3px solid var(--border-ink);
+    cursor: pointer;
+}
+.pause-volume-row input[type="range"]::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--clr-bg-panel);
+    border: 3px solid var(--border-ink);
+    cursor: pointer;
+}
+
 /* Footer */
 .pause-footer {
     margin-top: 1.25rem;
