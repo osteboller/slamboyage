@@ -74,6 +74,16 @@
                 <button id="pause-fullscreen"><span class="pause-btn-icon">⛶</span>Fullscreen</button>
                 <button id="pause-mainmenu"><span class="pause-btn-icon">⌂</span>Main Menu</button>
             </div>
+            <div class="pause-volume">
+                <label class="pause-volume-row">
+                    <span class="pause-volume-label">SFX</span>
+                    <input type="range" id="pause-vol-sfx" min="0" max="100" step="1" value="100">
+                </label>
+                <label class="pause-volume-row">
+                    <span class="pause-volume-label">Music</span>
+                    <input type="range" id="pause-vol-bgm" min="0" max="100" step="1" value="60">
+                </label>
+            </div>
             <div class="pause-footer">V 0.4 // SLAMBERZ_OS</div>
         </div>
     </div>
@@ -336,6 +346,7 @@
     </div>
 
     <script src="three.min.js"></script>
+    <script src="lib/howler.min.js"></script>
     <script type="module" src="src/main.js"></script>
     <script>
         const btn = document.getElementById('fullscreen-btn');
