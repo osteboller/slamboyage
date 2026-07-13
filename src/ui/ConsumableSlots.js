@@ -194,14 +194,19 @@ export class ConsumableSlots {
         this._ui.setDetailBackdrop(false);
     }
 
+    // Fjerner IKKE længere kortet fra slottet her — nogle konsumables (clone/
+    // transform/enchant) beder om et ekstra valg via ui.showCapPicker() FØR deres
+    // egentlige effekt sker. Blev kortet konsumeret med det samme (som før), gik
+    // det tabt uden effekt hvis man lukkede den picker eller navigerede væk mens
+    // den stod åben. main.js's onUse-håndtering kalder nu selv gameState.
+    // useConsumable(idx) + refresh() PRÆCIS når effekten reelt udføres — se
+    // 'consume()'-hjælperen der.
     _doUse() {
         if (this._openSlot === null) return;
         const idx = this._openSlot;
         const def = this._gs.consumables[idx];
         if (!def) return;
-        this._gs.useConsumable(idx);
         this._closePopup();
-        this.refresh();
         if (this.onUse) this.onUse(def, idx);
     }
 

@@ -28,9 +28,13 @@ export function capThumbnailHTML(entry, opts = {}) {
     const enchant = entry.enchant ?? null;
     const id      = entry.id;
 
+    // data-sfx="cap_select" her (ikke pr. kaldested) — denne helper er det ene
+    // fælles sted ALLE cap-thumbnails i hele spillet renderes igennem (collection,
+    // pile-overlay, shop, reward, packs osv.), så pokerjeton-klikket dækker dem
+    // automatisk allesammen uden at hvert kaldested selv skal huske det.
     if (!def?.texFront) {
         const hex = '#' + ((def?.color ?? 0xaaaaaa) >>> 0).toString(16).padStart(6, '0');
-        return `<span class="cap-enchant-wrap ${wrapClass}" title="${def?.name ?? ''}"
+        return `<span class="cap-enchant-wrap ${wrapClass}" title="${def?.name ?? ''}" data-sfx="cap_select"
                      style="background:${hex};opacity:${dimmed ? 0.55 : 1}" ${extraAttrs}></span>`;
     }
 
@@ -42,7 +46,7 @@ export function capThumbnailHTML(entry, opts = {}) {
 
     const idFrag = id != null ? `${idAttr}="${id}"` : '';
 
-    return `<div class="cap-enchant-wrap ${wrapClass}" ${idFrag}` +
+    return `<div class="cap-enchant-wrap ${wrapClass}" ${idFrag} data-sfx="cap_select"` +
            ` title="${def.name}" ${dimmed ? 'data-dimmed="true"' : ''} ${extraAttrs}>` +
            `<img class="${imgClass}" src="${def.texFront}" alt="${def.name}">` +
            `${overlayHTML}${innerHTML}</div>`;

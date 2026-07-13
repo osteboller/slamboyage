@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { DEFAULT_MASS, STACK_COUNT, SLAMMER_DEFS, CAP_DEFS, THROWS_PER_ROUND } from '../config/constants.js';
 import { CapViewer }      from './CapViewer.js';
 import { effectName, effectDesc } from '../game/effects/labels.js';
@@ -188,6 +189,10 @@ export class UIManager {
             el.classList.add('effect-indicator--exhaust');
             el.textContent = meta.count > 0 ? `💤×${meta.count}` : '💤';
             setTimeout(() => el.remove(), 1000);
+        } else if (meta.type === 'husk') {
+            el.classList.add('effect-indicator--husk');
+            el.textContent = '🕳️';
+            setTimeout(() => el.remove(), 1100);
         }
     }
 
@@ -388,12 +393,15 @@ export class UIManager {
     // label = hvad "count" tæller (default 'unused', matcher Iron Discipline's
     // "+N unused" kast-tekst) — Sharden/Balance sender deres eget label ind
     // ('unused Shard(s)'/'round at max stack'), da "unused" alene ikke giver mening der.
-    showRelicGain(icon, oldValue, newValue, count, label = 'unused') {
+    // texFront: slammerens EGET portræt (samme billede som bruges i shop/collection),
+    // ikke passivens lille symbol-ikon — så spilleren kan se HVILKEN slammer der voksede
+    // uden at skulle huske symbolet. Falder tilbage til et tomt cirkel-ikon hvis manglende.
+    showRelicGain(texFront, oldValue, newValue, count, label = 'unused') {
         const el = document.createElement('div');
         el.className = 'relic-gain-sticker';
         el.innerHTML = `
             <div class="relic-gain-top">
-                <span class="relic-gain-icon">${icon}</span>
+                <img class="relic-gain-icon" src="${texFront ?? ''}">
                 <span class="relic-gain-throws">+${count} ${label}</span>
             </div>
             <div class="relic-gain-row">
@@ -410,12 +418,12 @@ export class UIManager {
     // multiplier (fx Balance) brydes og falder tilbage til ×1.0, så spilleren
     // kan SE hvorfor den pludselig er væk i stedet for bare at opdage det
     // ved et tilfælde. Samme sticker, rødtonet i stedet for gyldent.
-    showRelicReset(icon, oldValue) {
+    showRelicReset(texFront, oldValue) {
         const el = document.createElement('div');
         el.className = 'relic-gain-sticker relic-gain-sticker--reset';
         el.innerHTML = `
             <div class="relic-gain-top">
-                <span class="relic-gain-icon">${icon}</span>
+                <img class="relic-gain-icon" src="${texFront ?? ''}">
                 <span class="relic-gain-throws">↺ reset</span>
             </div>
             <div class="relic-gain-row">
@@ -910,6 +918,11 @@ export class UIManager {
         if (bagBtn) {
             bagBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                // stopPropagation ovenfor forhindrer klikket i at nå AudioManagers
+                // globale, delegerede click-lytter på document (den fanger den
+                // ellers automatisk for alle <button>-elementer) — derfor et
+                // eksplicit kald her i stedet.
+                audio.play('button_click');
                 this.openCollection('caps');
             });
         }
@@ -1036,6 +1049,7 @@ export class UIManager {
         if (existing) existing.remove();
         const gs = this._gameState;
         if (!gs) return;
+        audio.play('overlay_open');
 
         const capsHTML = gs.ownedCaps.map(({ id, def, enchant }) => {
             const effectLabel = def.effect ? effectName(def.effect) : null;
@@ -1090,6 +1104,7 @@ export class UIManager {
             </div>`;
 
         const closeOverlay = () => {
+            audio.play('overlay_close');
             overlay.style.animation = 'screen-fade-out 0.18s ease-in forwards';
             overlay.style.pointerEvents = 'none';
             setTimeout(() => overlay.remove(), 180);
@@ -1191,6 +1206,24 @@ export class UIManager {
         overlay.addEventListener('pointerdown', e => {
             if (e.target === overlay) hide();
         });
+
+        // Volume-slidere — sat til de gemte værdier (localStorage via AudioManager,
+        // se _loadVolumes()) med det samme, ikke først når overlayet åbnes, så de
+        // altid matcher rent faktisk gældende volumen fra allerførste render.
+        const sfxSlider = document.getElementById('pause-vol-sfx');
+        const bgmSlider = document.getElementById('pause-vol-bgm');
+        sfxSlider.value = Math.round(audio.getSfxVolume() * 100);
+        bgmSlider.value = Math.round(audio.getBgmVolume() * 100);
+        // 'input' (ikke 'change') — live opdatering mens man trækker i sliderne,
+        // ikke først når man slipper.
+        sfxSlider.addEventListener('input', () => audio.setSfxVolume(sfxSlider.value / 100));
+        bgmSlider.addEventListener('input', () => audio.setBgmVolume(bgmSlider.value / 100));
+        // Sliderne ligger inde i #pause-panel, som allerede bruger bindTapSelect
+        // (se ovenfor) til at undgå at scroll-forsøg fejlfortolkes som knap-tryk —
+        // men det gælder KUN 'button'-elementer. Range-input skal kunne modtage
+        // pointerdown uden at det boble videre til noget der lukker overlayet.
+        sfxSlider.addEventListener('pointerdown', e => e.stopPropagation());
+        bgmSlider.addEventListener('pointerdown', e => e.stopPropagation());
     }
 
     // ─── DETAIL BACKDROP ─────────────────────────────────────────────────────
@@ -1318,7 +1351,6 @@ export class UIManager {
             rarityEl.textContent = label;
         }
 
-        detail.classList.toggle('cap-detail--lit', lit);
         detail.classList.toggle('cap-detail--side', !!opts.side);
 
         if (action) {
