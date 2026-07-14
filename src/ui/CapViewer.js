@@ -1,3 +1,4 @@
+import { audio } from '../audio/AudioManager.js';
 import { POG_R, POG_H, SLAM_H, ENCHANT_OVERLAY_OPACITY } from '../config/constants.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 
@@ -92,15 +93,18 @@ export class CapViewer {
 
     async show(def, type = 'cap', enchant = null) {
         const id = ++this._loadId;
+        audio.play('detail_open');
         this._visible = true;
 
-        // Cap-detail-redesignet (7. juli) strammede cap-kameraets framing for
-        // bedre fyld af viewer-rammen (~72%→~85%) — kun caps, IKKE slammere
-        // (separat, senere opgave). Sat pr. show()-kald i stedet for i
-        // konstruktøren, da CapViewer er en DELT klasse — både _capViewer og
-        // _slammerViewer i UIManager er instanser af den samme klasse, så en
-        // konstruktør-ændring ville utilsigtet have ramt begge.
-        this._camera.position.z = type === 'slammer' ? 4 : 3.3;
+        // Cap-detail-redesignet (7. juli) strammede kameraets framing for bedre
+        // fyld af viewer-rammen (~72%→~85%). Gjaldt oprindeligt kun caps — nu
+        // udvidet til også slammere (13. juli, samme radius POG_R på begge
+        // mesh-typer, så samme afstand giver samme fyld-procent). Sat pr.
+        // show()-kald i stedet for i konstruktøren, da CapViewer er en DELT
+        // klasse — både _capViewer og _slammerViewer i UIManager er instanser
+        // af den samme klasse, så en konstruktør-ændring ville utilsigtet have
+        // ramt begge (var netop grunden til at det blev udsat første gang).
+        this._camera.position.z = 3.3;
 
         // Stop old loop and clear canvas immediately — prevents old cap flashing
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
@@ -181,6 +185,12 @@ export class CapViewer {
     }
 
     hide() {
+        // GUARD er vigtig her — UIManager's globale "luk alt"-lytter kalder
+        // hide() UBETINGET på ethvert klik i hele spillet, uanset om en viewer
+        // overhovedet var åben. Uden dette tjek ville lyden spille på stort
+        // set hvert eneste klik i spillet (samme fælde som setDetailBackdrop
+        // stødte på tidligere i denne session).
+        if (this._visible) audio.play('detail_close');
         this._visible = false;
         if (this._animId) { cancelAnimationFrame(this._animId); this._animId = null; }
     }

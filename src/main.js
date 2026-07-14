@@ -2,6 +2,7 @@ import { audio }            from './audio/AudioManager.js';
 import { PhysicsEngine }    from './physics/PhysicsEngine.js';
 import { CollisionManager } from './physics/CollisionManager.js';
 import { RenderEngine }     from './render/RenderEngine.js';
+import { MenuBackground }   from './render/MenuBackground.js';
 import { CameraController } from './render/CameraController.js';
 import { loadTextures }     from './render/TextureLoader.js';
 import { InputManager }     from './input/InputManager.js';
@@ -112,6 +113,7 @@ consumables.onUse = (def, idx) => {
             ui.showCapPicker('Pick a cap to enchant', caps, entry => {
                 const pool = ENCHANT_DEFS.filter(e => e.id !== entry.enchant);
                 const enchantDef = pool[Math.floor(Math.random() * pool.length)];
+                audio.play('enchant');
                 gameState.applyEnchant(entry.id, enchantDef.id);
                 if (currentScreenName === 'battle') {
                     roundMgr.updateLiveCapEnchant(entry.id, enchantDef.id);
@@ -156,7 +158,11 @@ setTimeout(() => { loadingScreen.style.display = 'none'; }, 400);
 let currentScreen     = null;
 let currentScreenName = 'start';
 let returnToAfterMap  = 'start'; // hvor MAP-back-knappen sender brugeren hen
-const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState, consumables };
+// Egen scene/kamera (se MenuBackground.js) — genbruger kun renderer'en/canvas'et,
+// aldrig render.scene/render.camera, så et dekorativt mesh aldrig kan lække ind
+// i selve gameplayet.
+const menuBackground = new MenuBackground(render.renderer, texCache);
+const deps = { physics, render, cam, collisions, input, ui, powerBar, throwCtrl, roundMgr, gameState, consumables, menuBackground };
 
 const startScreen     = new StartScreen(deps);
 const mapScreen       = new MapScreen(deps);
@@ -228,7 +234,10 @@ document.body.appendChild(transitionCover);
 function goToNode(node) {
     returnToAfterMap = 'start';
     if (node.type === 'slammer') showScreen('slammer-choice', node);
-    else                         showScreen('battle', node);
+    else {
+        audio.play('enter_battle');
+        showScreen('battle', node);
+    }
 }
 
 function showScreen(name, context = null) {
@@ -268,7 +277,7 @@ function showScreen(name, context = null) {
             const node = context?.__resume ? context.node : context;
             audio.playBGM(node?.boss ? 'boss' : 'battle');
         } else {
-            const bgmByScreen = { start: 'menu', map: 'battle', shop: 'shop', 'boss-shop': 'shop' };
+            const bgmByScreen = { start: 'menu', map: 'battle', shop: 'shop', 'boss-shop': 'shop', 'run-end': 'failed_run' };
             if (bgmByScreen[name]) audio.playBGM(bgmByScreen[name]);
         }
 

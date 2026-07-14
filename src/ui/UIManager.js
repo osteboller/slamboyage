@@ -73,6 +73,7 @@ export class UIManager {
         valEl.className   = 'score-float-val';
         valEl.textContent = `+${baseAmount}`;
         el.appendChild(valEl);
+        audio.play('point_base');
 
         if (chain.length > 0) {
             el.classList.add('has-multiplier');
@@ -106,6 +107,7 @@ export class UIManager {
                     multEl.classList.remove('visible');
                     void multEl.offsetWidth;
                     multEl.classList.add('visible');
+                    audio.play('point_multi');
                 }, revealAt);
 
                 setTimeout(() => {
@@ -567,14 +569,37 @@ export class UIManager {
     }
 
     showRunOverlay() {
-        document.getElementById('tl-overlay').style.display    = '';
-        document.getElementById('score-display').style.display = '';
-        document.getElementById('pause-btn').style.display     = '';
+        document.getElementById('tl-overlay').style.display     = '';
+        document.getElementById('score-display').style.display  = '';
+        document.getElementById('pause-btn').style.display      = '';
+        document.getElementById('bottom-bar').style.display     = '';
+        // #power-container SKAL gendannes her — PowerBar.enable() (som normalt
+        // ville gøre dette) kaldes kun ÉN gang nogensinde, ved selve app-boot
+        // (main.js), aldrig igen pr. kamp. Direkte DOM-skjul i hideRunOverlay()
+        // uden en tilsvarende gendannelse her betød at power-baren forsvandt
+        // for evigt efter første besøg på hovedmenuen — fanget efter test.
+        // 'block' (IKKE '') — CSS-standarden for #power-container ER selv
+        // display:none (modsat #bottom-bar's flex-standard), så '' ville bare
+        // falde tilbage til den samme none og reelt intet ændre.
+        document.getElementById('power-container').style.display = 'block';
     }
+    // #bottom-bar (pile-knapper/status/prompt) er z-index:90 og var altid
+    // beregnet til bare at blive visuelt DÆKKET af en uigennemsigtig skærm
+    // (z:200) ovenpå — aldrig rigtigt skjult. Det holdt fint indtil
+    // #start-screen blev gennemsigtig (MenuBackground.js) og lod den bløde
+    // igennem. 'start' er den ENESTE ikke-RUN_SCREEN i routeren, så denne
+    // udvidelse rammer udelukkende den skærm.
+    // #results skal (modsat #power-container) IKKE automatisk vises igen i
+    // showRunOverlay() — dens egen specifikke spil-logik (showResults() efter
+    // et kast) styrer allerede præcis hvornår den skal frem, og gør det
+    // pålideligt hver gang uafhængigt af denne generelle skærm-toggle.
     hideRunOverlay() {
+        document.getElementById('power-container').style.display = 'none';
+        document.getElementById('results').style.display         = 'none';
         document.getElementById('tl-overlay').style.display    = 'none';
         document.getElementById('score-display').style.display = 'none';
         document.getElementById('pause-btn').style.display     = 'none';
+        document.getElementById('bottom-bar').style.display    = 'none';
     }
 
     setRunInfo(nodeName, clearScore) {

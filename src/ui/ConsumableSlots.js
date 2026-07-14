@@ -1,3 +1,5 @@
+import { audio } from '../audio/AudioManager.js';
+
 export class ConsumableSlots {
     constructor({ gameState, ui }) {
         this._gs         = gameState;
@@ -77,6 +79,7 @@ export class ConsumableSlots {
         const idx = parseInt(slotEl.dataset.slot, 10);
         if (this._openSlot === idx) { this._closePopup(); return; }
         this._openSlot = idx;
+        audio.playCardPlace();
         this._showPopup(idx);
     }
 

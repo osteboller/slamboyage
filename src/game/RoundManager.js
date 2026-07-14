@@ -690,6 +690,7 @@ export class RoundManager {
                     this._render.removeMesh(target.mesh);
                     this._physics.world.removeBody(target.body);
                     this._ui.popStackIcon(target.def);
+                    audio.play('exhaust');
                 }, i * EXHAUST_DRIP_MS);
             });
         });
@@ -778,6 +779,7 @@ export class RoundManager {
             const startAt = (step - 1) * 220;
             surgeLandDelay.set(cap, startAt + SURGE_SPIN_MS + 120);
             this.delay(() => {
+                audio.playCapFlipper();
                 this._render.animateCapFlipSpin(cap.mesh, 3, SURGE_SPIN_MS, () => {
                     const euler = new Vec3();
                     cap.body.quaternion.toEuler(euler);
@@ -849,6 +851,7 @@ export class RoundManager {
 
             this.delay(() => {
                 newCap.mesh.visible = true;
+                audio.playCapFlipper();
                 this._render.animateCapMaterialize(newCap.mesh, endFaceUp, 3, SPAWN_FALL_MS, () => {
                     // Snapper body-quaternion til den faktiske landing — IKKE fjernet her
                     // ved miss, den bliver liggende synligt til næste kast rydder den
@@ -1403,10 +1406,13 @@ export class RoundManager {
             // "poof"-ring i selve battle-viewet i stedet for en sticker-overlay.
             this._render.spawnEffectRing(worldPos, 2.5, 0x1a1a1a, 350, 300);
             this._render.spawnEffectRing(worldPos, 1.2, 0xff4444, 250, 250);
+            audio.play('destroy');
         } else if (meta.type === 'exhaust') {
             // Midlertidig fjernelse (kun denne runde) — grå/tåget ring, bevidst
             // adskilt fra destroys mørke/røde, matcher VERY_NEARBY_RADIUS (det er
-            // derfra targets faktisk blev fundet).
+            // derfra targets faktisk blev fundet). Selve lyden spilles IKKE her —
+            // den skal følge drypvis-fjernelsen pr. cap, se EXHAUST_DRIP_MS-loopet
+            // ovenfor, ikke denne ene ring der vises for hele gruppen på én gang.
             this._render.spawnEffectRing(worldPos, VERY_NEARBY_RADIUS, 0x888899, 600, 400);
         }
         this._ui.showEffectIndicator(screenX, screenY, meta);

@@ -162,6 +162,12 @@ export class ThrowController {
             this._cam.triggerShake(0.5 + t * 2.0, 250 + t * 400);
         }
 
+        // Caps med en usædvanligt høj r (kastet usædvanligt "vildt" afsted) samles
+        // op undervejs, så vi bagefter kan lade et par stykker af dem (ikke alle —
+        // ville blive en lydvæg ved store stacks) spille en ambient swoosh-lyd,
+        // se afspilningen efter løkken nedenfor.
+        const wildIndices = [];
+
         this._caps.forEach(({ body }, i) => {
             body.type           = BODY_TYPES.DYNAMIC;
             body.linearDamping  = SETTLE.AIR_LINEAR;
@@ -173,6 +179,7 @@ export class ThrowController {
 
             const angle = (i / this._caps.length) * Math.PI * 2 + (Math.random() - 0.5) * 1.5;
             const r     = 0.6 + Math.random() * 0.9;
+            if (r > 1.2) wildIndices.push(i);
 
             body.velocity.x = Math.cos(angle) * force * r;
             body.velocity.z = Math.sin(angle) * force * r;
@@ -181,6 +188,17 @@ export class ThrowController {
             body.angularVelocity.x = (Math.random() - 0.5) * force * 1.8;
             body.angularVelocity.z = (Math.random() - 0.5) * force * 1.8;
             body.angularVelocity.y = (Math.random() - 0.5) * force * 0.4;
+        });
+
+        // Maks 3 swoosh'er pr. blast, uanset hvor mange caps der kvalificerer —
+        // ren atmosfære, ikke en 1:1 fysik-event pr. cap (se AudioManager.playCapSwoosh()).
+        const MAX_SWOOSH_PER_BLAST = 3;
+        for (let n = wildIndices.length - 1; n > 0; n--) {
+            const j = Math.floor(Math.random() * (n + 1));
+            [wildIndices[n], wildIndices[j]] = [wildIndices[j], wildIndices[n]];
+        }
+        wildIndices.slice(0, MAX_SWOOSH_PER_BLAST).forEach(() => {
+            setTimeout(() => audio.playCapSwoosh(), Math.random() * 150);
         });
     }
 
