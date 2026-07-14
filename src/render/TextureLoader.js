@@ -1,4 +1,4 @@
-import { CAP_DEFS, SLAMMER_DEFS } from '../config/constants.js';
+import { CAP_DEFS, SLAMMER_DEFS, HUSK_CAP_DEF } from '../config/constants.js';
 
 function createKnurlTexture(rimColor) {
     const canvas = document.createElement('canvas');
@@ -28,6 +28,11 @@ export async function loadTextures(onProgress) {
     const urls = [
         ...CAP_DEFS.flatMap(d => [d.texFront, d.texBack]),
         ...SLAMMER_DEFS.flatMap(d => [d.texFront, d.texBack]),
+        // Husk er BEVIDST ikke i CAP_DEFS (kan ikke trækkes tilfældigt fra shop/
+        // packs/rewards, se HUSK_CAP_DEF's kommentar i constants.js) — men den kan
+        // stadig dukke op i spillet (Ballast), så dens tekstur skal preloades separat,
+        // ellers falder EntityFactory tilbage til dens flade fallback-farve for altid.
+        HUSK_CAP_DEF.texFront, HUSK_CAP_DEF.texBack,
     ].filter(Boolean);
     const total  = urls.length;
     let   loaded = 0;

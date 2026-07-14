@@ -346,12 +346,14 @@ export class RewardScreen {
                 if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
             }
         }
+        audio.play('pick_gain');
         if (this.onContinue) this.onContinue();
     }
 
     _confirmEnchant(idx) {
         const choice = this._choices[idx];
         if (!choice) return;
+        audio.play('enchant');
         this._gs.applyEnchant(choice.entry.id, choice.enchantDef.id);
         this._ui.showEnchantResult(choice.enchantDef, choice.entry);
         if (this.onContinue) this.onContinue();
@@ -373,6 +375,7 @@ export class RewardScreen {
                 this._gs.score += item.amount;
             }
         }
+        audio.play('pick_gain');
         if (this.onContinue) this.onContinue();
     }
 
@@ -387,6 +390,7 @@ export class RewardScreen {
             const oldDef = a.entry.def;
             const live   = this._gs.ownedCaps.find(c => c.id === a.entry.id);
             if (live) live.def = a.newDef;
+            audio.play('pick_gain');
             this._ui.showTransformResult(oldDef, a.newDef, () => { if (this.onContinue) this.onContinue(); });
             return;
         }
@@ -395,6 +399,7 @@ export class RewardScreen {
             // Rent bytte — ingen sælg-refusion, jf. sellSlammer ville give score oveni
             this._gs.ownedSlammers = this._gs.ownedSlammers.filter(s => s.name !== a.entry.name);
             this._gs.addSlammer(a.newDef);
+            audio.play('pick_gain');
             this._ui.showTransformResult(oldDef, a.newDef, () => { if (this.onContinue) this.onContinue(); });
             return;
         }
@@ -415,6 +420,7 @@ export class RewardScreen {
             const result = this._gs.gainCap(a.def);
             if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
         }
+        audio.play('pick_gain');
         if (this.onContinue) this.onContinue();
     }
 

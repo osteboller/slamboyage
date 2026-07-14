@@ -184,6 +184,66 @@ export class RenderEngine {
         requestAnimationFrame(tick);
     }
 
+    // Materialiserer en helt NY cap midt i et kast (fx "Spawn"-effekten) — spawnes
+    // ELEVERET og falder ned med spin, i stedet for at rejse sig/hoppe fra
+    // hvileposition som animateCapFlipSpin gør. endFaceUp er allerede afgjort FØR
+    // kaldet (samme "resultat kendt, skjules af spin undervejs"-mønster som Flipper/
+    // surge selv bruger) og styrer direkte landingsrotationen. capMesh.position.y
+    // SKAL være sat til den ønskede landingshøjde af kalderen før dette kald.
+    // Kalder onDone() når animationen er færdig.
+    animateCapMaterialize(capMesh, endFaceUp, spins = 3, durationMs = 900, onDone, dropHeight = 4.8) {
+        // Nulstiller HELE rotationen til en ren, IKKE-sammensat tilstand FØR vi
+        // læser start-værdier. capMesh.quaternion blev tidligere sat direkte fra
+        // en Cannon-quaternion der repræsenterer en SAMMENSAT rotation (X-flip +
+        // Y-spin på én gang, se RoundManager). At kun nulstille rotation.x bagefter
+        // og genbruge det EKSISTERENDE (Euler-dekomponerede) rotation.y var ikke
+        // nok — Euler-dekomponering af en sammensat rotation giver ikke en "ren"
+        // Y-komponent man kan regne isoleret videre på; resultatet var uforudsigeligt
+        // (så nogle gange rigtigt ud, andre gange landede den synligt med forkert
+        // side opad, selvom scoringen internt var korrekt). .set(x,y,z) sætter
+        // derimod ALLE tre akser direkte, ikke-sammensat — X/Z garanteret 0, Y en
+        // helt ny, ren spin-værdi (den kosmetiske startrotation er ligegyldig for
+        // om den ender rigtigt). Mesh'et er usynligt indtil faldet starter (se
+        // RoundManager), så der er intet visuelt spring ved at nulstille her.
+        capMesh.rotation.set(0, Math.random() * Math.PI * 2, 0);
+        const startX = 0;
+        const startY = capMesh.rotation.y;
+        const startZ = 0;
+        const baseY  = capMesh.position.y;
+        // 0 = lander face-up, ét halvt spin = lander face-down — plus N fulde spins for juice
+        const totalAngle = (endFaceUp ? 0 : Math.PI) + spins * Math.PI * 2;
+
+        capMesh.rotation.x = startX;
+        capMesh.userData.skipSync = true;
+        capMesh.position.y = baseY + dropHeight;
+        capMesh.scale.setScalar(0);
+        const start = performance.now();
+
+        const tick = () => {
+            const t = Math.min((performance.now() - start) / durationMs, 1);
+            // Accelererende (gravity-agtigt) fald — i modsætning til animateCapFlipSpin's
+            // stig-hover-fald-bue starter denne allerede oppe og falder bare ned.
+            const fallEase = t * t;
+            capMesh.position.y = baseY + dropHeight * (1 - fallEase);
+
+            const spinEase = 1 - Math.pow(1 - t, 2.5); // samme "hurtig start, blød landing" som Flipper
+            capMesh.rotation.x = startX + totalAngle * spinEase;
+            capMesh.rotation.y = startY;
+            capMesh.rotation.z = startZ;
+
+            // Pop-in: fuld skala nået efter de første 30% af animationen, så den synligt
+            // materialiserer i stedet for bare at "være der".
+            capMesh.scale.setScalar(Math.min(t / 0.3, 1));
+
+            if (t < 1) { requestAnimationFrame(tick); return; }
+            capMesh.userData.skipSync = false;
+            capMesh.position.y = baseY;
+            capMesh.scale.setScalar(1);
+            onDone?.();
+        };
+        requestAnimationFrame(tick);
+    }
+
     // Smoothly rotates capMesh from its current quaternion to the target euler over durationMs.
     // Bypasses sync() during animation via skipSync flag; calls onDone(finalQuat) when complete.
     animateCapFlip(capMesh, targetEulerXYZ, durationMs, onDone) {

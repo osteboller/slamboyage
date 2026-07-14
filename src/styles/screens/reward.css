@@ -91,6 +91,33 @@
        bagved). 5 er rigeligt headroom over kortenes 1. */
     z-index: 5;
 }
+/* "Juice" pr. reward-type. Holo/enchant genbrugte først Holo Pack-ikonets
+   pack-holo-shift-animation (frem-og-tilbage "swing", ease) 1:1 — det virker
+   fint på det lille kvadratiske ikon, men på en bred titel-boks bliver
+   svinget for langsomt/uroligt at følge. Byttet til samme ÉN-VEJS-teknik som
+   Next Round-knappen (shop.css' shop-next-shift — kun background-position,
+   ingen farver, så keyframen er delt frit): pastel-cyklussen skrevet ud TO
+   gange over en 200%-bred baggrund, animeret lineært i én retning. */
+.reward-title-box--holo {
+    background: linear-gradient(90deg,
+        #ff9a9e 0%, #fad0c4 12.5%, #a1c4fd 25%, #c2e9fb 37.5%,
+        #ff9a9e 50%, #fad0c4 62.5%, #a1c4fd 75%, #c2e9fb 87.5%, #ff9a9e 100%);
+    background-size: 200% 100%;
+    animation: shop-next-shift 4s linear infinite;
+}
+
+/* Resten af den etablerede pack--X-farvekonvention (se shop.css' pakke-
+   ikoner) genbrugt på titel-boksen — solid pastel-baggrund, SORT kant
+   uændret (alle stickers i spillet holder sig til sort kant, kun baggrunden
+   bærer temaet). Ny "mystery"-farve (indigo) og "silver"-farve (kølig grå)
+   opfundet her, da ingen af dem havde en etableret farve i forvejen.  */
+.reward-title-box--relic     { background: #efe3ff; } /* slammer pack — matcher .pack--relic (lilla) */
+.reward-title-box--card      { background: #fff2df; } /* card pack — matcher .pack--card (orange) */
+.reward-title-box--uncommon  { background: #e6e6e6; } /* uncommon-garanteret — matcher .pack--uncommon (grå) */
+.reward-title-box--rare      { background: #ffe0e0; } /* rare-garanteret — matcher .pack--rare (rød) */
+.reward-title-box--mystery   { background: #e2e5f7; } /* mystery — ny indigo-tone */
+.reward-title-box--gold      { background: #fff3cc; } /* gold chest — matcher --clr-gold */
+.reward-title-box--silver    { background: #eceef0; } /* silver chest — ny kølig grå-tone */
 
 .reward-title {
     font-family: 'JetBrains Mono', monospace;
@@ -100,13 +127,6 @@
     letter-spacing: 0.02em;
     text-transform: uppercase;
     margin: 0;
-}
-
-.reward-sub {
-    font-family: 'Space Grotesk', sans-serif;
-    font-size: clamp(10px, 1.8vw, 13px);
-    color: var(--text-secondary);
-    margin: 4px 0 0;
 }
 
 /* Cards grid — kolonner er content-brede (samme "tykkelse" som kiste-kortet i

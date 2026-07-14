@@ -1,3 +1,5 @@
+import { audio } from '../audio/AudioManager.js';
+
 // Egen screen for Trick Shot-forsøg — genbruger den delte 3D-infrastruktur
 // (physics/render/cam/collisions/input/throwCtrl/roundMgr) men holder sin egen
 // enter()/exit()/loop, helt adskilt fra BattleScreens node/free-mode dispatch.
@@ -109,6 +111,7 @@ export class TrickShotScreen {
     }
 
     _showResult(success) {
+        audio.play(success ? 'trickshot_passed' : 'trickshot_failed');
         const panel = document.getElementById('trickshot-result');
         panel.classList.toggle('trickshot-result--success', success);
         panel.classList.toggle('trickshot-result--fail', !success);

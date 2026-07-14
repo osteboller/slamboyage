@@ -1,8 +1,17 @@
 /* ─── START SCREEN ────────────────────────────────────────────────────────── */
+/* Gennemsigtig nok til at MenuBackground.js's svævende caps (renderet på
+   #canvas-container bagved, samme <canvas>/renderer som resten af spillet,
+   se render/MenuBackground.js) skinner blødt igennem — lys i stedet for mørk
+   (matcher --clr-bg, resten af spillets stil), teksten er derfor fortsat mørk
+   ligesom overalt ellers. Dot-grid'en beholdt — den er en del af den etablerede
+   stil, ikke redundant støj.
+   0.86 var alt for kraftigt — caps er I FORVEJEN halvgennemsigtige i selve 3D-
+   scenen (~0.5-0.8 opacity), og de to lag gange sammen (0.65 × (1-0.86) ≈ 9%)
+   gjorde dem reelt usynlige. 0.4 lader markant mere af 3D-laget skinne igennem. */
 #start-screen {
     position: fixed;
     inset: 0;
-    background: var(--clr-bg);
+    background: rgba(249, 249, 249, 0.4);
     background-image: var(--bg-dot-grid);
     background-size: var(--bg-dot-size);
     z-index: 200;

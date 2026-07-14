@@ -3,10 +3,11 @@ import { CAP_DEFS }    from '../config/constants.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 
 export class StartScreen {
-    constructor({ gameState, ui }) {
-        this._gameState    = gameState;
-        this._ui           = ui;
-        this._el           = null;
+    constructor({ gameState, ui, menuBackground }) {
+        this._gameState     = gameState;
+        this._ui            = ui;
+        this._menuBackground = menuBackground;
+        this._el            = null;
         this.onNewRun      = null; // () => {}
         this.onContinueRun = null; // () => {}
         this.onFreeMode    = null; // () => {}
@@ -18,6 +19,7 @@ export class StartScreen {
         this._el.id = 'start-screen';
         document.body.appendChild(this._el);
         this._render();
+        this._menuBackground?.start();
 
         this._el.addEventListener('click', (e) => {
             if (e.target.closest('#start-new-btn')      && this.onNewRun)      this.onNewRun();
@@ -63,6 +65,7 @@ export class StartScreen {
     }
 
     exit() {
+        this._menuBackground?.stop();
         this._el?.remove();
         this._el = null;
     }

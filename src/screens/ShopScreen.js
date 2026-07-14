@@ -433,6 +433,23 @@ export class ShopScreen {
     _render() {
         this._el.innerHTML = this._buildHTML();
         this._ui.setScore(this._gs.score);
+
+        // Pop-lyd pr. bånd-item der rent faktisk animerer ind (kun ved
+        // _justRerolled — se _buildBandHTML()) — itererer this._band direkte
+        // (samme kilde og samme i*90-forsinkelsesformel _buildBandHTML() selv
+        // bruger) i stedet for at læse fra DOM'en, så vi også kan tjekke
+        // item.enchant pr. vare: en allerede-enchantet cap i båndet spiller
+        // 'enchant' i stedet for den almindelige tilfældige pop.
+        if (this._justRerolled) {
+            this._band.forEach((item, i) => {
+                if (item.bought) return; // matcher _buildBandHTML()'s egen skip-betingelse
+                const delay = i * 90;
+                setTimeout(() => {
+                    if (item.enchant) audio.play('enchant');
+                    else audio.playShopPop();
+                }, delay);
+            });
+        }
     }
 
     // ─── PACK SCREEN ──────────────────────────────────────────────────────────
@@ -642,6 +659,7 @@ export class ShopScreen {
                 if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
             }
         }
+        audio.play('pick_gain');
         this._packs[idx].bought = true;
         this._pendingPack = null;
         this._ui.flashBagBtn();

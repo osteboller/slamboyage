@@ -8,6 +8,20 @@ const VOL_STORAGE_KEY = 'slamberz_audio_volumes';
 // end den oprindelige 700ms, men giver rig hurtigere klik-gennem mindre tid
 // til at kollidere med et fade der endnu ikke er færdigt.
 const BGM_FADE_MS = 900;
+// Minimumstid et spor skal have kørt før et NYT playBGM()-kald må afbryde det
+// — uden dette kunne hurtig navigation frem og tilbage mellem shop og map
+// (fx reroll i shoppen, eller bare browse mellem shop/map/battle) få musikken
+// til at flippe mellem shop- og battle-temaet hele tiden i stedet for at få
+// lov at "sætte sig". Et blokeret skifte er bare stille — spiller videre
+// uændret, indtil et SENERE playBGM()-kald rammer efter minimumstiden er gået.
+const MIN_BGM_PLAY_MS = 45000;
+// Debounce'en ovenfor gælder KUN skift mellem disse to spor (i begge
+// retninger) — det var her "flapper frem og tilbage" problemet reelt opstod.
+// menu/boss/failed_run skal stadig altid skifte/fade med det samme, uanset
+// hvor længe det forrige spor har kørt (fx en run der lige er tabt skal
+// høres med det samme, ikke risikere at blive blokeret af et shop/battle-
+// spor der lige er startet).
+const DEBOUNCED_BGM_IDS = new Set(['shop', 'battle']);
 
 // Global lyd-singleton — importér `audio` direkte hvor den skal bruges
 // (`import { audio } from '.../audio/AudioManager.js'`) i stedet for at sende
@@ -45,6 +59,9 @@ class AudioManager {
             this._bgm[id] = new Howl({ src: def.src, loop: true, volume: 0 });
         }
         this._activeBgmId = null;
+        // Tidspunkt det nuværende spor rent faktisk STARTEDE (ikke bare blev
+        // "bedt om" — se MIN_BGM_PLAY_MS-tjekket i playBGM()).
+        this._activeBgmSince = 0;
         // "Generation" pr. spor — bumpes hver gang sporet (gen)startes via
         // next.play() i playBGM(). Et planlagt fade-ud→stop()-kald husker hvilken
         // generation DET tilhørte, og springer stop() over hvis sporet er blevet
@@ -120,13 +137,48 @@ class AudioManager {
         sound.rate(opts.rate ?? (0.80 + Math.random() * 0.40), soundId);
     }
 
+    // Fælles pulje (2 tilfældige varianter) for alt der "popper frem" — reward-
+    // choice-reveal og shoppens bånd-række deler samme lyde. Egne navngivne
+    // metoder (ikke bare rått play() alle steder) så de to sammenhænge kan
+    // adskilles hvis de senere skal lyde forskelligt, uden at røre kaldestederne.
+    _playRandomPop() {
+        const i = 1 + Math.floor(Math.random() * 2);
+        this.play(`pop_${i}`);
+    }
+
     // Kaldes én gang PR. valg der popper frem på skærmen (reward/enchant-reward/
     // chest-reward/mystery-reward/slammer-choice/boss-reward/pack-opening).
-    // Egen navngivet metode (ikke bare et rått play('choice_pop') alle steder)
-    // så evt. fremtidig variation/timing kan ændres ét sted uden at røre
-    // kaldestederne.
     playChoiceReveal() {
-        this.play('choice_pop');
+        this._playRandomPop();
+    }
+
+    // Kaldes én gang PR. cap/kort der popper frem i shoppens bånd-række, se
+    // ShopScreen.js's _render().
+    playShopPop() {
+        this._playRandomPop();
+    }
+
+    // Vælger tilfældigt mellem 4 varianter — kaldes når et fyldt forbrugskort-
+    // slot klikkes og detail-popup'en åbner, se ConsumableSlots.js.
+    playCardPlace() {
+        const i = 1 + Math.floor(Math.random() * 4);
+        this.play(`card_place_${i}`);
+    }
+
+    // Vælger tilfældigt mellem 3 varianter — den vilde spin-animation når en
+    // cap flippes (Flipper/surge) eller materialiserer (spawn), se
+    // RoundManager.js. rate:1 — spin-animationens egen varighed/juice bærer
+    // allerede intensiteten, ingen grund til at sløre den med ekstra pitch.
+    playCapFlipper() {
+        const i = 1 + Math.floor(Math.random() * 3);
+        this.play(`cap_flipper_${i}`, { rate: 1 });
+    }
+
+    // Vælger tilfældigt mellem 3 varianter — ambient "flyver vildt afsted"-lyd
+    // for et par caps pr. blast, se ThrowController._blast().
+    playCapSwoosh() {
+        const i = 1 + Math.floor(Math.random() * 3);
+        this.play(`cap_swosh_${i}`);
     }
 
     // ─── BGM ──────────────────────────────────────────────────────────────────
@@ -147,8 +199,20 @@ class AudioManager {
         const next = this._bgm[id];
         if (!next) return;
 
+        // Det nuværende spor har ikke kørt længe nok endnu — ignorer skiftet
+        // stille, bliv på det nuværende. Gælder kun shop↔battle (se
+        // DEBOUNCED_BGM_IDS) — alle andre spor skifter altid med det samme.
+        // _activeBgmId er null ved den ALLERførste afspilning nogensinde
+        // (intet at afbryde), så den går altid igennem.
+        const now = performance.now();
+        const isDebouncedPair = this._activeBgmId
+            && DEBOUNCED_BGM_IDS.has(this._activeBgmId)
+            && DEBOUNCED_BGM_IDS.has(id);
+        if (isDebouncedPair && now - this._activeBgmSince < MIN_BGM_PLAY_MS) return;
+
         const prevId = this._activeBgmId;
-        this._activeBgmId = id;
+        this._activeBgmId    = id;
+        this._activeBgmSince = now;
 
         Object.entries(this._bgm).forEach(([bid, howl]) => {
             if (bid === id || !howl.playing()) return;
