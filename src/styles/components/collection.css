@@ -95,6 +95,7 @@
 .map-collection-panel[data-tab="caps"]     [data-content="caps"]     { display: flex; flex-direction: column; }
 .map-collection-panel[data-tab="slammers"] [data-content="slammers"] { display: flex; flex-direction: column; }
 .map-collection-panel[data-tab="relics"]   [data-content="relics"]   { display: flex; flex-direction: column; }
+.map-collection-panel[data-tab="binders"]  [data-content="binders"]  { display: flex; flex-direction: column; }
 
 /* ── Cap/slammer grid ───────────────────────────────────────────────────── */
 .col-grid {

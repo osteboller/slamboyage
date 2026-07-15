@@ -5,10 +5,11 @@ import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { effectName } from '../game/effects/labels.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js';
-import { pulseIconRotate } from '../ui/domUtils.js';
+import { pulseIconRotate, startTitleWobble } from '../ui/domUtils.js';
 import { formatScore } from '../ui/formatScore.js';
-import { seriesPillHTML } from '../config/seriesDefs.js';
+import { seriesPillHTML, SERIES_DEFS, getSeriesDef } from '../config/seriesDefs.js';
 import { watchRewardTitleSpacing } from '../ui/rewardTitleSpacing.js';
+import { BINDER_TIERS, pickBinderTier } from '../config/binderDefs.js';
 
 const SKIP_BONUS = 5;
 
@@ -371,6 +372,8 @@ export class RewardScreen {
                 const slot = this._gs.addConsumable(item.def);
                 // Intet ledigt slot — sælg automatisk i stedet for at tabe rewarden helt
                 if (slot === false) this._gs.score += item.def.sellPrice ?? 0;
+            } else if (item.kind === 'binder') {
+                this._gs.addBinder(item.series, item.tier);
             } else if (item.kind === 'points') {
                 this._gs.score += item.amount;
             }
@@ -419,6 +422,8 @@ export class RewardScreen {
         } else if (a.kind === 'new_cap') {
             const result = this._gs.gainCap(a.def);
             if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
+        } else if (a.kind === 'new_binder') {
+            this._gs.addBinder(a.series, a.tier);
         }
         audio.play('pick_gain');
         if (this.onContinue) this.onContinue();
@@ -482,8 +487,11 @@ export class RewardScreen {
             const source = pool.length > 0 ? pool : SLAMMER_DEFS;
             return { kind: 'slammer', def: source[Math.floor(Math.random() * source.length)] };
         }
-        if (roll < 0.85) {
+        if (roll < 0.80) {
             return { kind: 'card', def: CONSUMABLE_DEFS[Math.floor(Math.random() * CONSUMABLE_DEFS.length)] };
+        }
+        if (roll < 0.90) {
+            return { kind: 'binder', ...this._rollBinder() };
         }
         const amount = isGold ? (20 + Math.floor(Math.random() * 30)) : (5 + Math.floor(Math.random() * 15));
         return { kind: 'points', amount };
@@ -495,7 +503,7 @@ export class RewardScreen {
         const owned         = this._gs.ownedCaps;
         const ownedSlammers = this._gs.ownedSlammers;
         const commons       = owned.filter(c => (c.def.rarity ?? 1) === 1);
-        const candidates    = ['card', 'new_cap'];
+        const candidates    = ['card', 'new_cap', 'new_binder'];
 
         if (commons.length > 0)       candidates.push('transform_tier');
         if (owned.length > 0)         candidates.push('swap_cap');
@@ -527,6 +535,12 @@ export class RewardScreen {
         if (kind === 'card') {
             const def = CONSUMABLE_DEFS[Math.floor(Math.random() * CONSUMABLE_DEFS.length)];
             return { kind, def, title: def.name, desc: def.description };
+        }
+        if (kind === 'new_binder') {
+            const { series, tier } = this._rollBinder();
+            const s = getSeriesDef(series);
+            const t = BINDER_TIERS[tier];
+            return { kind, series, tier, title: 'New Binder', desc: `Gain a ${t.label} ${s.label} Binder (+${t.value.toFixed(1)} ${s.label} multiplier).` };
         }
         // new_cap — altid mulig, fallback hvis intet andet kunne vælges. Owned
         // caps sorteres ikke fra — duplikater er fair spil.
@@ -560,11 +574,13 @@ export class RewardScreen {
             : '';
 
         this._el.innerHTML = `
-            <button id="reward-skip-btn">
+            <button id="reward-skip-btn" data-sfx="skip">
                 SKIP &nbsp;<span class="reward-skip-bonus">${skipLabel}</span>
             </button>
-            <div class="reward-title-box ${titleModClass}">
-                <h2 class="reward-title">${nodeLabel}</h2>
+            <div class="reward-title-anchor">
+                <div class="reward-title-box ${titleModClass}">
+                    <h2 class="reward-title">${nodeLabel}</h2>
+                </div>
             </div>
             <div class="reward-cards ${(this._mode === 'chest' || this._mode === 'mystery') ? 'reward-cards--single' : ''}">${cardsHTML}</div>`;
 
@@ -584,6 +600,7 @@ export class RewardScreen {
         // op i den før vi måler den nye.
         this._titleUnwatch?.();
         this._titleUnwatch = watchRewardTitleSpacing(this._el);
+        startTitleWobble(this._el.querySelector('.reward-title-box'));
     }
 
     _rarityInfo(rarity) {
@@ -686,6 +703,38 @@ export class RewardScreen {
         </div>`;
     }
 
+    // Fælles serie+tier-roll til binder-udfald (chest + mystery-reward) — samme
+    // legacy_discs-værn som ShopScreen._binderChoices() (kræver ejerskab af
+    // mindst én legacy_discs-cap før den kan rulles).
+    _rollBinder() {
+        const hasLegacyDiscs = this._gs.ownedCaps.some(c => c.def.series === 'legacy_discs');
+        const seriesPool     = Object.keys(SERIES_DEFS).filter(s => s !== 'legacy_discs' || hasLegacyDiscs);
+        const series = seriesPool[Math.floor(Math.random() * seriesPool.length)];
+        return { series, tier: pickBinderTier() };
+    }
+
+    // Delt binder-kort — samme gum-pack-skabelon som _consumableCardHTML,
+    // genbrugt af BÅDE chest- og mystery-visningen.
+    _binderCardHTML(series, tier, key) {
+        const s       = getSeriesDef(series);
+        const t       = BINDER_TIERS[tier];
+        const stripe  = `repeating-linear-gradient(-45deg, ${t.color} 0px, ${t.color} 2px, #fff 2px, #fff 4px)`;
+        const textCol = this._headerTextColor(t.color);
+        return `<div class="reward-card reward-card--gumcard" data-key="${key}">
+            <div class="gum-pack-top" style="background:${stripe};">
+                <div class="gum-pack-header" style="background:${t.color}; color:${textCol};">${t.label.toUpperCase()} BINDER</div>
+                <div class="gum-pack-icon" style="color:${s.color};">${s.icon}</div>
+            </div>
+            <div class="gum-pack-bottom">
+                <div class="gum-pack-flavor">${s.label}</div>
+                <div class="gum-pack-desc">+${t.value.toFixed(1)}× ${s.label} multiplier</div>
+            </div>
+            <div class="gum-pack-footer" style="background:${stripe};">
+                <button class="reward-quick-pick" data-key="${key}">▶ TAKE</button>
+            </div>
+        </div>`;
+    }
+
     _headerTextColor(hex) {
         if (!hex) return '#fff';
         const r = parseInt(hex.slice(1, 3), 16);
@@ -728,6 +777,9 @@ export class RewardScreen {
         if (item.kind === 'card') {
             return this._consumableCardHTML(item.def, 'chest');
         }
+        if (item.kind === 'binder') {
+            return this._binderCardHTML(item.series, item.tier, 'chest');
+        }
         // points — ingen rarity-koncept, men titlen siger allerede hvilken kiste det er
         return `<div class="reward-card" data-key="chest">
             <div class="reward-points-display">★${formatScore(item.amount)}</div>
@@ -744,6 +796,7 @@ export class RewardScreen {
         if (action.kind === 'new_cap')     return this._capCards([action.def]);
         if (action.kind === 'new_slammer') return this._slammerCards([action.def]);
         if (action.kind === 'card')        return this._consumableCardHTML(action.def, 'mystery');
+        if (action.kind === 'new_binder')  return this._binderCardHTML(action.series, action.tier, 'mystery');
 
         // swap_cap/swap_slammer/transform_tier — behold før→efter-visningen,
         // men INGEN "MYSTERY"-toplabel (intet er skjult i disse kort).

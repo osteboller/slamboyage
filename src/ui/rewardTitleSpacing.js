@@ -8,8 +8,14 @@
 //
 // Returnerer en oprydningsfunktion — kald den når skærmen forlades/genskabes
 // for at fjerne resize-listeneren igen.
+// Måler .reward-title-anchor (IKKE .reward-title-box) — anchoren er nu det
+// rent POSITIONEREDE element (se reward.css), .reward-title-box selv bærer
+// kun dekorativ rotate/translate-bevægelse og er ikke længere positioneret
+// direkte. offsetTop/offsetHeight er upåvirket af transform/rotate/translate
+// under alle omstændigheder, men skal måles på det element der faktisk SIDDER
+// fast i layoutet.
 export function watchRewardTitleSpacing(screenEl) {
-    const titleBox = screenEl?.querySelector('.reward-title-box');
+    const titleBox = screenEl?.querySelector('.reward-title-anchor');
     if (!titleBox) return () => {};
 
     const update = () => {

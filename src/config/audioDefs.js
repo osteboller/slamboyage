@@ -100,18 +100,25 @@ export const SFX_DEFS = {
     // Territorial-stilens exhaust-effekt — spilles pr. cap, i takt med
     // drypvis-fjernelsen (EXHAUST_DRIP_MS-loopet i RoundManager).
     exhaust: { src: ['assets/audio/sfx/caps/exhaust.mp3'] },
+    // Blanco/White Card-consumablen — se main.js's onUse, def.id==='white_card'.
+    blanco: { src: ['assets/audio/sfx/ui/blanco.mp3'] },
+    // #pack-skip-btn (ShopScreen.js)/#reward-skip-btn (RewardScreen.js) — sat via
+    // data-sfx="skip" direkte på knapperne, override'r default button_click.
+    skip: { src: ['assets/audio/sfx/ui/skip.mp3'] },
 };
 
-// BGM — kun OGG indtil videre (ingen MP3-fallback lavet endnu, se doc'en) —
-// virker fint til test i Chrome/Firefox/Edge, men INGEN lyd på Safari/iOS før
-// en MP3-fil ligger ved siden af hver OGG her (tilføj den bare til src-arrayet,
-// ingen kodeændring nødvendig, Howler vælger selv det format browseren støtter).
+// BGM — MP3 (IKKE Ogg) — Safari/iOS understøtter aldrig Ogg Vorbis, i
+// modsætning til alle SFX'erne (som allerede var MP3, derfor virkede de fint
+// på iPhone mens BGM var tavs). Bevidst KUN ét format i stedet for en
+// OGG+MP3-fallback-liste — MP3 afspilles overalt (Chrome/Firefox/Edge/Safari),
+// så der er ingen grund til dobbelt filstørrelse for et format Safari alligevel
+// aldrig ville bruge.
 // randomStart: true → starter et tilfældigt sted i loopet hver gang (se
 // bgm_battle's ~4 min-længde, ønsket om variation ved hver ny kamp).
 export const BGM_DEFS = {
-    menu:       { src: ['assets/audio/bgm/bgm_main_menu.ogg'] },
-    shop:       { src: ['assets/audio/bgm/bgm_shop.ogg'] },
-    battle:     { src: ['assets/audio/bgm/bgm_battle.ogg'], randomStart: true },
-    boss:       { src: ['assets/audio/bgm/bgm_boss.ogg'] },
-    failed_run: { src: ['assets/audio/bgm/bgm_failed_run.ogg'] },
+    menu:       { src: ['assets/audio/bgm/bgm_main_menu.mp3'] },
+    shop:       { src: ['assets/audio/bgm/bgm_shop.mp3'] },
+    battle:     { src: ['assets/audio/bgm/bgm_battle.mp3'], randomStart: true },
+    boss:       { src: ['assets/audio/bgm/bgm_boss.mp3'] },
+    failed_run: { src: ['assets/audio/bgm/bgm_failed_run.mp3'] },
 };

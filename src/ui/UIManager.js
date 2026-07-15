@@ -10,6 +10,7 @@ import { getNoGlamFamPenalty } from '../game/bossModifiers/index.js';
 import { formatScore } from './formatScore.js';
 import { getSeriesDef } from '../config/seriesDefs.js';
 import { abilityBoxHTML } from './abilityBox.js';
+import { BINDER_TIERS } from '../config/binderDefs.js';
 
 export class UIManager {
     constructor() {
@@ -568,6 +569,32 @@ export class UIManager {
         el.addEventListener('animationend', () => el.remove());
     }
 
+    // Binder-HUD — én chip PR. SERIE spilleren ejer ≥1 binder for. I MODSÆTNING
+    // TIL showRarityMultBadge()/showPassiveTriggerBadge() ovenfor (transiente,
+    // auto-fjernet ved animationend) er dette en STATISK, altid-synlig række der
+    // RENDERER HELE det aktuelle sæt hver gang den kaldes, i stedet for at
+    // tilføje ét element. Kaldes ved battle-entry (BattleScreen.enter()); nye
+    // binders erhverves kun i shoppen (mellem kampe), så der er ikke behov for
+    // et separat "gained mid-battle"-kaldested. Viser den FULDE multiplier
+    // (1 + bonus, fx "1.2") frem for den rå bonus — matcher hvad spilleren
+    // rent faktisk ser i score-kæden. Grået ud (.series-mult-chip--inactive)
+    // hvis spilleren ikke aktuelt ejer nogen cap fra serien — binderen findes
+    // stadig og skal huskes, men bidrager ikke til noget lige nu.
+    renderSeriesMultChips(gameState) {
+        const container = document.getElementById('series-mult-chips');
+        if (!container) return;
+        const entries = gameState?.ownedBinderSeries ?? [];
+        if (entries.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
+        container.style.display = 'flex';
+        container.innerHTML = entries.map(({ series, bonus }) => {
+            const s        = getSeriesDef(series);
+            const hasCap   = gameState.ownedCaps.some(c => c.def.series === series);
+            const cls      = hasCap ? '' : ' series-mult-chip--inactive';
+            const style    = hasCap ? `style="background:${s.color}22; color:${s.color}; border-color:${s.color};"` : '';
+            return `<div class="series-mult-chip${cls}" ${style}>${s.icon} ${(1 + bonus).toFixed(1)}</div>`;
+        }).join('');
+    }
+
     showRunOverlay() {
         document.getElementById('tl-overlay').style.display     = '';
         document.getElementById('score-display').style.display  = '';
@@ -600,6 +627,13 @@ export class UIManager {
         document.getElementById('score-display').style.display = 'none';
         document.getElementById('pause-btn').style.display     = 'none';
         document.getElementById('bottom-bar').style.display    = 'none';
+        // Samme "power-container blev hængende for evigt"-fælde som ovenfor —
+        // #series-mult-chips er også position:fixed og ikke længere dækket af
+        // en uigennemsigtig skærm nu hvor #start-screen er translucent. Ingen
+        // gendannelse nødvendig i showRunOverlay() — renderSeriesMultChips()
+        // kaldes altid friskt ved BattleScreen.enter() og sætter selv sin
+        // egen display-værdi ud fra om spilleren rent faktisk ejer binders.
+        document.getElementById('series-mult-chips').style.display = 'none';
     }
 
     setRunInfo(nodeName, clearScore) {
@@ -962,15 +996,15 @@ export class UIManager {
             // efterfølgende click-event (se capture-listener nedenfor) kan
             // sluges centralt — ellers rammer det uvægerligt hvad end der lå
             // under popup'en (køb en cap i shoppen, vælg en anden node osv.)
-            const wasOpen = detail.style.display === 'block'
-                || slamDetail.style.display === 'block'
-                || relicDetail.style.display === 'block';
+            const wasOpen = detail.classList.contains('open')
+                || slamDetail.classList.contains('open')
+                || relicDetail.classList.contains('open');
             if (wasOpen) this._suppressNextClick = true;
 
-            overlay.style.display     = 'none';
-            detail.style.display      = 'none';
-            slamDetail.style.display  = 'none';
-            relicDetail.style.display = 'none';
+            overlay.style.display = 'none';
+            detail.classList.remove('open');
+            slamDetail.classList.remove('open');
+            relicDetail.classList.remove('open');
             this.setDetailBackdrop(false);
             this._capViewer.hide();
             this._slammerViewer.hide();
@@ -1105,6 +1139,51 @@ export class UIManager {
             </div>`;
         }).join('') || '<p style="padding:20px;color:#888;font-family:monospace">No slammers yet.</p>';
 
+        // Binders: ingen billede (ren ikon+tekst-samler, se binderDefs.js) —
+        // genbruger den allerede-eksisterende, men hidtil ubrugte .col-relic-
+        // liste-layout (icon+navn+beskrivelse-række) fremfor cap/slammer-
+        // fanernes cirkulære billed-grid, som ikke passer uden et billede.
+        // Grupperet pr. (serie, tier) — dubletter viser ×N i stedet for at
+        // gentage samme række flere gange. Beskrivelsen viser den AKTUELLE
+        // samlede multiplier for hele serien (1 + seriesBonus(), samme tal
+        // som HUD-chippen), ikke bare denne ene binders flade værdi — det er
+        // det tal spilleren rent faktisk vil vide.
+        const binderGroups = new Map();
+        gs.ownedBinders.forEach(({ series, tier }) => {
+            const key = `${series}|${tier}`;
+            binderGroups.set(key, (binderGroups.get(key) ?? 0) + 1);
+        });
+        // Sortering: al SAMME serie skal ligge samlet (aldrig spredt ud efter
+        // hvornår de blev erhvervet), og serier med højest samlet multiplier
+        // ligger øverst. Da alle rækker for samme serie deler nøjagtig samme
+        // seriesBonus()-værdi, holder de sig automatisk samlet af selve
+        // sammenligningen — sekundær sortering (serie-id) er kun et stabilt
+        // tiebreak hvis to FORSKELLIGE serier tilfældigvis har samme styrke.
+        // Tertiær sortering ordner tiers inden for én serie stærkest først.
+        const sortedKeys = [...binderGroups.keys()].sort((a, b) => {
+            const [seriesA, tierA] = a.split('|');
+            const [seriesB, tierB] = b.split('|');
+            const bonusA = gs.seriesBonus(seriesA);
+            const bonusB = gs.seriesBonus(seriesB);
+            if (bonusA !== bonusB) return bonusB - bonusA;
+            if (seriesA !== seriesB) return seriesA.localeCompare(seriesB);
+            return (BINDER_TIERS[tierB]?.value ?? 0) - (BINDER_TIERS[tierA]?.value ?? 0);
+        });
+        const bindersHTML = sortedKeys.map(key => {
+            const [series, tier] = key.split('|');
+            const count = binderGroups.get(key);
+            const s = getSeriesDef(series);
+            const t = BINDER_TIERS[tier];
+            const totalMult = 1 + gs.seriesBonus(series);
+            return `<div class="col-relic">
+                <div class="col-relic-icon" style="color:${s.color}">${s.icon}</div>
+                <div>
+                    <div class="col-relic-name">${t.label} ${s.label} Binder${count > 1 ? ` ×${count}` : ''}</div>
+                    <div class="col-relic-desc">Current: ×${totalMult.toFixed(1)} ${s.label} multiplier</div>
+                </div>
+            </div>`;
+        }).join('') || `<div class="col-relics-empty"><div class="col-relics-icon">📘</div>No binders yet.</div>`;
+
         const pips = Array.from({ length: THROWS_PER_ROUND }, () => `<span class="col-pip">●</span>`).join('');
 
         const overlay = document.createElement('div');
@@ -1118,10 +1197,14 @@ export class UIManager {
                     <button class="col-tab ${tab === 'slammers' ? 'active' : ''}" data-target="slammers">
                         Slammers <span class="col-tab-count">${gs.ownedSlammers.length}</span>
                     </button>
+                    <button class="col-tab ${tab === 'binders'  ? 'active' : ''}" data-target="binders">
+                        Binders <span class="col-tab-count">${gs.ownedBinders.length}</span>
+                    </button>
                     <button id="map-collection-close" class="col-close">✕</button>
                 </div>
                 <div class="col-content" data-content="caps"><div class="col-grid">${capsHTML}</div></div>
                 <div class="col-content" data-content="slammers"><div class="col-grid">${slammersHTML}</div></div>
+                <div class="col-content" data-content="binders"><div class="col-relic-grid">${bindersHTML}</div></div>
                 <div class="col-footer">
                     <span class="col-footer-stat">Throws: ${pips}</span>
                     <span class="col-footer-stat">Max stack: <b>${gs.stackSizeLimit}</b></span>
@@ -1388,7 +1471,7 @@ export class UIManager {
             actionEl.parentNode.replaceChild(fresh, actionEl);
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
-                detail.style.display = 'none';
+                detail.classList.remove('open');
                 this.setDetailBackdrop(false);
                 this._capViewer.hide();
                 action.callback();
@@ -1446,7 +1529,7 @@ export class UIManager {
         const capViewerShown = this._capViewer.show(def, 'cap', opts.previewEnchant ? null : enchant);
         if (opts.previewEnchant) capViewerShown.then(() => this._capViewer.previewEnchant(opts.previewEnchant, enchant));
         this._randomDetailRotation(detail);
-        detail.style.display = 'block';
+        detail.classList.add('open');
         this.setDetailBackdrop(true);
     }
 
@@ -1472,7 +1555,7 @@ export class UIManager {
             actionEl.parentNode.replaceChild(fresh, actionEl);
             fresh.addEventListener('click', e => {
                 e.stopPropagation();
-                detail.style.display = 'none';
+                detail.classList.remove('open');
                 this.setDetailBackdrop(false);
                 action.callback();
             });
@@ -1480,7 +1563,7 @@ export class UIManager {
             actionEl.style.display = 'none';
         }
 
-        detail.style.display = 'block';
+        detail.classList.add('open');
         this.setDetailBackdrop(true);
     }
 
@@ -1500,7 +1583,7 @@ export class UIManager {
         this._slammerViewer.show(def, 'slammer');
         this._renderSlammerStats(def);
         this._randomDetailRotation(detail);
-        detail.style.display = 'block';
+        detail.classList.add('open');
         this.setDetailBackdrop(true);
         detail.classList.toggle('slammer-detail--side', !!opts.side);
 
@@ -1524,7 +1607,7 @@ export class UIManager {
                 actionEl.parentNode.replaceChild(fresh, actionEl);
                 fresh.addEventListener('click', e => {
                     e.stopPropagation();
-                    detail.style.display = 'none';
+                    detail.classList.remove('open');
                     this.setDetailBackdrop(false);
                     this._slammerViewer.hide();
                     action.callback();
@@ -1593,7 +1676,7 @@ export class UIManager {
                 sellBtn.onclick = () => {
                     this._gameState.sellSlammer(def.name);
                     this.setScore(this._gameState.score);
-                    detail.style.display = 'none';
+                    detail.classList.remove('open');
                     this.setDetailBackdrop(false);
                     // Genopfrisk collection-oversigten hvis den er åben, så ejerskabet opdateres
                     if (document.getElementById('map-collection-overlay')) this.openCollection('slammers');

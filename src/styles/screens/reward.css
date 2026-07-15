@@ -1,3 +1,88 @@
+/* ─── RUN-START PACK SCREEN ──────────────────────────────────────────────────
+   Vises ÉN gang, ved den allerførste "New Run" (se RunStartPackScreen.js).
+   Trin 2 (åbnet pack) genbruger .reward-cards/.reward-card 1:1 — ingen ny
+   CSS nødvendig der. Dette er kun trin 1 (vælg mellem 3 packs). */
+#run-start-packs-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--clr-bg);
+    background-image: var(--bg-dot-grid);
+    background-size: var(--bg-dot-size);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(20px, 4vh, 36px);
+    z-index: 200;
+    padding: clamp(16px, 3vw, 24px);
+}
+/* Samme JS-drevne hak (domUtils.js's startTitleWobble(), kaldt fra
+   RunStartPackScreen.js) + blødt CSS-float som .start-title/.reward-title-box
+   — se .reward-title-box's kommentar for baggrunden. */
+@keyframes rsp-title-pop-in-scale {
+    from { opacity: 0; scale: 0.85; }
+    to   { opacity: 1; scale: 1; }
+}
+@keyframes rsp-title-float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -5px; }
+}
+.rsp-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(20px, 4vw, 28px);
+    font-weight: 800;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    text-align: center;
+    margin: 0;
+    /* IKKE en transition på rotate — se .start-title's kommentar. Hårdt
+       spring, ingen tweening, det ER selve "hakket". */
+    animation: rsp-title-pop-in-scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+               rsp-title-float 3.4s ease-in-out infinite 0.3s;
+}
+.rsp-pack-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(14px, 3vw, 28px);
+}
+/* Samme kort-anatomi som .shop-pack (ikon-boks + label), bare lodret stablet
+   og uden pris — dette er gratis. Egen let skæv rotation pr. kort, matcher
+   spillets øvrige sticker-æstetik. */
+.rsp-pack-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: clamp(120px, 22vw, 160px);
+    padding: 16px 12px;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: var(--shadow-sticker);
+    border-radius: 0;
+    cursor: pointer;
+    transition: box-shadow 0.08s, transform 0.1s;
+}
+.rsp-pack-card:nth-child(1) { transform: rotate(-2deg); }
+.rsp-pack-card:nth-child(2) { transform: rotate(1deg);  }
+.rsp-pack-card:nth-child(3) { transform: rotate(-1deg); }
+.rsp-pack-card:hover  { box-shadow: var(--shadow-raised); }
+.rsp-pack-card:active { box-shadow: var(--shadow-pressed); transform: translate(3px, 3px); }
+.rsp-pack-card .pack-icon-box {
+    width: 56px;
+    height: 64px;
+    font-size: 30px;
+}
+.rsp-pack-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #000;
+    text-align: center;
+    line-height: 1.2;
+}
+
 /* ─── REWARD SCREEN ───────────────────────────────────────────────────────── */
 #reward-screen {
     position: fixed;
@@ -65,23 +150,36 @@
 #reward-skip-btn:active, #pack-skip-btn:active { box-shadow: none;              transform: rotate(-2deg) translateY(4px); }
 .reward-skip-bonus { font-weight: 800; }
 
-/* Title sticker box — position:absolute, fast forankret til toppen (samme
-   princip som #reward-skip-btn ovenfor), IKKE en flex-child af
-   #reward-screen længere. left:50% + translateX(-50%) centrerer den
-   vandret uafhængigt af sin egen (indholds-afhængige) bredde. Den lille
-   rotate(-1deg) er så minimal at den ikke mærkbart forstyrrer -50%-
-   centreringen, så det sammensatte transform er trygt. */
-.reward-title-box {
+/* Title sticker box — position:absolute (på .reward-title-anchor), fast
+   forankret til toppen (samme princip som #reward-skip-btn ovenfor), IKKE en
+   flex-child af #reward-screen længere. left:calc(50% - 24px) + translateX
+   (-50%) centrerer den vandret uafhængigt af sin egen (indholds-afhængige)
+   bredde. */
+/* Positionering og dekoration er nu PÅ TO FORSKELLIGE ELEMENTER — ikke
+   samme element som før. Grunden: da rotate/translate lå som selvstændige
+   egenskaber PÅ SAMME element som centrerings-transformen (translateX(-50%)
+   translateX(-24px)), komponerede de i en fast rækkefølge (translate →
+   rotate → scale → transform, jf. spec) der gjorde rotations-PIVOTPUNKTET
+   forskudt væk fra boksens eget centrum (så den så ud til at rotere om et
+   hjørne i stedet for midten) — jo mere synlig vinklen/floatet blev, jo
+   tydeligere blev fejlen (var usynlig dengang rotationen bare var en fast,
+   lille -1deg). Løsningen: .reward-title-anchor gør AL positionering (ren
+   translateX(-50%), ingen dekoration overhovedet), .reward-title-box gør AL
+   dekoration (rotate/translate/scale) uden nogen positionerings-transform at
+   komponere imod — så roterer den garanteret om sit eget centrum. */
+@keyframes reward-title-pop-in-scale {
+    from { opacity: 0; scale: 0.85; }
+    to   { opacity: 1; scale: 1; }
+}
+@keyframes reward-title-float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -5px; }
+}
+.reward-title-anchor {
     position: absolute;
     top: 14px;
-    left: 50%;
-    display: inline-block;
-    background: var(--clr-bg-panel);
-    border: 4px solid #000;
-    box-shadow: 6px 6px 0px #000;
-    padding: clamp(8px, 1.5vh, 14px) clamp(16px, 4vw, 28px);
-    transform: translateX(-50%) rotate(-1deg) translateX(-24px);
-    text-align: center;
+    left: calc(50% - 24px);
+    transform: translateX(-50%);
     /* Skal altid vinde over kortene nedenunder — det midterste kort får sit
        eget z-index:1 (se .reward-cards .reward-card:nth-child(2)) for at
        ligge oven på nabo-kortene i det forskudte layout. Delte z-index:1 på
@@ -91,6 +189,19 @@
        bagved). 5 er rigeligt headroom over kortenes 1. */
     z-index: 5;
 }
+.reward-title-box {
+    display: inline-block;
+    background: var(--clr-bg-panel);
+    border: 4px solid #000;
+    box-shadow: 6px 6px 0px #000;
+    padding: clamp(8px, 1.5vh, 14px) clamp(16px, 4vw, 28px);
+    rotate: -1deg;
+    /* IKKE en transition på rotate — se .start-title's kommentar. Hårdt
+       spring, ingen tweening, det ER selve "hakket". */
+    animation: reward-title-pop-in-scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+               reward-title-float 3.4s ease-in-out infinite 0.3s;
+    text-align: center;
+}
 /* "Juice" pr. reward-type. Holo/enchant genbrugte først Holo Pack-ikonets
    pack-holo-shift-animation (frem-og-tilbage "swing", ease) 1:1 — det virker
    fint på det lille kvadratiske ikon, men på en bred titel-boks bliver
@@ -98,12 +209,19 @@
    Next Round-knappen (shop.css' shop-next-shift — kun background-position,
    ingen farver, så keyframen er delt frit): pastel-cyklussen skrevet ud TO
    gange over en 200%-bred baggrund, animeret lineært i én retning. */
+/* animation-shorthand er IKKE additiv på tværs af regler — denne erstatter
+   HELE .reward-title-box's animation-liste, ikke kun tilføjer til den. Skal
+   derfor eksplicit gentage pop-in+wobble her ved siden af shop-next-shift
+   (tre forskellige egenskaber — transform×2 + background-position×1 — så de
+   sameksisterer uden konflikt), ellers ville holo-titler miste pop-ind/vippe. */
 .reward-title-box--holo {
     background: linear-gradient(90deg,
         #ff9a9e 0%, #fad0c4 12.5%, #a1c4fd 25%, #c2e9fb 37.5%,
         #ff9a9e 50%, #fad0c4 62.5%, #a1c4fd 75%, #c2e9fb 87.5%, #ff9a9e 100%);
     background-size: 200% 100%;
-    animation: shop-next-shift 4s linear infinite;
+    animation: reward-title-pop-in-scale 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+               reward-title-float 3.4s ease-in-out infinite 0.3s,
+               shop-next-shift 4s linear infinite;
 }
 
 /* Resten af den etablerede pack--X-farvekonvention (se shop.css' pakke-
@@ -116,6 +234,7 @@
 .reward-title-box--uncommon  { background: #e6e6e6; } /* uncommon-garanteret — matcher .pack--uncommon (grå) */
 .reward-title-box--rare      { background: #ffe0e0; } /* rare-garanteret — matcher .pack--rare (rød) */
 .reward-title-box--mystery   { background: #e2e5f7; } /* mystery — ny indigo-tone */
+.reward-title-box--binder    { background: #f0e6d2; } /* binder pack — tan/pap, matcher .pack--binder */
 .reward-title-box--gold      { background: #fff3cc; } /* gold chest — matcher --clr-gold */
 .reward-title-box--silver    { background: #eceef0; } /* silver chest — ny kølig grå-tone */
 

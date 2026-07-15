@@ -125,18 +125,31 @@
    ikke kun fra klik-udenfor. z-index under selve popup'en (300) men over alt
    andet, så det dækker den skærm popup'en er åbnet fra (reward/shop/boss-shop/
    collection) uanset hvilken det er. */
+/* opacity+visibility (IKKE display:none/block) — giver en blød fade i stedet
+   for et instant spring, uden at kræve JS-timede setTimeout'er. visibility
+   forsinkes KUN på vej ud (0.18s), så elementet forbliver klikbart/synligt
+   gennem hele fade-out'en, men bliver ikke-interaktivt med det samme via
+   pointer-events (ingen forsinkelse der) — undgår at et hurtigt dobbeltklik
+   rammer en popup der visuelt er ved at forsvinde. */
 #detail-backdrop {
-    display: none;
     position: fixed;
     inset: 0;
     background: var(--overlay-modal);
     z-index: 295;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.18s ease, visibility 0s linear 0.18s;
 }
-#detail-backdrop.open { display: block; }
+#detail-backdrop.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.18s ease, visibility 0s linear 0s;
+}
 
 /* ─── CAP DETAIL ──────────────────────────────────────────────────────────── */
 #cap-detail {
-    display: none;
     position: fixed;
     left: 50%; top: 50%;
     /* --detail-rot sættes med en ny tilfældig vinkel af UIManager._showCapDetail()
@@ -150,6 +163,22 @@
     text-align: center;
     min-width: 180px;
     border-radius: 0;
+    /* Blød fade i stedet for instant display:none/block — se #detail-backdrop's
+       kommentar for hvorfor opacity+visibility fremfor display bruges. Rører
+       BEVIDST ikke transform/scale her — @media (max-height:520px) nedenfor
+       sætter sin egen scale(0.72) på #cap-detail, og en .open-scale ville
+       (pga. højere selector-specificitet) altid vinde over det uanset
+       viewport, hvilket ville ødelægge den korte-viewport-nedskalering. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+#cap-detail.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.16s ease, visibility 0s linear 0s;
 }
 .cap-viewer-wrap {
     position: relative;
@@ -332,7 +361,6 @@
 
 /* ─── RELIC / CARD DETAIL ────────────────────────────────────────────────── */
 #relic-detail {
-    display: none;
     position: fixed;
     left: 50%; top: 50%;
     transform: translate(-50%, -50%) rotate(1deg);
@@ -344,6 +372,17 @@
     text-align: center;
     width: 220px;
     border-radius: 0;
+    /* Samme blød fade-mønster som #cap-detail — se dens kommentar. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+#relic-detail.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.16s ease, visibility 0s linear 0s;
 }
 #relic-detail-icon {
     font-size: 64px;
@@ -386,7 +425,6 @@
 
 /* ─── SLAMMER DETAIL ──────────────────────────────────────────────────────── */
 #slammer-detail {
-    display: none;
     position: fixed;
     left: 50%; top: 50%;
     /* --detail-rot sættes med en ny tilfældig vinkel af UIManager._showSlammerDetail()
@@ -400,6 +438,17 @@
     text-align: center;
     min-width: 180px;
     border-radius: 0;
+    /* Samme blød fade-mønster som #cap-detail — se dens kommentar. */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
+}
+#slammer-detail.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 0.16s ease, visibility 0s linear 0s;
 }
 .slammer-viewer-wrap {
     position: relative;

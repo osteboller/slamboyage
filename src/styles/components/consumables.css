@@ -86,6 +86,12 @@
    og ikke forvirrer spilleren med forskellige positioner. #detail-backdrop
    (samme dæmpnings-lag som cap/slammer/relic-detail) tændes/slukkes af
    ConsumableSlots via UIManager.setDetailBackdrop(). */
+/* opacity+visibility i stedet for JS-sat display:none/'' — matcher #cap-detail/
+   #slammer-detail's bløde fade-mønster (se modals.css) i stedet for et instant
+   spring. Kortets egen pop-ind-rotation/scale (#consumable-popup-inner,
+   consumable-popup-in-keyframen nedenfor) er urørt — den ydre opacity-fade
+   bærer bare det hele blødt med ud igen ved lukning, hvor der FØR slet ingen
+   luknings-animation var. */
 #consumable-popup {
     position: fixed;
     inset: 0;
@@ -94,11 +100,17 @@
     align-items: center;
     justify-content: center;
     padding: 16px;
+    opacity: 0;
+    visibility: hidden;
     pointer-events: none;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
 }
 
 #consumable-popup.open {
+    opacity: 1;
+    visibility: visible;
     pointer-events: auto;
+    transition: opacity 0.16s ease, visibility 0s linear 0s;
 }
 
 #consumable-popup-inner {

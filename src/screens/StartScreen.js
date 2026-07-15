@@ -1,6 +1,9 @@
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { CAP_DEFS }    from '../config/constants.js';
 import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
+import { SERIES_DEFS } from '../config/seriesDefs.js';
+import { pickBinderTier } from '../config/binderDefs.js';
+import { startTitleWobble } from '../ui/domUtils.js';
 
 export class StartScreen {
     constructor({ gameState, ui, menuBackground }) {
@@ -19,6 +22,7 @@ export class StartScreen {
         this._el.id = 'start-screen';
         document.body.appendChild(this._el);
         this._render();
+        startTitleWobble(this._el.querySelector('.start-title'));
         this._menuBackground?.start();
 
         this._el.addEventListener('click', (e) => {
@@ -53,6 +57,11 @@ export class StartScreen {
             if (cardBtn) {
                 const def = CONSUMABLE_DEFS.find(c => c.id === cardBtn.dataset.devCard);
                 if (def) this._gameState.addConsumable(def);
+            }
+            if (e.target.closest('#dev-add-binder-btn')) {
+                const seriesKeys = Object.keys(SERIES_DEFS);
+                const series     = seriesKeys[Math.floor(Math.random() * seriesKeys.length)];
+                this._gameState.addBinder(series, pickBinderTier());
             }
             if (e.target.closest('#dev-skip-to-boss-btn')) {
                 this._gameState.startRun();
@@ -93,9 +102,14 @@ export class StartScreen {
                 </div>
             </div>
             <div id="dev-btns">
-                <button id="dev-add-score-btn">DEV +100★</button>
-                <button id="dev-enchant-caps-btn">DEV ENCHANT CAPS</button>
-                <button id="dev-skip-to-boss-btn">DEV SKIP TO BOSS</button>
+                <div class="dev-btn-row">
+                    <button id="dev-add-score-btn">+100★</button>
+                    <button id="dev-enchant-caps-btn">ENCHANT CAPS</button>
+                </div>
+                <div class="dev-btn-row">
+                    <button id="dev-skip-to-boss-btn">SKIP TO BOSS</button>
+                    <button id="dev-add-binder-btn">+BINDER</button>
+                </div>
                 <div id="dev-series-btns" class="dev-mini-btn-group">
                     <div class="dev-btn-row">
                         <button class="dev-mini-btn" data-dev-series="pewl_ballz">PEWLS</button>

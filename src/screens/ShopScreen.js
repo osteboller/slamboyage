@@ -6,13 +6,26 @@ import { CONSUMABLE_DEFS } from '../config/consumableDefs.js';
 import { capThumbnailHTML } from '../ui/capThumbnail.js';
 import { ENCHANT_DEFS } from '../config/enchantDefs.js';
 import { pickWeightedItem, pickWeightedItems } from '../config/rarityWeights.js';
-import { pulseIconRotate } from '../ui/domUtils.js';
+import { pulseIconRotate, startTitleWobble } from '../ui/domUtils.js';
 import { formatScore } from '../ui/formatScore.js';
-import { seriesPillHTML } from '../config/seriesDefs.js';
+import { seriesPillHTML, SERIES_DEFS, getSeriesDef } from '../config/seriesDefs.js';
 import { watchRewardTitleSpacing } from '../ui/rewardTitleSpacing.js';
+import { BINDER_TIERS, pickBinderTier } from '../config/binderDefs.js';
 
 const BAND_SIZE       = 5;
-const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 4, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10 };
+const PACK_PRICES     = { cap: 8, slammer: 10, slammer_rare: 16, card: 4, cap_holo: 12, cap_uncommon: 12, cap_rare: 18, mystery: 10, binder: 8 };
+// Relativ trækvægt for hvilke 2 pack-typer der udbydes pr. shop-besøg (se
+// _genPacks()) — FØR var alle 7 typer lige sandsynlige (ren uniform shuffle),
+// hvilket gjorde Rare Slammer Pack (den sjældneste ting i spillet) til at
+// dukke op lige så tit som en Card Pack. Slammer-pakkerne (især den sjældne)
+// skal føles som en sjælden godbid, caps/kort skal være det almindelige.
+// binder sat tæt på card/cap_uncommon's 20 — skal føles som en ny standard-
+// staple ("card, uncommon, binder"), ikke en sjælden pull.
+const PACK_WEIGHTS    = { slammer: 8, slammer_rare: 3, card: 20, cap_holo: 8, cap_uncommon: 20, cap_rare: 10, mystery: 8, binder: 18 };
+// Vægt PR. SLOT når en Mystery Pack åbnes (3 uafhængige slot-træk, se
+// _mysteryChoices()) — slammer er bevidst lav (var FØR garanteret 1 pr. pakke,
+// hvilket føltes for hyppigt/OP), cap/card er de "sikre" almindelige udfald.
+const MYSTERY_SLOT_WEIGHTS = { cap: 40, card: 35, slammer: 10, binder: 15 };
 // FEATHER holdes bevidst udenfor — enchants/index.js's handler er stadig
 // udkommenteret (ingen stack-space-implementering endnu). IRONCLAD har nu en
 // reel handler (beskytter mod destroySelf) og kan derfor rulles.
@@ -356,18 +369,71 @@ export class ShopScreen {
             .map(def => ({ def, enchant: randomEnchant() }));
     }
 
+    // 3 UAFHÆNGIGT vægtede slots (IKKE længere garanteret 1 af hver type) —
+    // matcher Dice 'n Million's mystery-udbud, hvor man sagtens kan blive
+    // præsenteret for fx 2 stamps + 1 terning i stedet for altid ét af hvert.
+    // Løser samtidig "slammer føles for hyppig"-problemet fra tidligere: en
+    // slammer var FØR garanteret i hver eneste mystery pack, nu er den bare
+    // én mulig, relativt sjælden udfaldstype pr. slot.
+    // exclude — udelader én type fra puljen (bruges af _mysteryChoices() til at
+    // forhindre at alle 3 slots lander på samme type, se dér).
+    _mysterySlotType(exclude = null) {
+        const entries = Object.entries(MYSTERY_SLOT_WEIGHTS).filter(([type]) => type !== exclude);
+        const total   = entries.reduce((sum, [, w]) => sum + w, 0);
+        let r = Math.random() * total;
+        for (const [type, w] of entries) {
+            r -= w;
+            if (r <= 0) return type;
+        }
+        return entries[entries.length - 1][0];
+    }
+
     _mysteryChoices() {
-        const randomEnchant = () => ENCHANT_IDS[Math.floor(Math.random() * ENCHANT_IDS.length)];
-        // Always one of each type — shuffled so order is random
-        const slammer = this._slammerChoicesAny()[0];
-        const cap     = pickWeightedItem(CAP_DEFS.filter(c => c.rarity >= 2), this._gs.loop)
-            ?? CAP_DEFS[Math.floor(Math.random() * CAP_DEFS.length)];
-        const card    = this._cardChoices()[0];
-        return [
-            { itemType: 'slammer', def: slammer },
-            { itemType: 'cap',     def: cap, enchant: randomEnchant() },
-            { itemType: 'card',    def: card },
-        ].sort(() => Math.random() - 0.5);
+        const randomEnchant  = () => ENCHANT_IDS[Math.floor(Math.random() * ENCHANT_IDS.length)];
+        const hasLegacyDiscs = this._gs.ownedCaps.some(c => c.def.series === 'legacy_discs');
+        const seriesPool     = Object.keys(SERIES_DEFS).filter(s => s !== 'legacy_discs' || hasLegacyDiscs);
+
+        // 2 fri træk, så et 3. — hvis de to første allerede matcher (fx cap+cap),
+        // udelukkes DEN type fra det 3. træk, så alle 3 aldrig kan blive ens.
+        // To ens (fx cap+cap+card) er stadig fair spil, matcher DaM's "2 stamps
+        // + 1 terning"-eksempel — det er kun "3 ens" der er uønsket.
+        const t1 = this._mysterySlotType();
+        const t2 = this._mysterySlotType();
+        const t3 = this._mysterySlotType(t1 === t2 ? t1 : null);
+
+        return [t1, t2, t3].map(type => {
+            if (type === 'slammer') {
+                return { itemType: 'slammer', def: this._slammerChoicesAny()[0] };
+            }
+            if (type === 'binder') {
+                const series = seriesPool[Math.floor(Math.random() * seriesPool.length)];
+                return { itemType: 'binder', series, tier: pickBinderTier() };
+            }
+            if (type === 'card') {
+                return { itemType: 'card', def: this._cardChoices()[0] };
+            }
+            const cap = pickWeightedItem(CAP_DEFS.filter(c => c.rarity >= 2), this._gs.loop)
+                ?? CAP_DEFS[Math.floor(Math.random() * CAP_DEFS.length)];
+            return { itemType: 'cap', def: cap, enchant: randomEnchant() };
+        });
+    }
+
+    // Binder Pack — 3 valg, HVER med sin egen tier (vægtet, se binderDefs.js).
+    // Seriens er UNIFORM blandt de tilgængelige serier (UNDTAGEN legacy_discs
+    // som kræver at man allerede ejer ≥1 legacy_discs-cap — mirrorer Dice 'n
+    // Million's 0/6+-øje-stamp-regel), men trukket UDEN tilbagelægning på tværs
+    // af de 3 valg — samme serie må ikke optræde flere gange i SAMME pakke (så
+    // man reelt får 3 forskellige valg at vælge imellem, ikke fx "3× Zupers").
+    // Dubletter PÅ TVÆRS AF FLERE pakke-åbninger (og i hele ownedBinders) er
+    // stadig fair spil — binders har ingen unikheds-begrænsning generelt.
+    _binderChoices() {
+        const hasLegacyDiscs = this._gs.ownedCaps.some(c => c.def.series === 'legacy_discs');
+        const seriesPool     = Object.keys(SERIES_DEFS).filter(s => s !== 'legacy_discs' || hasLegacyDiscs);
+        const shuffled       = [...seriesPool].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, 3).map(series => ({
+            series,
+            tier: pickBinderTier(),
+        }));
     }
 
     _genPacks() {
@@ -381,8 +447,26 @@ export class ShopScreen {
             { type: 'cap_uncommon', basePrice: PACK_PRICES.cap_uncommon, choices: this._capChoicesMinRarity(2, bandNames) },
             { type: 'cap_rare',     basePrice: PACK_PRICES.cap_rare,     choices: this._capChoicesMinRarity(3, bandNames) },
             { type: 'mystery',      basePrice: PACK_PRICES.mystery,      choices: this._mysteryChoices()                  },
+            { type: 'binder',       basePrice: PACK_PRICES.binder,       choices: this._binderChoices()                   },
         ];
-        return all.sort(() => Math.random() - 0.5).slice(0, 2).map(p => ({ ...p, bought: false }));
+
+        // Vægtet trækning UDEN tilbagelægning (se PACK_WEIGHTS) — ikke bare en
+        // uniform shuffle+slice som før. Trækker 2 forskellige typer, én ad
+        // gangen, fjerner den trukne fra puljen inden næste træk.
+        const pool   = [...all];
+        const picked = [];
+        for (let i = 0; i < 2 && pool.length > 0; i++) {
+            const total = pool.reduce((sum, p) => sum + (PACK_WEIGHTS[p.type] ?? 1), 0);
+            let r   = Math.random() * total;
+            let idx = pool.length - 1;
+            for (let j = 0; j < pool.length; j++) {
+                r -= (PACK_WEIGHTS[pool[j].type] ?? 1);
+                if (r <= 0) { idx = j; break; }
+            }
+            picked.push(pool[idx]);
+            pool.splice(idx, 1);
+        }
+        return picked.map(p => ({ ...p, bought: false }));
     }
 
     _flashNoRoom(el) {
@@ -416,6 +500,7 @@ export class ShopScreen {
             else if (pack.type === 'cap_holo')     pack.choices = this._capChoicesHolo();
             else if (pack.type === 'cap_uncommon') pack.choices = this._capChoicesMinRarity(2, bandNames);
             else if (pack.type === 'cap_rare')     pack.choices = this._capChoicesMinRarity(3, bandNames);
+            else if (pack.type === 'binder')       pack.choices = this._binderChoices();
             else                                    pack.choices = this._capChoicesMinRarity(1, bandNames);
             this._renderPackScreen(pack, this._pendingPack);
         } else {
@@ -576,7 +661,7 @@ export class ShopScreen {
         const titleMap = {
             cap: 'CAP PACK', slammer: 'SLAMMER PACK', slammer_rare: 'RARE SLAMMER PACK',
             card: 'CARD PACK', cap_holo: 'HOLO PACK', cap_uncommon: 'UNCOMMON PACK',
-            cap_rare: 'RARE PACK', mystery: 'MYSTERY PACK',
+            cap_rare: 'RARE PACK', mystery: 'MYSTERY PACK', binder: 'BINDER PACK',
         };
         // Genbruger den etablerede pack--X-farvekonvention fra pakke-ikonerne
         // i shoppen (.pack--relic/card/uncommon/rare/holo, se shop.css) på
@@ -587,19 +672,22 @@ export class ShopScreen {
             slammer: 'reward-title-box--relic', slammer_rare: 'reward-title-box--rare',
             card: 'reward-title-box--card', cap_holo: 'reward-title-box--holo',
             cap_uncommon: 'reward-title-box--uncommon', cap_rare: 'reward-title-box--rare',
-            mystery: 'reward-title-box--mystery',
+            mystery: 'reward-title-box--mystery', binder: 'reward-title-box--binder',
         };
         let cardsHTML;
         if      (pack.type === 'slammer' || pack.type === 'slammer_rare') cardsHTML = this._packSlammerCards(pack.choices);
         else if (pack.type === 'card')      cardsHTML = this._packCardCards(pack.choices);
         else if (pack.type === 'mystery')   cardsHTML = this._packMysteryCards(pack.choices);
+        else if (pack.type === 'binder')    cardsHTML = this._packBinderCards(pack.choices);
         else if (pack.type === 'cap_holo')  cardsHTML = this._packHoloCards(pack.choices);
         else                                cardsHTML = this._packCapCards(pack.choices);
 
         this._packEl.innerHTML = `
-            <button id="pack-skip-btn">SKIP</button>
-            <div class="reward-title-box ${titleModClassMap[pack.type] ?? ''}">
-                <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'}</h2>
+            <button id="pack-skip-btn" data-sfx="skip">SKIP</button>
+            <div class="reward-title-anchor">
+                <div class="reward-title-box ${titleModClassMap[pack.type] ?? ''}">
+                    <h2 class="reward-title">${titleMap[pack.type] ?? 'PACK'}</h2>
+                </div>
             </div>
             <div class="reward-cards">${cardsHTML}</div>`;
 
@@ -611,6 +699,7 @@ export class ShopScreen {
             setTimeout(() => audio.playChoiceReveal(), delay);
         });
         this._packEl.style.animation = 'screen-fade-in 0.2s ease-out forwards';
+        startTitleWobble(this._packEl.querySelector('.reward-title-box'));
     }
 
     _pickFromPack(key, pack, idx) {
@@ -647,11 +736,16 @@ export class ShopScreen {
                     return;
                 }
                 if (this.onConsumableAdded) this.onConsumableAdded(slotIdx);
+            } else if (item.itemType === 'binder') {
+                this._gs.addBinder(item.series, item.tier);
             } else {
                 const result = this._gs.gainEnchantedCap(item.def, item.enchant ?? null);
                 if (!result.ok) this._ui.showCollectionFullMessage(result.compensated);
                 this._ui.flashBagBtn();
             }
+        } else if (pack.type === 'binder') {
+            const item = pack.choices[parseInt(key, 10)];
+            if (item) this._gs.addBinder(item.series, item.tier);
         } else {
             const def = pack.choices.find(c => c.name === key);
             if (def) {
@@ -728,6 +822,25 @@ export class ShopScreen {
                     </div>
                 </div>`;
             }
+            if (item.itemType === 'binder') {
+                const s       = getSeriesDef(item.series);
+                const tier    = BINDER_TIERS[item.tier];
+                const stripe  = `repeating-linear-gradient(-45deg, ${tier.color} 0px, ${tier.color} 2px, #fff 2px, #fff 4px)`;
+                const textCol = this._headerTextColor(tier.color);
+                return `<div class="reward-card reward-card--gumcard" data-key="${i}">
+                    <div class="gum-pack-top" style="background:${stripe};">
+                        <div class="gum-pack-header" style="background:${tier.color}; color:${textCol};">${tier.label.toUpperCase()} BINDER</div>
+                        <div class="gum-pack-icon" style="color:${s.color};">${s.icon}</div>
+                    </div>
+                    <div class="gum-pack-bottom">
+                        <div class="gum-pack-flavor">${s.label}</div>
+                        <div class="gum-pack-desc">+${tier.value.toFixed(1)}× ${s.label} multiplier</div>
+                    </div>
+                    <div class="gum-pack-footer" style="background:${stripe};">
+                        <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
+                    </div>
+                </div>`;
+            }
             const entry  = { def: item.def, enchant: item.enchant ?? null };
             const r      = this._rarityInfo(item.def.rarity ?? 1);
             const effL   = item.def.effect ? effectName(item.def.effect) : '';
@@ -798,6 +911,33 @@ export class ShopScreen {
                     </div>
                     <div class="gum-pack-footer" style="background:${stripe};">
                         <button class="reward-quick-pick" data-key="${c.id}">▶ PICK</button>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    // Binder Pack — 3 valg, hver uafhængigt rullet (serie + tier, se
+    // _binderChoices()). Ingen cap-billede/slammer-portræt at vise — genbruger
+    // den samme gum-pack-skabelon som Card Pack (_packCardCards ovenfor) 1:1,
+    // tier-farven bærer stripe/header, serie-ikon+navn bærer resten.
+    _packBinderCards(items) {
+        return items.map((item, i) => {
+            const s       = getSeriesDef(item.series);
+            const tier    = BINDER_TIERS[item.tier];
+            const stripe  = `repeating-linear-gradient(-45deg, ${tier.color} 0px, ${tier.color} 2px, #fff 2px, #fff 4px)`;
+            const textCol = this._headerTextColor(tier.color);
+            return `
+                <div class="reward-card reward-card--gumcard" data-key="${i}">
+                    <div class="gum-pack-top" style="background:${stripe};">
+                        <div class="gum-pack-header" style="background:${tier.color}; color:${textCol};">${tier.label.toUpperCase()} BINDER</div>
+                        <div class="gum-pack-icon" style="color:${s.color};">${s.icon}</div>
+                    </div>
+                    <div class="gum-pack-bottom">
+                        <div class="gum-pack-flavor">${s.label}</div>
+                        <div class="gum-pack-desc">+${tier.value.toFixed(1)}× ${s.label} multiplier</div>
+                    </div>
+                    <div class="gum-pack-footer" style="background:${stripe};">
+                        <button class="reward-quick-pick" data-key="${i}">▶ PICK</button>
                     </div>
                 </div>`;
         }).join('');
@@ -943,6 +1083,7 @@ export class ShopScreen {
             cap_uncommon: { label: 'Uncommon Pack',     cls: ' pack--uncommon', hint: '3 uncommon+ caps · pick 1',  emptyHint: 'No uncommon+ caps left' },
             cap_rare:     { label: 'Rare Pack',         cls: ' pack--rare',     hint: '3 rare+ caps · pick 1',      emptyHint: 'No rare+ caps left' },
             mystery:      { label: 'Mystery Pack',      cls: ' pack--mystery',  hint: 'mixed rewards · pick 1',     emptyHint: '—'                      },
+            binder:       { label: 'Binder Pack',       cls: ' pack--binder',   hint: '3 binders · pick 1',         emptyHint: '—' },
         };
         const m         = META[pack.type] ?? META.cap;
         const iconHTML  = this._packIconHTML(pack);
@@ -989,7 +1130,7 @@ export class ShopScreen {
             }).join('');
             return `<div class="pack-icon-box pack-icon-box--gumstack">${miniCards}</div>`;
         }
-        const icons = { slammer: '🔨', slammer_rare: '🔨', cap: '🛍', cap_holo: '✨', cap_uncommon: '🛍', cap_rare: '⭐', mystery: '🎲' };
+        const icons = { slammer: '🔨', slammer_rare: '🔨', cap: '🛍', cap_holo: '✨', cap_uncommon: '🛍', cap_rare: '⭐', mystery: '🎲', binder: '📘' };
         const icon  = icons[pack.type] ?? '🛍';
         return `<div class="pack-icon-box"><span class="pack-icon-emoji">${icon}</span></div>`;
     }

@@ -58,6 +58,7 @@ export class BattleScreen {
         } else {
             this._ui.clearRunInfo();
         }
+        this._ui.renderSeriesMultChips(this._gameState);
 
         if (node?.boss) this._ui.setBossInfo(node.boss);
         else            this._ui.clearBossInfo();

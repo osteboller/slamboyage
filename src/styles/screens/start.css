@@ -28,6 +28,20 @@
     padding: 32px 24px;
 }
 
+/* To UAFHÆNGIGE bevægelser på samme element — de separate rotate/translate
+   CSS-egenskaber (IKKE compound transform) bruges her netop for at kunne
+   style'e dem helt forskelligt uden at de overskriver hinanden. Vippen (rotate)
+   styres nu af JS (domUtils.js's startTitleWobble() — kaldt fra StartScreen.js)
+   i stedet for en ren CSS @keyframes+steps()-loop, fordi steps() altid rammer
+   PRÆCIS de samme faste vinkler i PRÆCIS samme rytme — en tilfældig vinkel
+   (symmetrisk om 0°) med et let varierende interval føles mindre mekanisk.
+   Selve "hakket" er stadig en kort, skarp CSS-transition herunder. Floatet
+   (translate) er fortsat en ren, uendelig CSS-animation — blød op/ned, egen
+   (længere, usynkroniseret) periode. */
+@keyframes start-title-float {
+    0%, 100% { translate: 0 0; }
+    50%      { translate: 0 -5px; }
+}
 .start-title {
     font-family: 'JetBrains Mono', monospace;
     font-size: clamp(36px, 10vw, 56px);
@@ -39,7 +53,11 @@
     /* Underline sticker */
     border-bottom: 6px solid #000;
     padding-bottom: 8px;
-    transform: rotate(-1deg);
+    /* IKKE en transition på rotate — vinklen skal skifte som et hårdt,
+       øjeblikkeligt spring (ingen tweening overhovedet) hver gang JS
+       (startTitleWobble()) sætter en ny værdi, det ER selve "hakket". En
+       transition her ville gøre skiftet blødt/synligt glidende. */
+    animation: start-title-float 3.4s ease-in-out infinite;
 }
 
 .start-sub {
@@ -58,6 +76,21 @@
     margin-top: 10px;
 }
 
+/* Staggered pop-ind når startskærmen mountes — knapperne dukker ikke bare op
+   på ét splitsekund alle sammen, men ét ad gangen med et lille bounce-
+   overshoot. backwards-fill holder knappen usynlig i selve delay-vinduet
+   (ellers ville alle tre glimte synlige ét frame før animationen starter). */
+@keyframes start-btn-pop-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.94); }
+    to   { opacity: 1; transform: translateY(0)     scale(1);   }
+}
+.start-btns .start-btn {
+    animation: start-btn-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+.start-btns .start-btn:nth-child(1) { animation-delay: 0.05s; }
+.start-btns .start-btn:nth-child(2) { animation-delay: 0.15s; }
+.start-btns .start-btn:nth-child(3) { animation-delay: 0.25s; }
+
 .start-btn {
     padding: 14px 0;
     width: 100%;
@@ -72,17 +105,29 @@
     transition: box-shadow 0.08s, transform 0.08s;
 }
 
+/* Meget dæmpet "åndende" skygge på hovedhandlingen — trækker øjet dertil uden
+   at distrahere. animation-play-state:paused ved hover/active giver kontrollen
+   tilbage til de almindelige transitions ovenfor, så selve interaktions-
+   feedbacken ikke kæmper med den løbende animation om box-shadow-værdien. */
+@keyframes start-btn-breathe {
+    0%, 100% { box-shadow: var(--shadow-raised); }
+    50%      { box-shadow: 8px 8px 0px #000; }
+}
 .start-btn.primary {
     background: #000;
     color: #fff;
     box-shadow: var(--shadow-raised);
+    animation: start-btn-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+               start-btn-breathe 3.5s ease-in-out infinite 0.4s;
 }
 .start-btn.primary:hover {
     box-shadow: var(--shadow-sticker);
+    animation-play-state: paused;
 }
 .start-btn.primary:active {
     box-shadow: var(--shadow-pressed);
     transform: translate(3px, 3px);
+    animation-play-state: paused;
 }
 
 .start-btn-sub {
@@ -120,7 +165,8 @@
 
 #dev-add-score-btn,
 #dev-enchant-caps-btn,
-#dev-skip-to-boss-btn {
+#dev-skip-to-boss-btn,
+#dev-add-binder-btn {
     font-family: 'JetBrains Mono', monospace;
     font-size: 10px;
     font-weight: 700;
@@ -136,10 +182,12 @@
 }
 #dev-add-score-btn:hover,
 #dev-enchant-caps-btn:hover,
-#dev-skip-to-boss-btn:hover  { opacity: 0.7; }
+#dev-skip-to-boss-btn:hover,
+#dev-add-binder-btn:hover    { opacity: 0.7; }
 #dev-add-score-btn:active,
 #dev-enchant-caps-btn:active,
-#dev-skip-to-boss-btn:active { opacity: 1; }
+#dev-skip-to-boss-btn:active,
+#dev-add-binder-btn:active   { opacity: 1; }
 
 /* Delt af dev-serie- og dev-kort-knapperne — begge er "grupper af små
    dashed-knapper i rækker", kun indholdet (serier vs. consumables) er forskelligt. */

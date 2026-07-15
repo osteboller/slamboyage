@@ -166,7 +166,6 @@ export class ConsumableSlots {
     }
 
     _openPopup() {
-        this._popupEl.style.display = '';
         this._popupEl.classList.add('open');
         // Samme dæmpnings-lag som cap/slammer/relic-detail — nu hvor popup'en
         // er centreret ligesom dem, skal den også dæmpe baggrunden ligesom dem.
@@ -192,7 +191,6 @@ export class ConsumableSlots {
 
     _closePopup() {
         this._openSlot = null;
-        this._popupEl.style.display = 'none';
         this._popupEl.classList.remove('open');
         this._ui.setDetailBackdrop(false);
     }
@@ -218,6 +216,7 @@ export class ConsumableSlots {
         const def = this._gs.consumables[this._openSlot];
         if (!def) return;
         this._gs.sellConsumable(this._openSlot);
+        audio.play('purchase');
         this._closePopup();
         this.refresh();
         this._ui.showScoreGain(def.sellPrice);

@@ -21,6 +21,7 @@ import { TrickShotScreen }  from './screens/TrickShotScreen.js';
 import { RewardScreen }     from './screens/RewardScreen.js';
 import { BossShopScreen }   from './screens/BossShopScreen.js';
 import { RunEndScreen }    from './screens/RunEndScreen.js';
+import { RunStartPackScreen } from './screens/RunStartPackScreen.js';
 import { ENCHANT_DEFS }   from './config/enchantDefs.js';
 import { CAP_DEFS }       from './config/constants.js';
 
@@ -77,6 +78,7 @@ consumables.onUse = (def, idx) => {
         const remaining = roundMgr.remainingCaps;
         if (remaining.length > 0) {
             ui.showCapPicker('Pick a cap to clone', remaining, entry => {
+                audio.play('pick_gain');
                 roundMgr.addGhostCap(entry.def, entry.enchant);
                 consume();
             });
@@ -89,6 +91,7 @@ consumables.onUse = (def, idx) => {
                 const pool = CAP_DEFS.filter(d => d.name !== entry.def.name);
                 entry.def  = pool[Math.floor(Math.random() * pool.length)];
             });
+            audio.play('blanco');
             ui.showBlancoResult(caps.length, () => ui.openCollection('caps'));
             consume();
         }
@@ -172,8 +175,11 @@ const trickShotScreen = new TrickShotScreen(deps);
 const rewardScreen    = new RewardScreen(deps);
 const bossShopScreen  = new BossShopScreen(deps);
 const runEndScreen    = new RunEndScreen(deps);
+// Skal oprettes EFTER shopScreen — genbruger dens choice-generatorer/kort-
+// renderere direkte (se RunStartPackScreen.js's kommentar for hvorfor).
+const runStartPackScreen = new RunStartPackScreen({ gameState, ui, shop: shopScreen, consumables });
 
-const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop']);
+const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop', 'run-start-packs']);
 
 // Skærme uden noget resume-mekanik (ingen battleSaveState/resumeScreen-håndtering
 // for dem, se onPauseMainMenu/onContinueRun nedenfor) — pause-knappen (Retry/Main
@@ -181,7 +187,7 @@ const RUN_SCREENS = new Set(['map', 'battle', 'trickshot', 'reward', 'shop', 'sl
 // midt i at vælge, eller et Trick Shot-forsøg. 'shop' er IKKE med her, da den har
 // sin egen resume-håndtering — MEN se ShopScreen._showPackScreen()/_pickFromPack(),
 // som selv skjuler pause-knappen mens en pakke er åben (samme problem, lokalt scope).
-const UNSAFE_MENU_SCREENS = new Set(['trickshot', 'reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop']);
+const UNSAFE_MENU_SCREENS = new Set(['trickshot', 'reward', 'slammer-choice', 'enchant-reward', 'chest-reward', 'mystery-reward', 'boss-reward', 'boss-shop', 'run-start-packs']);
 
 // Pause-menu callbacks — globale, virker fra alle run-screens
 let battleSaveState = null;
@@ -287,7 +293,7 @@ function showScreen(name, context = null) {
             // lander i map-screen med Next som eneste vej ind i 1-1, så der er tid til
             // at bruge dev-knapperne (fx tilføje caps til collection) FØR første kast.
             // Bevidst forskel fra de to andre "start frisk run"-indgange.
-            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); ui.resetSlammerToStarter(); returnToAfterMap = 'start'; showScreen('map'); };
+            startScreen.onNewRun      = () => { battleSaveState = null; resumeScreen = null; gameState.startRun(); ui.resetSlammerToStarter(); returnToAfterMap = 'start'; showScreen('run-start-packs'); };
             startScreen.onContinueRun = () => {
                 if (battleSaveState) {
                     const saved = battleSaveState;
@@ -330,6 +336,9 @@ function showScreen(name, context = null) {
                 const loop       = gameState.loop;
                 const ownedCaps  = [...gameState.ownedCaps];
                 const result     = gameState.completeNode(totalScore);
+                // Samme "bestået/fejlet"-lyd som Trick Shot bruger — genbruges her
+                // for node-goal'et, samme princip (nåede/nåede ikke et mål).
+                audio.play(result.won ? 'trickshot_passed' : 'trickshot_failed');
                 if (result.won) {
                     if (result.isBoss) { showScreen('boss-reward', { bossShards: result.bossShards, parentNode: nodePlayed }); return; }
                     // Cap-valget (3 stk) er en fast, garanteret reward efter HVER node —
@@ -362,6 +371,17 @@ function showScreen(name, context = null) {
                 else showScreen('shop'); // ingen ekstra reward — direkte til shop
             };
             rewardScreen.enter(context);
+
+        } else if (name === 'run-start-packs') {
+            currentScreen = runStartPackScreen;
+            // context.after skelner mellem New Run (→ map, som normalt) og Try
+            // Again (→ direkte ind i node 1's kamp, som Try Again altid har gjort
+            // — pack-valget indsættes bare FØR det, ikke i stedet for det).
+            runStartPackScreen.onContinue = () => {
+                if (context?.after === 'goToNode') goToNode(gameState.currentNode);
+                else showScreen('map');
+            };
+            runStartPackScreen.enter();
 
         } else if (name === 'enchant-reward') {
             currentScreen = rewardScreen;
@@ -409,7 +429,7 @@ function showScreen(name, context = null) {
 
         } else if (name === 'run-end') {
             currentScreen = runEndScreen;
-            runEndScreen.onTryAgain = () => { gameState.startRun(); ui.resetSlammerToStarter(); goToNode(gameState.currentNode); };
+            runEndScreen.onTryAgain = () => { gameState.startRun(); ui.resetSlammerToStarter(); showScreen('run-start-packs', { after: 'goToNode' }); };
             runEndScreen.onMainMenu = () => showScreen('start');
             runEndScreen.enter(context);
 

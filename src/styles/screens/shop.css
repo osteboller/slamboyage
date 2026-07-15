@@ -286,6 +286,20 @@
     50%  { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
 }
+/* Binder pack — tan/brun (Pap-tierens farve som "default" for selve
+   pakke-ikonet i shop-listen, før den er åbnet og man ser den faktiske tier) */
+.pack--binder .pack-icon-box {
+    background: rgba(176,141,87,0.15);
+    border-color: #b08d57;
+    box-shadow: 3px 3px 0px #6b3f2a;
+}
+.pack--binder .pack-type  { color: #6b3f2a; }
+.pack--binder .pack-price {
+    border-color: #b08d57;
+    box-shadow: 2px 2px 0px #6b3f2a;
+    color: #6b3f2a;
+}
+
 .pack-choice--card .pack-relic-icon {
     font-size: 32px;
     text-align: center;

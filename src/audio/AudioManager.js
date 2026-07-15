@@ -1,13 +1,15 @@
 import { SFX_DEFS, BGM_DEFS } from '../config/audioDefs.js';
 
 const VOL_STORAGE_KEY = 'slamberz_audio_volumes';
-// Var 1500ms, men gav problemer når man klikkede sig hurtigt gennem flere
-// BGM-udløsende skærme i træk (map/shop/battle) — næste playBGM()-kald kunne
-// nå at afbryde et spor midt i et allerede igangværende 1500ms-fade, hvilket
-// gjorde skiftet mærkbart "hakkende"/uklart. 900ms er stadig tydeligt blødere
-// end den oprindelige 700ms, men giver rig hurtigere klik-gennem mindre tid
-// til at kollidere med et fade der endnu ikke er færdigt.
-const BGM_FADE_MS = 900;
+// Var 900ms — dengang blev den sat KORT specifikt for at give hurtige klik
+// mindre tid til at kollidere med et fade der endnu ikke var færdigt. Den
+// bekymring er siden løst rigtigt af _bgmEpoch-mekanismen nedenfor (et
+// forældet fade-ud→stop()-kald tjekker nu eksplicit om sporet er blevet
+// genstartet imens, uanset hvor lang tid fadet tager) — så en længere,
+// blødere fade er tryg at bruge nu, uanset hvor hurtigt man klikker mellem
+// skærme. 1800ms føles markant mindre "pludseligt" end 900ms uden at være
+// sløvt.
+const BGM_FADE_MS = 1800;
 // Minimumstid et spor skal have kørt før et NYT playBGM()-kald må afbryde det
 // — uden dette kunne hurtig navigation frem og tilbage mellem shop og map
 // (fx reroll i shoppen, eller bare browse mellem shop/map/battle) få musikken
