@@ -1147,9 +1147,14 @@ export class RoundManager {
             // Rundevis aura-multiplier (fx martyr/Relic Hunter) — akkumuleret i
             // _roundCapMultipliers ovenfor i Phase 2b, samme mønster som roundBonus.
             const roundMult  = this._roundCapMultipliers.get(cap.entryId) ?? 1;
-            const capChain   = [...positionChain, ...(rarityMult > 1 ? [rarityMult] : []), ...(holoMult > 1 ? [holoMult] : []), ...(roundMult !== 1 ? [roundMult] : [])];
+            // Binders — passivt, ALTID aktivt per-serie multiplier. ADDITIV stak på
+            // tværs af alle ejede binders matching cap.def.series (se GameState.
+            // seriesBonus()) — bevidst IKKE passiveMultiplier() (den er for
+            // MULTIPLIKATIV slammer-stakning, et andet stakningsmønster).
+            const seriesMult = 1 + (this._gs?.seriesBonus(cap.def?.series) ?? 0);
+            const capChain   = [...positionChain, ...(rarityMult > 1 ? [rarityMult] : []), ...(holoMult > 1 ? [holoMult] : []), ...(roundMult !== 1 ? [roundMult] : []), ...(seriesMult > 1 ? [seriesMult] : [])];
             const capScore   = Math.floor(((baseValue ?? 1) + (bonus ?? 0) + roundBonus + carry + flatSlammerBonus + voltage) * (localMultiplier ?? 1) * roundMult);
-            const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult * holoMult);
+            const finalScore = Math.floor(capScore * finalGlobalMult * rarityMult * holoMult * seriesMult);
             return { cap, capScore, finalScore, effectMeta: effectMeta ?? null, chain: capChain, carry, destroySelf: !!destroySelf, grantCaps: grantCaps ?? [] };
         });
         // Rarity Multiplier-feedback: én badge pr. UNIK rarity der rent faktisk

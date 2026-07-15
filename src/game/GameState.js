@@ -1,4 +1,5 @@
 import { CAP_DEFS, SLAMMER_DEFS, CARD_PRICE_GROWTH, MAX_OWNED_SLAMMERS, MAX_OWNED_CAPS } from '../config/constants.js';
+import { BINDER_TIERS } from '../config/binderDefs.js';
 import { getLoopThresholds, getBossClearScore, SHOP_PRICE_START_DISCOUNT, SHOP_PRICE_GROWTH_PER_NODE, SHOP_PRICE_MAX_MULT, SHOP_ENCHANT_BASE_CHANCE } from '../config/mapData.js';
 import { TRICK_SHOTS } from '../config/trickShotDefs.js';
 import { BOSS_DEFS } from '../config/bossDefs.js';
@@ -14,6 +15,7 @@ export class GameState {
         this.stackSizeLimit = 10;
         this.ownedCaps      = [];
         this.ownedSlammers  = [];
+        this.ownedBinders   = []; // { series, tier, value } — ubegrænset, run-scoped (se startRun())
         this._loop          = 1;
         this._nextCapId     = 0; // monotonically increasing — unique per owned cap instance
         this._rerollCostBase   = 1;
@@ -67,6 +69,7 @@ export class GameState {
         // passer perfekt som en "neutral" starter. Fremtidig idé: karaktervalg
         // med egne startere — se docs/slammer-passives-draft.md.
         this.ownedSlammers  = [];
+        this.ownedBinders   = [];
         const starterSlammer = SLAMMER_DEFS.find(s => s.name === 'Regal Pug');
         if (starterSlammer) this.addSlammer(starterSlammer);
         this.runNodes       = this._generateNodes(1);
@@ -223,6 +226,32 @@ export class GameState {
         this.score += entry.sellPrice ?? 0;
         if (entry.passive?.type === 'stackSize') this.stackSizeLimit -= entry.passive.value;
         this.ownedSlammers = this.ownedSlammers.filter(s => s.name !== name);
+    }
+
+    // ─── BINDERS ── passivt, altid-aktivt per-serie score-multiplier-samler
+    // (se binderDefs.js). INGEN loft (i modsætning til addSlammer()/
+    // canAddSlammer()) — bevidst ubegrænset array.
+    addBinder(series, tier) {
+        const def = BINDER_TIERS[tier];
+        if (!def) return false;
+        this.ownedBinders.push({ series, tier, value: def.value });
+        return true;
+    }
+
+    // Summeret bonus for én serie — ADDITIV på tværs af ALLE ejede binders der
+    // matcher, uanset tier/duplikater. Bruges af RoundManager (seriesMult =
+    // 1 + seriesBonus(cap.def.series)) og HUD-chip-rækken (UIManager).
+    seriesBonus(series) {
+        return this.ownedBinders
+            .filter(b => b.series === series)
+            .reduce((sum, b) => sum + b.value, 0);
+    }
+
+    // Unikke serier med ≥1 ejet binder + deres samlede bonus — til HUD-chip-
+    // rækken (én chip pr. serie, ikke pr. binder).
+    get ownedBinderSeries() {
+        const series = [...new Set(this.ownedBinders.map(b => b.series))];
+        return series.map(s => ({ series: s, bonus: this.seriesBonus(s) }));
     }
 
     // ─── CONSUMABLES ──────────────────────────────────────────────────────────
