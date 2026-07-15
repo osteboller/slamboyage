@@ -173,7 +173,7 @@
                 <div class="help-icon">🔄</div>
                 <div>
                     <strong>Rounds</strong>
-                    <p>You have <strong>3 throws</strong> per round. Between throws, caps are restacked — tap anywhere to confirm and continue.</p>
+                    <p>You start with <strong>3 throws</strong> per round — some cards and bonuses can grant extra ones. Between throws, caps are restacked — tap anywhere to confirm and continue.</p>
                 </div>
             </div>
 
@@ -195,10 +195,10 @@
             </div>
 
             <div class="help-section">
-                <div class="help-icon">🃏</div>
+                <div class="help-icon">📘</div>
                 <div>
-                    <strong>Cards</strong>
-                    <p>Consumable cards sit in slots next to your score. Tap a filled slot to see what it does and use it — most only work in specific places (battle, shop, map), shown right on the card.</p>
+                    <strong>Binders</strong>
+                    <p>A binder is a passive collectible tied to one cap series — owning one permanently boosts the score multiplier for every cap from that series. Unlike slammers, binders have no limit: own several for the same series and their bonuses stack. Find them in Binder Packs (or a Mystery Pack) in the shop.</p>
                 </div>
             </div>
 
@@ -207,6 +207,62 @@
                 <div>
                     <strong>Bag</strong>
                     <p>Open the Bag to see your caps, slammers and cards — and to equip a different slammer.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">🃏</div>
+                <div>
+                    <strong>Cards</strong>
+                    <p>Consumable cards sit in slots next to your score. Tap a filled slot to see what it does and use it — most only work in specific places (battle, shop, map), shown right on the card.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">🗺️</div>
+                <div>
+                    <strong>Map &amp; Nodes</strong>
+                    <p>The map is a path of nodes — battles, chests, and other events. Each battle node has a score goal to reach across your 3 throws; fall short and the run ends. Clear enough nodes and you'll reach the boss.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">🏹</div>
+                <div>
+                    <strong>Trick Shot</strong>
+                    <p>Some nodes are Trick Shots — a single throw with a specific criteria to meet (like landing a certain cap face-up) instead of a score goal.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">👹</div>
+                <div>
+                    <strong>Boss Battles</strong>
+                    <p>Each boss has its own gimmick that changes the rules for that fight — check the boss info banner in battle to see what you're up against. Beating a boss opens its own boss shop.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">🛒</div>
+                <div>
+                    <strong>Shop</strong>
+                    <p>Spend the ★ you earn from flipping caps in the shop — buy caps straight off the shelf, or open sealed packs for a chance at cards, slammers, binders, and more.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">✨</div>
+                <div>
+                    <strong>Enchants</strong>
+                    <p>A holographic cap front means that cap is enchanted — it has a bonus effect layered on top of its normal ability. Tap it to see exactly what the enchant does.</p>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <div class="help-icon">♻️</div>
+                <div>
+                    <strong>Loops</strong>
+                    <p>Clearing the whole map doesn't end the run — it loops back around at a higher difficulty, with better rewards to match.</p>
                 </div>
             </div>
         </div>
@@ -243,7 +299,7 @@
     </div>
 
     <!-- Consumable popup -->
-    <div id="consumable-popup" style="display:none">
+    <div id="consumable-popup">
         <div id="consumable-popup-inner">
             <div id="consumable-popup-top">
                 <div id="consumable-popup-header">
@@ -326,6 +382,13 @@
     <div id="power-container">
         <div id="power-mask"></div>
     </div>
+
+    <!-- Binder HUD — persistent per-serie multiplier-chip-række, én chip pr.
+         serie spilleren ejer ≥1 binder for, placeret til højre for power-
+         baren. Rendered via UIManager.renderSeriesMultChips() (fuld-refresh,
+         kaldes ved battle-entry) — IKKE en transient badge som
+         #slammer-badge-stack, forbliver synlig hele kampen. -->
+    <div id="series-mult-chips" style="display:none"></div>
 
     <!-- ── Rotate overlay ───────────────────────────────────────────────── -->
     <div id="rotate-overlay">
