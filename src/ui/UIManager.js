@@ -973,6 +973,19 @@ export class UIManager {
             this._toggleOverlay('Caps in stack', this._remainingDefs, false, e.currentTarget, overlay);
         });
 
+        // Bindes ÉN gang her (IKKE inde i _toggleOverlay(), som kaldes hver gang
+        // overlayet åbnes) — #cap-overlay-dots er et permanent element (kun dets
+        // innerHTML skiftes), så en bindTapSelect() pr. åbning ville stable nye
+        // lyttere oven på de gamle for evigt, uden nogen fjernes. Efter N
+        // åbninger fyrede ét klik derfor handleren N gange (hørt som flere
+        // overlappende detail_open-lyde) — this._activeOverlayDefs opdateres af
+        // _toggleOverlay() ved hver åbning, så handleren her altid læser den
+        // AKTUELT viste liste, uanset hvornår den blev bundet.
+        const dotsEl = document.getElementById('cap-overlay-dots');
+        bindTapSelect(dotsEl, '.cap-thumb', el => {
+            this._showCapDetail(this._activeOverlayDefs[+el.dataset.idx], el.dataset.lit === 'true');
+        });
+
         const bagBtn = document.getElementById('bag-btn');
         if (bagBtn) {
             bagBtn.addEventListener('click', (e) => {
@@ -1029,6 +1042,9 @@ export class UIManager {
             return;
         }
         overlay.dataset.anchor = anchorEl.id;
+        // Læst af den ÉN-gangs-bundne tap-lytter i _buildPileOverlay() — se dens
+        // kommentar for hvorfor bindTapSelect() ikke længere kaldes herfra.
+        this._activeOverlayDefs = defs;
 
         document.getElementById('cap-overlay-title').textContent =
             title + (defs.length === 0 ? ' — ingen endnu' : ` (${defs.length})`);
@@ -1074,15 +1090,6 @@ export class UIManager {
                     background:${hex};opacity:${lit ? 1 : 0.55};
                     border:2px solid rgba(255,255,255,0.15)"></span>`;
         }).join('');
-
-        // bindTapSelect i stedet for rå pointerdown — #cap-overlay-dots scroller
-        // (overflow-y:auto) når der er mange caps, og et rent pointerdown-tryk
-        // fyrer FØR en scroll-gestus kan skelnes fra et tap, så et forsøg på at
-        // scrolle forbi en cap åbnede den med det samme. Samme rodårsag/fix som
-        // pause-panel og Mystixx-cap-vælgeren (se dem for referencen).
-        bindTapSelect(dotsEl, '.cap-thumb', el => {
-            this._showCapDetail(defs[+el.dataset.idx], el.dataset.lit === 'true');
-        });
 
         const rect = anchorEl.getBoundingClientRect();
         if (rect.top < window.innerHeight / 2) {
